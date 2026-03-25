@@ -1,0 +1,448 @@
+:imagesdir: images
+
+[[section-dev-agent-architecture]]
+== Snif Architecture
+
+This document defines the target architecture for *Snif*, a repository-aware merge request review agent. It translates the product and research discussion from `clever-sniffing-spark.md` into an implementation-grade architecture.
+
+=== Purpose
+
+The goal of Snif is not to be a generic "AI reviewer." The goal is to build a controlled review system that:
+
+* understands repository-specific conventions and architecture
+* stays quiet on clean merge requests
+* produces only high-signal findings with evidence and impact
+* can be measured, tuned, and operated professionally
+
+Phase 1 is intentionally narrow:
+
+* one command: `review`
+* one primary use case: GitLab merge request review
+* one primary architecture: single-agent review with deterministic context assembly
+
+=== Architectural Drivers
+
+|===
+| Driver | Why it matters
+
+| High precision
+| A noisy reviewer will be disabled quickly, regardless of model quality.
+
+| Predictable context
+| Review quality depends more on context quality than on prompt wording alone.
+
+| Operational control
+| The team must own configuration, filtering, comment lifecycle, and evaluation.
+
+| Low infrastructure burden
+| Phase 1 should not require a vector database, graph service, or complex indexing stack.
+
+| Evolvability
+| The architecture must support later upgrades such as structural indexing, multi-agent review, and semantic retrieval without rework of the core pipeline.
+|===
+
+=== Chosen Architectural Style
+
+Snif follows a *layered modular monolith* architecture with *ports and adapters* at the system boundary and a *pipeline orchestrator* at the application core.
+
+This is the best fit for Phase 1 because it keeps the system easy to reason about while isolating external dependencies.
+
+*Core design patterns:*
+
+* *Pipeline Orchestrator* for the review flow
+* *Ports and Adapters* for GitLab, OpenCode, filesystem, and configuration
+* *Strategy Pattern* for context retrieval and later retrieval upgrades
+* *Policy-based Filtering* for confidence, evidence, impact, and suppression rules
+
+This is explicitly *not* a microservice architecture, event-driven architecture, or RAG platform in Phase 1.
+
+=== High-Level System Context
+
+Snif sits between GitLab merge requests and the LLM execution engine.
+
+|===
+| External System | Role
+
+| GitLab
+| Source of MR metadata, diff, changed files, and comment/discussion APIs.
+
+| Repository Filesystem
+| Source of conventions, changed files, and related code context.
+
+| OpenCode
+| Execution engine used to run the assembled prompt against a configured model.
+
+| Internal AI Endpoint
+| OpenAI-compatible model provider used by OpenCode.
+
+| CI Runner / Local CLI
+| Runtime environment that invokes `snif review`.
+|===
+
+=== Core Design Decisions
+
+==== 1. Single-Agent Review in Phase 1
+
+Phase 1 uses one review agent for the entire merge request.
+
+Rationale:
+
+* merge request review is cross-file reasoning
+* splitting early introduces coordination overhead and false positives
+* the main bottleneck is context quality, not parallelism
+
+Multi-agent review is deferred until the single-agent baseline is proven and measured.
+
+==== 2. Deterministic, Diff-First Context Retrieval
+
+Phase 1 context assembly is deterministic and structure-aware.
+
+Retrieval order:
+
+1. merge request metadata
+2. project conventions
+3. unified diff
+4. full changed files
+5. related files derived from imports, tests, and shared types
+
+This is the primary architectural decision for review quality. The system begins from code relationships that are explicit and testable.
+
+Rejected for Phase 1:
+
+* vector database
+* embeddings pipeline
+* persistent knowledge graph service
+* semantic search as the primary retrieval mechanism
+
+These may help later, but they add operational cost and retrieval ambiguity before the baseline is validated.
+
+==== 3. OpenCode as Execution Layer, Not as System Owner
+
+Snif owns:
+
+* context selection
+* prompt construction
+* response schema
+* filtering
+* GitLab comment handling
+* evaluation
+
+OpenCode owns:
+
+* model invocation
+* tool execution
+* provider compatibility
+
+This separation preserves architectural control while avoiding low-value reinvention.
+
+==== 4. Evaluation-Driven Delivery
+
+Prompt or retrieval changes are not shipped based on intuition. They are shipped only if the evaluation harness remains above the defined thresholds for:
+
+* precision
+* recall
+* noise rate
+
+This is a core architectural constraint, not an afterthought.
+
+==== 5. Comment Lifecycle is a First-Class Capability
+
+GitLab output is not "post comments and forget them."
+
+Snif must support:
+
+* idempotent re-runs
+* fingerprinted findings
+* stale comment resolution
+* feedback signal capture
+
+Without this, the system cannot remain trustworthy across multiple MR updates.
+
+=== Building Blocks
+
+==== Level 1
+
+|===
+| Component | Responsibility
+
+| CLI Application
+| Entry point that coordinates commands such as `review` and `eval`.
+
+| Application Core
+| Review orchestration, policy enforcement, and command flow.
+
+| Context Subsystem
+| Builds deterministic review context from GitLab and repository files.
+
+| Prompt Subsystem
+| Produces structured prompts and output schemas for the model.
+
+| Execution Adapter
+| Invokes OpenCode with generated runtime configuration.
+
+| Output Subsystem
+| Parses findings, filters them, fingerprints them, and posts to GitLab.
+
+| Evaluation Subsystem
+| Runs benchmark fixtures and computes precision, recall, and noise rate.
+|===
+
+==== Level 2
+
+|===
+| Module | Responsibility | Pattern
+
+| `config`
+| Parse `.dev-agent.json`, merge with env vars, validate settings
+| Configuration Adapter
+
+| `commands`
+| CLI entry points for `review` and `eval`
+| Application Service
+
+| `context::builder`
+| Assemble the review context package
+| Orchestrator
+
+| `context::budget`
+| Enforce deterministic token budgets
+| Policy Object
+
+| `context::diff_parser`
+| Parse unified diff structure and changed hunks
+| Parser
+
+| `context::related_files`
+| Resolve imports, tests, and shared types
+| Retrieval Strategy
+
+| `context::index`
+| Optional lightweight structural index for later retrieval upgrades
+| Local Read Model
+
+| `prompts`
+| Render system prompt, user prompt, and JSON schema
+| Template Layer
+
+| `execution::opencode`
+| Generate runtime config and call OpenCode
+| Adapter
+
+| `output::parser`
+| Parse structured LLM output into findings
+| Translator
+
+| `output::filter`
+| Enforce confidence, evidence, impact, ignore, and suppression rules
+| Policy Engine
+
+| `output::fingerprint`
+| Create stable finding fingerprints
+| Identity Service
+
+| `output::gitlab`
+| Fetch MR data, post comments, resolve stale discussions
+| Adapter
+
+| `eval`
+| Execute fixed fixtures and compute quality metrics
+| Test Harness
+|===
+
+=== Runtime Flow: `review`
+
+1. CLI starts `snif review`.
+2. Config loader reads `.dev-agent.json` and required env vars.
+3. GitLab adapter fetches MR metadata, diff, labels, and changed files.
+4. Context builder loads conventions and changed file contents.
+5. Related-file retrieval resolves direct imports, tests, and shared types.
+6. Budget policy trims context deterministically and records omitted files.
+7. Prompt subsystem renders system prompt, user prompt, and output schema.
+8. OpenCode adapter generates runtime config and executes the review.
+9. Output parser converts model output into internal findings.
+10. Filter policy drops findings that fail confidence or lack:
+* violated invariant
+* evidence in the diff
+* impact if left unfixed
+11. Fingerprinting identifies stable findings across runs.
+12. GitLab adapter compares current findings to prior bot comments.
+13. New findings are posted; stale findings are resolved.
+14. Metrics and run metadata are logged for later analysis.
+
+=== Runtime Flow: `eval`
+
+1. CLI starts `snif eval`.
+2. Fixture loader reads benchmark merge request fixtures.
+3. For each fixture, the system runs the same context, prompt, execution, and filtering path as production review.
+4. Output is compared with expected findings or expected silence.
+5. Precision, recall, and noise rate are calculated.
+6. The run fails if the quality gates are not met.
+
+This ensures prompt tuning and retrieval changes are evaluated against a stable benchmark.
+
+=== Context Retrieval Architecture
+
+==== Phase 1 Retrieval Model
+
+The retrieval model is *deterministic first*:
+
+* start from the diff
+* expand through direct structural relationships
+* stop at the configured budget
+
+Ranking priority:
+
+1. MR metadata
+2. conventions
+3. diff
+4. full changed files
+5. direct imports
+6. corresponding tests
+7. shared types
+
+This makes context selection explainable and reproducible.
+
+==== Phase 1.5 Retrieval Upgrade
+
+If deterministic retrieval is insufficient, add a lightweight structural repository index:
+
+* file import graph
+* symbol export/import map
+* test-to-source mapping
+* module ownership hints
+
+Storage options:
+
+* generated JSON files
+* local SQLite database
+
+This remains local, rebuildable, and operationally simple.
+
+==== Phase 3 Semantic Retrieval
+
+Embeddings are a later enhancement, not a Phase 1 dependency.
+
+If added, semantic retrieval is used only for secondary tasks such as:
+
+* analogous-code lookup
+* fallback retrieval where structural links are weak
+* broader repository pattern matching
+
+Structural retrieval remains primary for MR review.
+
+=== Deployment and Operations
+
+==== Runtime Environments
+
+|===
+| Environment | Purpose
+
+| Local CLI
+| Developer-driven review and evaluation runs
+
+| GitLab CI
+| Automated merge request review
+|===
+
+==== Deployment Shape
+
+Phase 1 deployment is intentionally simple:
+
+* `snif` shipped as a single Rust binary
+* OpenCode installed in the runner as execution dependency
+* provider credentials injected through environment variables
+* repository-specific review behavior configured through `.dev-agent.json`
+
+This minimizes runtime variance and CI setup complexity.
+
+=== Operational Data
+
+The system needs a small amount of operational state:
+
+* comment fingerprints
+* prior bot comment identifiers
+* evaluation fixtures
+* evaluation results
+* token and timing logs
+
+This is not a product database. It is lightweight operational metadata for correctness and tuning.
+
+=== Quality Attributes
+
+|===
+| Attribute | Architectural Response
+
+| Precision
+| Deterministic retrieval, strict filtering, evaluation gate
+
+| Maintainability
+| Modular monolith with explicit adapters and policies
+
+| Evolvability
+| Retrieval strategy separated from orchestration and execution
+
+| Observability
+| Evaluation harness, token logs, comment lifecycle data
+
+| Operational simplicity
+| Single binary, no vector infrastructure, no service mesh, no persistent graph service
+|===
+
+=== Risks and Mitigations
+
+|===
+| Risk | Impact | Mitigation
+
+| Poor review quality from weak context
+| High noise, low trust
+| Deterministic retrieval, budget rules, benchmark harness
+
+| LLM overconfidence
+| Incorrect comments
+| Require invariant + evidence + impact, then filter aggressively
+
+| Comment churn across pushes
+| Developer frustration
+| Stable fingerprints and stale-thread resolution
+
+| Premature complexity
+| Slow delivery, hard operations
+| No vector DB or graph service in Phase 1
+
+| Benchmark drift
+| Fake quality signal
+| Maintain fixed fixtures and rerun on prompt/model/retrieval changes
+|===
+
+=== Evolution Plan
+
+|===
+| Phase | Scope | Architectural Change
+
+| 1
+| Single-agent MR review
+| Deterministic context builder, filtering, GitLab lifecycle, eval harness
+
+| 1.5
+| Deeper structural retrieval
+| Add lightweight repository index
+
+| 2
+| Specialized parallel review dimensions
+| Add orchestrated sub-reviewers only if baseline is proven and justified
+
+| 3
+| Semantic retrieval and additional commands
+| Add embeddings as secondary retrieval; expand to `suggest`, `migrate`, `document`
+|===
+
+=== Recommendation
+
+Proceed with Phase 1 exactly as a controlled, deterministic review system. Do not add embeddings, a vector database, or a persistent knowledge graph before the single-agent baseline is implemented and measured.
+
+The professional path forward is:
+
+1. ship the deterministic review pipeline
+2. prove quality with the evaluation harness
+3. upgrade retrieval structurally before upgrading it semantically
+4. add multi-agent behavior only when a measured bottleneck justifies it
