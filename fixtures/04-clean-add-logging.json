@@ -1,0 +1,10 @@
+{
+  "name": "clean-add-logging",
+  "description": "Adding structured logging to existing functions. No issues should be found.",
+  "diff": "--- a/src/service.rs\n+++ b/src/service.rs\n@@ -1,8 +1,12 @@\n+use tracing::{info, debug};\n+\n pub fn handle_request(path: &str, body: &[u8]) -> Result<Vec<u8>, String> {\n+    info!(path = %path, body_len = body.len(), \"Handling request\");\n     let parsed = parse_body(body).map_err(|e| format!(\"Parse error: {}\", e))?;\n     let result = process(parsed)?;\n+    info!(result_len = result.len(), \"Request processed\");\n     Ok(result)\n }\n \n fn parse_body(body: &[u8]) -> Result<String, String> {\n+    debug!(len = body.len(), \"Parsing body\");\n     String::from_utf8(body.to_vec()).map_err(|e| e.to_string())\n }\n",
+  "files": {
+    "src/service.rs": "use tracing::{info, debug};\n\npub fn handle_request(path: &str, body: &[u8]) -> Result<Vec<u8>, String> {\n    info!(path = %path, body_len = body.len(), \"Handling request\");\n    let parsed = parse_body(body).map_err(|e| format!(\"Parse error: {}\", e))?;\n    let result = process(parsed)?;\n    info!(result_len = result.len(), \"Request processed\");\n    Ok(result)\n}\n\nfn parse_body(body: &[u8]) -> Result<String, String> {\n    debug!(len = body.len(), \"Parsing body\");\n    String::from_utf8(body.to_vec()).map_err(|e| e.to_string())\n}\n\nfn process(input: String) -> Result<Vec<u8>, String> {\n    Ok(input.into_bytes())\n}\n"
+  },
+  "conventions": null,
+  "expected_findings": []
+}

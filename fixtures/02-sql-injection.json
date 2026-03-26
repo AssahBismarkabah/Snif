@@ -1,0 +1,17 @@
+{
+  "name": "sql-injection",
+  "description": "User input concatenated directly into SQL query without parameterization",
+  "diff": "--- a/src/db.rs\n+++ b/src/db.rs\n@@ -1,5 +1,14 @@\n use rusqlite::Connection;\n \n+pub fn find_user(conn: &Connection, username: &str) -> Option<String> {\n+    let query = format!(\"SELECT email FROM users WHERE name = '{}'\", username);\n+    conn.query_row(&query, [], |row| row.get(0)).ok()\n+}\n+\n+pub fn find_user_safe(conn: &Connection, username: &str) -> Option<String> {\n+    conn.query_row(\"SELECT email FROM users WHERE name = ?1\", [username], |row| row.get(0)).ok()\n+}\n+\n pub fn get_connection() -> Connection {\n     Connection::open_in_memory().expect(\"Failed to open database\")\n }\n",
+  "files": {
+    "src/db.rs": "use rusqlite::Connection;\n\npub fn find_user(conn: &Connection, username: &str) -> Option<String> {\n    let query = format!(\"SELECT email FROM users WHERE name = '{}'\", username);\n    conn.query_row(&query, [], |row| row.get(0)).ok()\n}\n\npub fn find_user_safe(conn: &Connection, username: &str) -> Option<String> {\n    conn.query_row(\"SELECT email FROM users WHERE name = ?1\", [username], |row| row.get(0)).ok()\n}\n\npub fn get_connection() -> Connection {\n    Connection::open_in_memory().expect(\"Failed to open database\")\n}\n"
+  },
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/db.rs",
+      "start_line": 4,
+      "category": "security",
+      "description": "SQL injection via string formatting instead of parameterized query"
+    }
+  ]
+}

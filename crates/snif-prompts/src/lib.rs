@@ -24,11 +24,13 @@ pub fn render_system_prompt(config: &SnifConfig) -> String {
     prompt.push_str(
         "\nRespond with a JSON array of findings. If the change is clean \
          and you find no real issues, respond with an empty array: []\n\n\
+         Line numbers MUST refer to the line numbers in the file content \
+         provided in the Changed Files section, NOT the diff hunk headers.\n\n\
          Each finding must follow this schema:\n\
          {\n\
            \"file\": \"path/to/file\",\n\
-           \"start_line\": <number>,\n\
-           \"end_line\": <number or null>,\n\
+           \"start_line\": <line number in the file>,\n\
+           \"end_line\": <line number in the file or null>,\n\
            \"category\": \"logic\" | \"security\" | \"convention\" | \"performance\" | \"style\" | \"other\",\n\
            \"confidence\": <0.0 to 1.0>,\n\
            \"evidence\": \"<quoted code from the diff or context>\",\n\
@@ -65,7 +67,11 @@ pub fn render_user_prompt(context: &ContextPackage) -> String {
         if let Some(summary) = &file.summary {
             prompt.push_str(&format!("Summary: {}\n", summary));
         }
-        prompt.push_str(&format!("```\n{}\n```\n\n", file.content));
+        prompt.push_str("```\n");
+        for (i, line) in file.content.lines().enumerate() {
+            prompt.push_str(&format!("{:>4} | {}\n", i + 1, line));
+        }
+        prompt.push_str("```\n\n");
     }
 
     if !context.related_files.is_empty() {

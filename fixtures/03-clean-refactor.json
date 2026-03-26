@@ -1,0 +1,10 @@
+{
+  "name": "clean-refactor",
+  "description": "A clean refactoring that extracts a helper function. No issues should be found.",
+  "diff": "--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -5,10 +5,14 @@ pub fn process_items(items: &[Item]) -> Vec<Result<Output, ProcessError>> {\n     items.iter().map(|item| process_single(item)).collect()\n }\n \n-fn process_single(item: &Item) -> Result<Output, ProcessError> {\n+fn process_single(item: &Item) -> Result<Output, ProcessError> {\n+    let validated = validate_item(item)?;\n+    Ok(transform(validated))\n+}\n+\n+fn validate_item(item: &Item) -> Result<&Item, ProcessError> {\n     if item.value.is_empty() {\n-        return Err(ProcessError::EmptyValue);\n+        return Err(ProcessError::EmptyValue);\n     }\n-    let transformed = transform(item);\n-    Ok(transformed)\n+    Ok(item)\n }\n",
+  "files": {
+    "src/lib.rs": "pub struct Item { pub value: String }\npub struct Output;\n\n#[derive(Debug)]\npub enum ProcessError {\n    EmptyValue,\n}\n\npub fn process_items(items: &[Item]) -> Vec<Result<Output, ProcessError>> {\n    items.iter().map(|item| process_single(item)).collect()\n}\n\nfn process_single(item: &Item) -> Result<Output, ProcessError> {\n    let validated = validate_item(item)?;\n    Ok(transform(validated))\n}\n\nfn validate_item(item: &Item) -> Result<&Item, ProcessError> {\n    if item.value.is_empty() {\n        return Err(ProcessError::EmptyValue);\n    }\n    Ok(item)\n}\n\nfn transform(_item: &Item) -> Output { Output }\n"
+  },
+  "conventions": null,
+  "expected_findings": []
+}

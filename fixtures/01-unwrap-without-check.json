@@ -1,0 +1,17 @@
+{
+  "name": "unwrap-without-check",
+  "description": "Function calls unwrap() on an Option parameter without checking, causing a panic if None is passed",
+  "diff": "--- a/src/handler.rs\n+++ b/src/handler.rs\n@@ -10,6 +10,12 @@ use std::collections::HashMap;\n \n pub struct Config {\n     pub settings: HashMap<String, String>,\n+    pub database_url: Option<String>,\n+}\n+\n+pub fn connect_to_database(config: &Config) -> String {\n+    let url = config.database_url.unwrap();\n+    format!(\"Connecting to {}\", url)\n }\n \n pub fn get_setting(config: &Config, key: &str) -> Option<&String> {\n",
+  "files": {
+    "src/handler.rs": "use std::collections::HashMap;\n\npub struct Config {\n    pub settings: HashMap<String, String>,\n    pub database_url: Option<String>,\n}\n\npub fn connect_to_database(config: &Config) -> String {\n    let url = config.database_url.unwrap();\n    format!(\"Connecting to {}\", url)\n}\n\npub fn get_setting(config: &Config, key: &str) -> Option<&String> {\n    config.settings.get(key)\n}\n"
+  },
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/handler.rs",
+      "start_line": 9,
+      "category": "logic",
+      "description": "unwrap() on Option without checking causes panic if database_url is None"
+    }
+  ]
+}

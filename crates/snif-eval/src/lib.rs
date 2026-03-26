@@ -60,6 +60,18 @@ pub fn run_evaluation(fixtures_path: &Path, config: &SnifConfig) -> Result<EvalR
         let mut findings = snif_output::parser::parse_response(&result.response)?;
         findings = snif_output::filter::apply_filters(findings, &config.filter);
 
+        for f in &findings {
+            tracing::info!(
+                fixture = %fix.name,
+                file = %f.location.file,
+                line = f.location.start_line,
+                category = %f.category,
+                confidence = f.confidence,
+                explanation = %f.explanation,
+                "Finding"
+            );
+        }
+
         let fixture_result =
             metrics::compute_fixture_result(&fix.name, &fix.expected_findings, &findings, 5);
 

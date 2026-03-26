@@ -40,8 +40,13 @@ struct Choice {
 
 impl LlmClient {
     pub fn new(endpoint: &str, model: &str, api_key: &str) -> Self {
+        let http = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(120))
+            .build()
+            .unwrap_or_default();
+
         Self {
-            http: reqwest::Client::new(),
+            http,
             endpoint: endpoint.trim_end_matches('/').to_string(),
             model: model.to_string(),
             api_key: api_key.to_string(),
@@ -79,33 +84,56 @@ impl LlmClient {
             temperature: 0.0,
         };
 
-        let response = self
-            .http
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to send request to LLM provider")?;
+        let max_retries = 2;
+        let mut last_error = String::new();
 
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            bail!("LLM provider returned {}: {}", status, body);
+        for attempt in 0..=max_retries {
+            if attempt > 0 {
+                tracing::warn!(attempt, "Retrying LLM request after server error");
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+
+            let response = match self
+                .http
+                .post(&url)
+                .header("Authorization", format!("Bearer {}", self.api_key))
+                .header("Content-Type", "application/json")
+                .json(&request)
+                .send()
+                .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    last_error = format!("Request failed: {}", e);
+                    continue;
+                }
+            };
+
+            let status = response.status();
+            if status.is_server_error() {
+                last_error = format!("Server error {}", status);
+                continue;
+            }
+
+            if !status.is_success() {
+                let body = response.text().await.unwrap_or_default();
+                bail!("LLM provider returned {}: {}", status, body);
+            }
+
+            let chat_response: ChatResponse = response
+                .json()
+                .await
+                .context("Failed to parse LLM provider response")?;
+
+            return chat_response
+                .choices
+                .into_iter()
+                .next()
+                .map(|c| c.message.content.trim().to_string())
+                .context("LLM provider returned no choices");
         }
 
-        let chat_response: ChatResponse = response
-            .json()
-            .await
-            .context("Failed to parse LLM provider response")?;
-
-        chat_response
-            .choices
-            .into_iter()
-            .next()
-            .map(|c| c.message.content.trim().to_string())
-            .context("LLM provider returned no choices")
+        bail!("LLM request failed after {} retries: {}", max_retries, last_error)
     }
 }
 

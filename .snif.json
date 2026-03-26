@@ -1,7 +1,8 @@
 {
   "model": {
-    "review_model": "gpt-5.3-codex",
+    "review_model": "kimi-k2.5",
     "summary_model": "deepseek-v3p2",
     "endpoint": "https://api.ai.camer.digital/v1"
-  }
+  },
+  "eval_fixtures_path": "./fixtures"
 }
