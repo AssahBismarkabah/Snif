@@ -1,0 +1,6 @@
+[package]
+name = "snif-context"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

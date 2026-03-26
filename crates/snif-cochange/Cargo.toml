@@ -1,0 +1,6 @@
+[package]
+name = "snif-cochange"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

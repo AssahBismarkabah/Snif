@@ -1,0 +1,15 @@
+[package]
+name = "snif-parser"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+snif-types = { path = "../snif-types" }
+tree-sitter = { workspace = true }
+tree-sitter-rust = { workspace = true }
+tree-sitter-typescript = { workspace = true }
+tree-sitter-python = { workspace = true }
+streaming-iterator = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+walkdir = { workspace = true }

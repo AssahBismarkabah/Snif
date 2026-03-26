@@ -1,0 +1,11 @@
+[package]
+name = "snif-graph"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+snif-types = { path = "../snif-types" }
+snif-store = { path = "../snif-store" }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+sha2 = { workspace = true }

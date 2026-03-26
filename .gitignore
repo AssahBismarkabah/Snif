@@ -8,6 +8,7 @@ spikes/target/
 .idea/
 .claude/
 .conductor/
+.snif/
 
 # OS files
 .DS_Store

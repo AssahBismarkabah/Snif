@@ -1,0 +1,6 @@
+[package]
+name = "snif-retrieval"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

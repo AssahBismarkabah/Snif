@@ -1,0 +1,6 @@
+[package]
+name = "snif-embeddings"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

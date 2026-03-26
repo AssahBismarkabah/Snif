@@ -1,0 +1,19 @@
+[package]
+name = "snif"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "snif"
+path = "src/main.rs"
+
+[dependencies]
+snif-config = { path = "../snif-config" }
+snif-types = { path = "../snif-types" }
+snif-parser = { path = "../snif-parser" }
+snif-store = { path = "../snif-store" }
+snif-graph = { path = "../snif-graph" }
+clap = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
