@@ -1,0 +1,12 @@
+{
+  "name": "unwrap-without-check",
+  "description": "Function calls unwrap() on an Option parameter without checking, causing a panic if None is passed",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/handler.rs",
+      "start_line": 9,
+      "category": "logic"
+    }
+  ]
+}

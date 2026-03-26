@@ -1,0 +1,14 @@
+use rusqlite::Connection;
+
+pub fn find_user(conn: &Connection, username: &str) -> Option<String> {
+    let query = format!("SELECT email FROM users WHERE name = '{}'", username);
+    conn.query_row(&query, [], |row| row.get(0)).ok()
+}
+
+pub fn find_user_safe(conn: &Connection, username: &str) -> Option<String> {
+    conn.query_row("SELECT email FROM users WHERE name = ?1", [username], |row| row.get(0)).ok()
+}
+
+pub fn get_connection() -> Connection {
+    Connection::open_in_memory().expect("Failed to open database")
+}

@@ -1,0 +1,21 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -5,10 +5,14 @@ pub fn process_items(items: &[Item]) -> Vec<Result<Output, ProcessError>> {
+     items.iter().map(|item| process_single(item)).collect()
+ }
+ 
+-fn process_single(item: &Item) -> Result<Output, ProcessError> {
++fn process_single(item: &Item) -> Result<Output, ProcessError> {
++    let validated = validate_item(item)?;
++    Ok(transform(validated))
++}
++
++fn validate_item(item: &Item) -> Result<&Item, ProcessError> {
+     if item.value.is_empty() {
+-        return Err(ProcessError::EmptyValue);
++        return Err(ProcessError::EmptyValue);
+     }
+-    let transformed = transform(item);
+-    Ok(transformed)
++    Ok(item)
+ }

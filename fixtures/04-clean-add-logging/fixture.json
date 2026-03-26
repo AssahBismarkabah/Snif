@@ -1,0 +1,6 @@
+{
+  "name": "clean-add-logging",
+  "description": "Adding structured logging to existing functions. No issues should be found.",
+  "conventions": null,
+  "expected_findings": []
+}

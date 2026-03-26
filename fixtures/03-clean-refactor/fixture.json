@@ -1,0 +1,6 @@
+{
+  "name": "clean-refactor",
+  "description": "A clean refactoring that extracts a helper function. No issues should be found.",
+  "conventions": null,
+  "expected_findings": []
+}

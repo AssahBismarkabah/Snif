@@ -1,0 +1,6 @@
+{
+  "name": "style-noise",
+  "description": "Code with inconsistent naming and formatting. Style-only issues that must NOT be flagged.",
+  "conventions": null,
+  "expected_findings": []
+}

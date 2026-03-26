@@ -1,0 +1,12 @@
+{
+  "name": "sql-injection",
+  "description": "User input concatenated directly into SQL query without parameterization",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/db.rs",
+      "start_line": 4,
+      "category": "security"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+--- a/src/handler.rs
++++ b/src/handler.rs
+@@ -10,6 +10,12 @@ use std::collections::HashMap;
+ 
+ pub struct Config {
+     pub settings: HashMap<String, String>,
++    pub database_url: Option<String>,
++}
++
++pub fn connect_to_database(config: &Config) -> String {
++    let url = config.database_url.unwrap();
++    format!("Connecting to {}", url)
+ }
+ 
+ pub fn get_setting(config: &Config, key: &str) -> Option<&String> {
