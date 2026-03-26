@@ -1,37 +1,41 @@
 # Snif
 
-Snif is a code review agent that runs inside your CI pipeline. It reads a pull request, assembles repository context, runs a single structured LLM review, and posts only findings that are specific, evidenced, and actionable.
+Snif is a repository-aware code review agent. It reads a code change, assembles
+context from the repository, runs a single structured review through an LLM, and
+posts only findings that are specific, evidenced, and actionable.
 
-Most AI reviewers treat every codebase the same. They read a narrow slice of context, apply a generic prompt, and produce noisy output that developers learn to ignore. Snif solves this by treating context assembly, output filtering, and annotation lifecycle as engineering problems — not prompt problems.
+Most AI review tools treat every codebase the same way. They read a narrow slice
+of context, apply a generic prompt, and return output that is noisy, obvious, or
+weakly justified. Developers learn to ignore that output quickly. Snif treats
+this as a systems problem rather than a prompt problem, and solves it by owning
+the full pipeline: context assembly, output filtering, annotation lifecycle, and
+evaluation.
 
-## How It Works
+Snif ships as a single Rust binary. It is designed to run inside CI pipelines
+triggered by pull request or merge request events, but can also be invoked
+locally from the terminal with `snif review`. The core is platform-agnostic.
+GitLab, GitHub, and future platforms are integration adapters, not product
+boundaries.
 
-Snif ships as a single Rust binary. It runs in three environments:
+A review run loads repository configuration from `.snif.json` and credentials
+from environment variables, fetches the change metadata and diff from the
+platform adapter, assembles deterministic context from conventions, changed
+files, imports, tests, and shared types, executes a single structured review
+through OpenCode, filters findings aggressively, and posts surviving findings as
+inline comments while resolving stale ones from prior runs.
 
-- **CI pipelines** — triggered by GitLab CI, GitHub Actions, or any CI system on PR/MR events
-- **Platform webhooks** — triggered directly by GitHub or GitLab on change events
-- **Local CLI** — `snif review` from a developer's terminal
+Snif is quiet on clean changes. No output is a success, not a miss. Reruns are
+idempotent — stable finding fingerprints prevent comment churn across pushes.
+Prompt, model, and retrieval changes must pass a fixed evaluation harness before
+shipping.
 
-A review run follows a fixed pipeline:
+The quality targets for Phase 1 are at least 80% precision, at least 60% recall,
+a noise rate under 10%, and review completion within 120 seconds.
 
-1. Load repo config and credentials from environment
-2. Fetch change metadata and diff from the platform adapter
-3. Assemble deterministic context: conventions, changed files, imports, tests, shared types
-4. Execute a single structured review through OpenCode
-5. Filter findings aggressively — reject anything speculative, style-only, or weakly evidenced
-6. Post surviving findings as inline comments; resolve stale ones from prior runs
 
-## Key Properties
+# Status
 
-- **Quiet on clean changes.** No output is a success, not a miss.
-- **Idempotent reruns.** Stable finding fingerprints prevent comment churn across pushes.
-- **Platform-agnostic core.** GitLab, GitHub, and future platforms are integration adapters, not product boundaries.
-- **Benchmark-gated.** Prompt, model, and retrieval changes must pass a fixed evaluation harness before shipping.
-
-## Quality Targets
-
-Snif targets at least 80% precision, 60% recall, a noise rate under 10%, and review completion within 120 seconds. These are validated against a fixed benchmark harness before any prompt, model, or retrieval change ships.
-
-## Status
-
-Documentation phase. Implementation has not started. See [Product](./docs/product.md) and [Architecture](./docs/architecture.md) for the full design.
+This repository is in the documentation phase. Implementation has not started.
+See the [Product](./docs/product.md) document for scope, delivery plan, and
+success criteria. See the [Architecture](./docs/architecture.md) document for
+the technical design.
