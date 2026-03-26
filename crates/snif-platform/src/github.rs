@@ -2,6 +2,9 @@ use crate::PlatformAdapter;
 use anyhow::{bail, Context, Result};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
+const FINGERPRINT_MARKER: &str = "<!-- snif:fingerprint:";
+const BOT_MARKER: &str = "<!-- snif:review -->";
+
 pub struct GitHubAdapter {
     token: String,
     owner: String,
@@ -67,6 +70,34 @@ impl GitHubAdapter {
 
         Ok(response)
     }
+
+    fn format_finding_body(finding: &Finding) -> String {
+        let fingerprint_tag = finding
+            .fingerprint
+            .as_ref()
+            .map(|fp| format!("{}{} -->", FINGERPRINT_MARKER, fp.id))
+            .unwrap_or_default();
+
+        format!(
+            "{}\n{}\n\
+             **[{}]** (confidence: {:.0}%)\n\n\
+             {}\n\n\
+             **Impact:** {}\n\n\
+             **Evidence:**\n```\n{}\n```\
+             {}\n",
+            BOT_MARKER,
+            fingerprint_tag,
+            finding.category,
+            finding.confidence * 100.0,
+            finding.explanation,
+            finding.impact,
+            finding.evidence,
+            finding
+                .suggestion
+                .as_ref()
+                .map_or(String::new(), |s| format!("\n\n**Suggestion:** {}", s))
+        )
+    }
 }
 
 impl PlatformAdapter for GitHubAdapter {
@@ -108,36 +139,36 @@ impl PlatformAdapter for GitHubAdapter {
         let response = self.get(&format!("pulls/{}", self.pr_number))?;
         let pr: serde_json::Value = response.json()?;
 
-        let title = pr.get("title")
+        let title = pr
+            .get("title")
             .and_then(serde_json::Value::as_str)
             .map(String::from);
 
-        let author = pr.get("user")
+        let author = pr
+            .get("user")
             .and_then(|u: &serde_json::Value| u.get("login"))
             .and_then(serde_json::Value::as_str)
             .map(String::from);
 
-        let base_branch = pr.get("base")
+        let base_branch = pr
+            .get("base")
             .and_then(|b: &serde_json::Value| b.get("ref"))
             .and_then(serde_json::Value::as_str)
             .map(String::from);
 
-        Ok(ChangeMetadata { title, author, base_branch })
+        Ok(ChangeMetadata {
+            title,
+            author,
+            base_branch,
+        })
     }
 
     fn post_findings(&self, findings: &[Finding]) -> Result<()> {
         for finding in findings {
+            let comment_body = Self::format_finding_body(finding);
+
             let body = serde_json::json!({
-                "body": format!(
-                    "**[{}]** {} (confidence: {:.0}%)\n\n{}\n\n**Impact:** {}\n\n**Evidence:**\n```\n{}\n```{}",
-                    finding.category,
-                    finding.explanation,
-                    finding.confidence * 100.0,
-                    finding.explanation,
-                    finding.impact,
-                    finding.evidence,
-                    finding.suggestion.as_ref().map_or(String::new(), |s| format!("\n\n**Suggestion:** {}", s))
-                ),
+                "body": comment_body,
                 "commit_id": serde_json::Value::Null,
                 "path": finding.location.path,
                 "line": finding.location.start_line,
@@ -173,12 +204,113 @@ impl PlatformAdapter for GitHubAdapter {
     }
 
     fn get_prior_fingerprints(&self) -> Result<Vec<Fingerprint>> {
-        // TODO: fetch prior bot comments and extract fingerprints
-        Ok(vec![])
+        let response = self.get(&format!("pulls/{}/comments", self.pr_number))?;
+        let comments: Vec<serde_json::Value> = response.json()?;
+
+        let mut fingerprints = Vec::new();
+        for comment in &comments {
+            let body = match comment.get("body").and_then(serde_json::Value::as_str) {
+                Some(b) => b,
+                None => continue,
+            };
+
+            // Only process comments posted by snif
+            if !body.contains(BOT_MARKER) {
+                continue;
+            }
+
+            // Extract fingerprint from marker
+            if let Some(start) = body.find(FINGERPRINT_MARKER) {
+                let after = &body[start + FINGERPRINT_MARKER.len()..];
+                if let Some(end) = after.find(" -->") {
+                    let fp_id = after[..end].trim().to_string();
+                    if !fp_id.is_empty() {
+                        fingerprints.push(Fingerprint { id: fp_id });
+                    }
+                }
+            }
+        }
+
+        tracing::info!(count = fingerprints.len(), "Fetched prior fingerprints");
+        Ok(fingerprints)
     }
 
-    fn resolve_stale(&self, _stale: &[Fingerprint]) -> Result<()> {
-        // TODO: resolve stale bot comments
+    fn resolve_stale(&self, stale: &[Fingerprint]) -> Result<()> {
+        if stale.is_empty() {
+            return Ok(());
+        }
+
+        // Fetch all comments to find the ones matching stale fingerprints
+        let response = self.get(&format!("pulls/{}/comments", self.pr_number))?;
+        let comments: Vec<serde_json::Value> = response.json()?;
+
+        let stale_ids: Vec<&str> = stale.iter().map(|fp| fp.id.as_str()).collect();
+
+        for comment in &comments {
+            let body = match comment.get("body").and_then(serde_json::Value::as_str) {
+                Some(b) => b,
+                None => continue,
+            };
+
+            if !body.contains(BOT_MARKER) {
+                continue;
+            }
+
+            // Check if this comment's fingerprint is in the stale list
+            let is_stale = if let Some(start) = body.find(FINGERPRINT_MARKER) {
+                let after = &body[start + FINGERPRINT_MARKER.len()..];
+                if let Some(end) = after.find(" -->") {
+                    let fp_id = after[..end].trim();
+                    stale_ids.contains(&fp_id)
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            if is_stale {
+                // Post a reply indicating the issue is resolved
+                if let Some(comment_id) = comment.get("id").and_then(serde_json::Value::as_i64) {
+                    let reply_body = serde_json::json!({
+                        "body": format!(
+                            "{}\n\n:white_check_mark: **Resolved** — this issue is no longer present in the current change.",
+                            BOT_MARKER
+                        ),
+                    });
+
+                    let url = self.api_url(&format!(
+                        "pulls/{}/comments/{}/replies",
+                        self.pr_number, comment_id
+                    ));
+
+                    match self
+                        .http
+                        .post(&url)
+                        .header("Authorization", format!("Bearer {}", self.token))
+                        .header("Accept", "application/vnd.github.v3+json")
+                        .header("User-Agent", "snif-review-agent")
+                        .json(&reply_body)
+                        .send()
+                    {
+                        Ok(r) if r.status().is_success() => {
+                            tracing::info!(comment_id, "Resolved stale finding");
+                        }
+                        Ok(r) => {
+                            tracing::warn!(
+                                comment_id,
+                                status = %r.status(),
+                                "Failed to resolve stale finding"
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!(comment_id, error = %e, "Failed to resolve stale finding");
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 }

@@ -22,6 +22,7 @@ snif-prompts = { path = "../snif-prompts" }
 snif-execution = { path = "../snif-execution" }
 snif-output = { path = "../snif-output" }
 snif-platform = { path = "../snif-platform" }
+snif-eval = { path = "../snif-eval" }
 clap = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }

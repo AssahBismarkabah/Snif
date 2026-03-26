@@ -44,8 +44,16 @@ enum Commands {
         diff_file: Option<String>,
     },
 
-    /// Run the evaluation harness
-    Eval,
+    /// Run the evaluation harness against benchmark fixtures
+    Eval {
+        /// Path to fixtures directory
+        #[arg(long)]
+        fixtures: String,
+
+        /// Path to the repository root (for config loading)
+        #[arg(long, default_value = ".")]
+        path: String,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -67,8 +75,8 @@ fn main() -> anyhow::Result<()> {
         } => {
             commands::review::run(&path, repo.as_deref(), pr, diff_file.as_deref())?;
         }
-        Commands::Eval => {
-            commands::eval::run()?;
+        Commands::Eval { fixtures, path } => {
+            commands::eval::run(&path, &fixtures)?;
         }
     }
 

@@ -4,3 +4,11 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+snif-types = { path = "../snif-types" }
+snif-embeddings = { path = "../snif-embeddings" }
+snif-config = { path = "../snif-config" }
+rusqlite = { workspace = true }
+sqlite-vec = { workspace = true }
+zerocopy = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }

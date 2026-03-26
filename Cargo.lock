@@ -2504,6 +2504,7 @@ dependencies = [
  "snif-config",
  "snif-context",
  "snif-embeddings",
+ "snif-eval",
  "snif-execution",
  "snif-graph",
  "snif-output",
@@ -2561,6 +2562,18 @@ dependencies = [
 [[package]]
 name = "snif-eval"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "snif-config",
+ "snif-execution",
+ "snif-output",
+ "snif-prompts",
+ "snif-types",
+ "tracing",
+ "walkdir",
+]
 
 [[package]]
 name = "snif-execution"
@@ -2578,6 +2591,16 @@ dependencies = [
 [[package]]
 name = "snif-feedback"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "rusqlite",
+ "snif-config",
+ "snif-embeddings",
+ "snif-types",
+ "sqlite-vec",
+ "tracing",
+ "zerocopy 0.7.35",
+]
 
 [[package]]
 name = "snif-graph"

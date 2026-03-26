@@ -114,13 +114,33 @@ pub fn run(
         println!("{}", json);
     }
 
-    // If GitHub adapter is available, post findings as PR comments
+    // If GitHub adapter is available, manage annotation lifecycle
     if let (Some(repo_str), Some(pr_num)) = (repo, pr) {
         let parts: Vec<&str> = repo_str.splitn(2, '/').collect();
         if parts.len() == 2 {
             let adapter = snif_platform::github::GitHubAdapter::new(parts[0], parts[1], pr_num)?;
+
+            // Fetch prior findings for lifecycle management
+            let prior = adapter.get_prior_fingerprints()?;
+
+            // Post new findings
             adapter.post_findings(&findings)?;
-            tracing::info!("Findings posted to GitHub PR");
+            tracing::info!(posted = findings.len(), "Findings posted to GitHub PR");
+
+            // Resolve stale findings (present before, absent now)
+            let current_ids: Vec<&str> = findings
+                .iter()
+                .filter_map(|f| f.fingerprint.as_ref().map(|fp| fp.id.as_str()))
+                .collect();
+            let stale: Vec<_> = prior
+                .into_iter()
+                .filter(|fp| !current_ids.contains(&fp.id.as_str()))
+                .collect();
+
+            if !stale.is_empty() {
+                tracing::info!(count = stale.len(), "Resolving stale findings");
+                adapter.resolve_stale(&stale)?;
+            }
         }
     }
 
