@@ -1,0 +1,7 @@
+{
+  "model": {
+    "review_model": "kimi-k2-instruct-0905",
+    "summary_model": "deepseek-v3p2",
+    "endpoint": "https://api.ai.camer.digital/v1"
+  }
+}

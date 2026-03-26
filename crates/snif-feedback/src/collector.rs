@@ -37,7 +37,7 @@ pub fn collect_signals(
     for signal in signals {
         let finding_text = format!(
             "{}: {} — {}",
-            signal.finding.location.path, signal.finding.explanation, signal.finding.impact
+            signal.finding.location.file, signal.finding.explanation, signal.finding.impact
         );
 
         let embedding = embedder.embed_single(&finding_text)?;

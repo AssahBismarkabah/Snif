@@ -39,7 +39,9 @@ pub fn parse_repository(
         .into_iter()
         .filter_entry(|e| {
             let name = e.file_name().to_str().unwrap_or("");
-            !name.starts_with('.') && !exclude_patterns.iter().any(|p| p == name)
+            // Allow the root directory itself, filter hidden dirs and excluded patterns
+            e.depth() == 0
+                || (!name.starts_with('.') && !exclude_patterns.iter().any(|p| p == name))
         })
     {
         let entry = entry?;

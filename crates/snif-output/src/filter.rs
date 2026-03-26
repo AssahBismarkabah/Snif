@@ -10,7 +10,7 @@ pub fn apply_filters(findings: Vec<Finding>, config: &FilterConfig) -> Vec<Findi
             // Confidence check
             if f.confidence < config.min_confidence {
                 tracing::debug!(
-                    file = %f.location.path,
+                    file = %f.location.file,
                     confidence = f.confidence,
                     "Filtered: below confidence threshold"
                 );
@@ -19,19 +19,19 @@ pub fn apply_filters(findings: Vec<Finding>, config: &FilterConfig) -> Vec<Findi
 
             // Evidence check
             if f.evidence.trim().is_empty() {
-                tracing::debug!(file = %f.location.path, "Filtered: empty evidence");
+                tracing::debug!(file = %f.location.file, "Filtered: empty evidence");
                 return false;
             }
 
             // Impact check
             if f.impact.trim().is_empty() {
-                tracing::debug!(file = %f.location.path, "Filtered: empty impact");
+                tracing::debug!(file = %f.location.file, "Filtered: empty impact");
                 return false;
             }
 
             // Style suppression
             if config.suppress_style_only && f.category == FindingCategory::Style {
-                tracing::debug!(file = %f.location.path, "Filtered: style-only");
+                tracing::debug!(file = %f.location.file, "Filtered: style-only");
                 return false;
             }
 
@@ -55,7 +55,7 @@ fn deduplicate(findings: Vec<Finding>) -> Vec<Finding> {
     for finding in findings {
         let key = format!(
             "{}:{}:{}",
-            finding.location.path, finding.location.start_line, finding.category
+            finding.location.file, finding.location.start_line, finding.category
         );
 
         if let Some(&idx) = seen.get(&key) {

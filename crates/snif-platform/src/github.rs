@@ -170,7 +170,7 @@ impl PlatformAdapter for GitHubAdapter {
             let body = serde_json::json!({
                 "body": comment_body,
                 "commit_id": serde_json::Value::Null,
-                "path": finding.location.path,
+                "path": finding.location.file,
                 "line": finding.location.start_line,
                 "side": "RIGHT",
             });
@@ -187,13 +187,13 @@ impl PlatformAdapter for GitHubAdapter {
 
             if response.status().is_success() {
                 tracing::info!(
-                    file = %finding.location.path,
+                    file = %finding.location.file,
                     line = finding.location.start_line,
                     "Posted finding"
                 );
             } else {
                 tracing::warn!(
-                    file = %finding.location.path,
+                    file = %finding.location.file,
                     status = %response.status(),
                     "Failed to post finding"
                 );

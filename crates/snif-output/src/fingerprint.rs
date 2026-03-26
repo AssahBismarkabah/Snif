@@ -10,7 +10,7 @@ pub fn compute_fingerprints(findings: &mut [Finding]) {
 
 fn compute_fingerprint(finding: &Finding) -> Fingerprint {
     let mut hasher = Sha256::new();
-    hasher.update(finding.location.path.as_bytes());
+    hasher.update(finding.location.file.as_bytes());
     hasher.update(finding.location.start_line.to_string().as_bytes());
     if let Some(end) = finding.location.end_line {
         hasher.update(end.to_string().as_bytes());

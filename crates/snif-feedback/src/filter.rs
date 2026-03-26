@@ -29,7 +29,7 @@ pub fn apply_feedback_filter(
     for mut finding in findings {
         let finding_text = format!(
             "{}: {} — {}",
-            finding.location.path, finding.explanation, finding.impact
+            finding.location.file, finding.explanation, finding.impact
         );
 
         let embedding = match embedder.embed_single(&finding_text) {
@@ -58,7 +58,7 @@ pub fn apply_feedback_filter(
 
         if dismissed_count >= 3 {
             tracing::debug!(
-                file = %finding.location.path,
+                file = %finding.location.file,
                 dismissed = dismissed_count,
                 "Feedback filter: suppressed (similar to dismissed findings)"
             );

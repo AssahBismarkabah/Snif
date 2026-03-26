@@ -9,6 +9,7 @@ spikes/target/
 .claude/
 .conductor/
 .snif/
+.fastembed_cache/
 
 # OS files
 .DS_Store

@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Finding {
+    #[serde(flatten)]
     pub location: FileLocation,
     pub category: FindingCategory,
     pub confidence: f64,
@@ -9,15 +10,21 @@ pub struct Finding {
     pub explanation: String,
     pub impact: String,
     pub suggestion: Option<String>,
+    #[serde(skip_deserializing)]
     pub fingerprint: Option<Fingerprint>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileLocation {
-    #[serde(rename = "file")]
-    pub path: String,
+    pub file: String,
     pub start_line: usize,
     pub end_line: Option<usize>,
+}
+
+impl FileLocation {
+    pub fn path(&self) -> &str {
+        &self.file
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -44,6 +44,13 @@ enum Commands {
         diff_file: Option<String>,
     },
 
+    /// Remove all local runtime data (index, cache, feedback)
+    Clean {
+        /// Path to the repository root
+        #[arg(long, default_value = ".")]
+        path: String,
+    },
+
     /// Run the evaluation harness against benchmark fixtures
     Eval {
         /// Path to fixtures directory
@@ -74,6 +81,9 @@ fn main() -> anyhow::Result<()> {
             diff_file,
         } => {
             commands::review::run(&path, repo.as_deref(), pr, diff_file.as_deref())?;
+        }
+        Commands::Clean { path } => {
+            commands::clean::run(&path)?;
         }
         Commands::Eval { fixtures, path } => {
             commands::eval::run(&path, &fixtures)?;

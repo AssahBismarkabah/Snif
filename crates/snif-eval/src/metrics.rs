@@ -38,7 +38,7 @@ pub fn compute_fixture_result(
                 continue;
             }
 
-            let path_match = actual_finding.location.path == expected_finding.file;
+            let path_match = actual_finding.location.file == expected_finding.file;
             let line_diff =
                 (actual_finding.location.start_line as i64 - expected_finding.start_line as i64).unsigned_abs() as usize;
             let line_match = line_diff <= line_tolerance;
