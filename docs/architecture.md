@@ -8,80 +8,43 @@ This is not a microservice architecture, event-driven pipeline, or multi-agent o
 
 ## System Context
 
-| External System | Role |
-|---|---|
-| Repository platform (GitLab, GitHub) | Source of change metadata, diffs, and annotation APIs |
-| Repository filesystem | Source of conventions, file contents, and related code |
-| OpenCode | LLM execution runtime |
-| CI / webhook trigger | Invokes `snif review` or `snif eval` |
+Snif sits between four external systems. The **repository platform** (GitLab, GitHub) provides change metadata, diffs, and annotation APIs. The **repository filesystem** provides conventions, file contents, and related code. **OpenCode** handles LLM execution. The **CI or webhook trigger** invokes `snif review` or `snif eval`.
 
 ## Modules
 
 ### Core Pipeline
 
-| Module | Responsibility |
-|---|---|
-| `config` | Parse `.dev-agent.json`, merge env vars, validate settings |
-| `commands` | CLI entry points and argument handling |
-| `review` | End-to-end review pipeline orchestration |
+`config` loads `.snif.json`, merges environment variables, and validates settings. `commands` handles CLI entry points and argument parsing. `review` orchestrates the end-to-end review pipeline.
 
 ### Context Assembly
 
-| Module | Responsibility |
-|---|---|
-| `context::builder` | Assemble the final context package from all sources |
-| `context::diff_parser` | Parse unified diffs into changed files and hunks |
-| `context::related_files` | Resolve imports, tests, and shared types for changed files |
-| `context::conventions` | Load repository review conventions and policies |
-| `context::budget` | Enforce token and file-count limits; record omissions |
+`context::builder` assembles the final context package from all sources. `context::diff_parser` parses unified diffs into changed files and hunks. `context::related_files` resolves imports, tests, and shared types for changed files. `context::conventions` loads repository review conventions and policies. `context::budget` enforces token and file-count limits and records what was omitted.
 
 ### Prompt and Execution
 
-| Module | Responsibility |
-|---|---|
-| `prompts` | Render system prompt, user prompt, and output schema |
-| `execution::opencode` | Generate runtime config and invoke OpenCode |
+`prompts` renders the system prompt, user prompt, and output schema. `execution::opencode` generates runtime config and invokes OpenCode.
 
 ### Output Processing
 
-| Module | Responsibility |
-|---|---|
-| `output::parser` | Translate model response into structured findings |
-| `output::filter` | Apply confidence, evidence, impact, and suppression rules |
-| `output::fingerprint` | Generate stable finding identity across reruns |
-| `output::publish` | Translate findings into platform-neutral publication actions |
+`output::parser` translates the model response into structured findings. `output::filter` applies confidence, evidence, impact, and suppression rules. `output::fingerprint` generates stable finding identity across reruns. `output::publish` translates findings into platform-neutral publication actions.
 
 ### Platform Integration
 
-| Module | Responsibility |
-|---|---|
-| `platform` | Provider-neutral interfaces for triggers, metadata, diffs, annotations |
-| `platform::gitlab` | GitLab merge request and discussion adapter |
-| `platform::github` | GitHub pull request and review comment adapter |
-| `platform::annotations` | Post comments, map prior output, resolve stale discussions |
+`platform` defines provider-neutral interfaces for triggers, metadata, diffs, and annotations. `platform::gitlab` and `platform::github` are concrete adapters for their respective platforms. `platform::annotations` handles posting comments, mapping prior bot output, and resolving stale discussions.
 
 ### Evaluation
 
-| Module | Responsibility |
-|---|---|
-| `eval` | Run benchmark fixtures, compute metrics, enforce quality gates |
+`eval` runs benchmark fixtures, computes quality metrics, and enforces quality gates.
 
 ## Data Model
 
-| Model | Purpose |
-|---|---|
-| Review request | Input for a run: platform identity, change identity, repo location |
-| Context package | Assembled payload: metadata, diff, files, related files, truncation info |
-| Finding | Normalized issue with confidence, evidence, impact, and location |
-| Fingerprint | Stable identity key for cross-rerun comparison |
-| Run metadata | Timing, token usage, omitted context, outcome |
-| Evaluation result | Per-fixture and aggregate benchmark outcomes |
+The system revolves around six internal models. A **review request** is the canonical input — platform identity, change identity, and repo location. The **context package** is the assembled payload sent to the prompt layer, containing metadata, diff, file contents, related files, and truncation info. A **finding** is the normalized representation of a model-reported issue with confidence, evidence, impact, and location. A **fingerprint** is the stable identity key used to compare findings across reruns. **Run metadata** captures timing, token usage, omitted context, and outcome. An **evaluation result** records per-fixture and aggregate benchmark outcomes.
 
 ## Runtime Flow: `snif review`
 
 ```
 CLI start
-  -> config: load .dev-agent.json + env vars
+  -> config: load .snif.json + env vars
   -> platform: select adapter, fetch change metadata + diff
   -> context::conventions: load repo review guidance
   -> context::builder: load changed files from working tree
@@ -114,7 +77,7 @@ CLI start
 Context assembly is deterministic and follows a fixed priority:
 
 1. Change metadata (author, branch, labels)
-2. Repository conventions (`.dev-agent.json` review hints)
+2. Repository conventions (`.snif.json` review hints)
 3. Unified diff
 4. Full changed files
 5. Direct imports of changed files
@@ -146,10 +109,7 @@ The system biases toward false negatives over false positives until precision is
 
 ## Configuration
 
-| Source | Content |
-|---|---|
-| `.dev-agent.json` | Platform adapter, model settings, context budget, filter thresholds, conventions paths, eval fixture paths |
-| Environment variables | Credentials, provider endpoints |
+Repository-scoped configuration lives in `.snif.json`, committed to the repo. It covers the platform adapter, model settings, context budget, filter thresholds, conventions paths, and evaluation fixture paths. Credentials and provider endpoints come from environment variables.
 
 Validation fails fast on missing or inconsistent settings. No external database required.
 

@@ -27,23 +27,15 @@ This means Snif owns:
 
 Snif targets engineering teams running CI-driven code review. The primary integration surface is a CI pipeline step that triggers on pull request or merge request events.
 
-| User | Interaction |
-|---|---|
-| Developer | Sees inline review comments on their PR/MR |
-| Tech lead | Configures review behavior per repository via `.dev-agent.json` |
-| Platform admin | Adds Snif to CI pipelines and manages credentials |
+Developers see inline review comments on their PRs. Tech leads configure review behavior per repository via `.snif.json`. Platform admins add Snif to CI pipelines and manage credentials.
 
 ## Deployment Model
 
-Snif ships as a single Rust binary. It runs anywhere a CI job runs.
+Snif ships as a single Rust binary. It runs anywhere a CI job runs — GitHub Actions, GitLab CI, Jenkins, or any system that can execute a binary and pass environment variables.
 
-| Environment | Trigger | Example |
-|---|---|---|
-| CI pipeline | PR/MR event | GitHub Actions job, GitLab CI stage |
-| Platform webhook | Repository event | GitHub App, GitLab webhook |
-| Local | Manual | `snif review` from terminal |
+The primary trigger is a PR/MR event in CI. Snif can also be invoked by platform webhooks (GitHub App, GitLab webhook) or manually from a developer's terminal with `snif review`.
 
-Configuration lives in the repository (`.dev-agent.json`). Credentials come from environment variables. No external database or service is required.
+Configuration lives in the repository (`.snif.json`). Credentials come from environment variables. No external database or service is required.
 
 ## Phase 1 Scope
 
@@ -67,15 +59,9 @@ Phase 1 delivers one workflow: **deterministic change review**.
 
 ## Success Metrics
 
-| Metric | Target | Rationale |
-|---|---|---|
-| Precision | >= 80% | Most comments must be correct |
-| Recall | >= 60% | Must still catch meaningful issues |
-| Noise rate | <= 10% | Clean changes stay quiet |
-| False positive rate | < 10% | Trust erodes fast on wrong comments |
-| Actionable rate | > 60% | Findings must lead to developer action |
-| Review time | < 120s | Must fit CI time budgets |
-| Token cost | Tracked per review | Cost regressions must be visible |
+Snif is measured on trust, not volume. Precision must be at least 80% — most comments must be correct. Recall must be at least 60% — the reviewer must still catch meaningful issues. Noise rate must stay under 10% — clean changes stay quiet. The false positive rate in production must remain below 10%, and over 60% of findings must be directly actionable by the developer.
+
+Review time must stay under 120 seconds to fit CI time budgets. Token cost is tracked per review so cost regressions are visible immediately.
 
 Quality gates block shipping if precision drops below 70% or noise rate exceeds 20%.
 
@@ -93,12 +79,13 @@ Each fixture includes: change metadata, unified diff, file contents, conventions
 
 ## Delivery Plan
 
-| Phase | Scope |
-|---|---|
-| **1** | Single-agent deterministic review, strict filtering, platform adapters, evaluation harness |
-| **1.5** | Structural retrieval upgrade (local import graph, symbol map) if baseline retrieval proves insufficient |
-| **2** | Specialized review dimensions (security, logic, conventions) — only if measured gaps justify it |
-| **3** | Additional commands (`suggest`, `migrate`, `document`), semantic retrieval as secondary path |
+**Phase 1** delivers the single-agent deterministic reviewer with strict filtering, platform adapters, and the evaluation harness. This is the foundation.
+
+**Phase 1.5** adds a structural retrieval upgrade — a local import graph and symbol map — but only if baseline retrieval proves insufficient against the benchmark.
+
+**Phase 2** introduces specialized review dimensions (security, logic, conventions) as separate review passes. This only happens if measured gaps in depth or latency justify the added complexity.
+
+**Phase 3** expands the command surface (`suggest`, `migrate`, `document`) and adds semantic retrieval as a secondary path alongside the structural baseline.
 
 ## Implementation Order
 

@@ -30,12 +30,7 @@ A review run follows a fixed pipeline:
 
 ## Quality Targets
 
-| Metric | Target |
-|---|---|
-| Precision | >= 80% |
-| Recall | >= 60% |
-| Noise rate | <= 10% |
-| Review time | < 120s |
+Snif targets at least 80% precision, 60% recall, a noise rate under 10%, and review completion within 120 seconds. These are validated against a fixed benchmark harness before any prompt, model, or retrieval change ships.
 
 ## Status
 
