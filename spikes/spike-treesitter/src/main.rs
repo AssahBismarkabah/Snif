@@ -21,15 +21,23 @@ struct Cli {
     json: bool,
 }
 
+fn all_adapters() -> Vec<Box<dyn LanguageAdapter>> {
+    vec![
+        Box::new(RustAdapter),
+        Box::new(TypeScriptAdapter::new(false)),
+        Box::new(TypeScriptAdapter::new(true)),
+        Box::new(PythonAdapter),
+    ]
+}
+
 fn detect_adapter(path: &Path) -> Option<Box<dyn LanguageAdapter>> {
     let ext = path.extension()?.to_str()?;
-    match ext {
-        "rs" => Some(Box::new(RustAdapter)),
-        "ts" => Some(Box::new(TypeScriptAdapter::new(false))),
-        "tsx" => Some(Box::new(TypeScriptAdapter::new(true))),
-        "py" => Some(Box::new(PythonAdapter)),
-        _ => None,
+    for adapter in all_adapters() {
+        if adapter.file_extensions().contains(&ext) {
+            return Some(adapter);
+        }
     }
+    None
 }
 
 fn parse_repo(repo_path: &str) -> Result<Vec<FileExtraction>> {

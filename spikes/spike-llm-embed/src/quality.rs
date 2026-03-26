@@ -43,6 +43,14 @@ pub fn query_similar(
     Ok(results)
 }
 
+fn truncate(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max])
+    }
+}
+
 pub fn print_similarity_results(results: &[SimilarityResult]) {
     println!("\n  --- Embedding Quality: Top-10 Similar ---\n");
 
@@ -53,11 +61,12 @@ pub fn print_similarity_results(results: &[SimilarityResult]) {
         );
         for (i, m) in result.matches.iter().enumerate() {
             println!(
-                "    {:>2}. [{:.3}] {} ({})",
+                "    {:>2}. [{:.3}] {} ({}) - {}",
                 i + 1,
                 m.distance,
                 m.name,
-                m.file_path
+                m.file_path,
+                truncate(&m.summary, 60)
             );
         }
         println!();
