@@ -7,6 +7,7 @@ pub fn run(
     repo: Option<&str>,
     pr: Option<u64>,
     diff_file: Option<&str>,
+    format: &str,
 ) -> Result<()> {
     let repo_path = Path::new(path);
     tracing::info!(path = %repo_path.display(), "Starting review");
@@ -108,10 +109,18 @@ pub fn run(
         tracing::info!("No findings — change looks clean");
     } else {
         tracing::info!(count = findings.len(), "Findings after filtering");
+    }
 
-        // Print findings to stdout (for diff-file mode or when no platform adapter posts)
-        let json = serde_json::to_string_pretty(&findings)?;
-        println!("{}", json);
+    match format {
+        "sarif" => {
+            let sarif = snif_output::sarif::to_sarif(&findings);
+            println!("{}", serde_json::to_string_pretty(&sarif)?);
+        }
+        _ => {
+            if !findings.is_empty() {
+                println!("{}", serde_json::to_string_pretty(&findings)?);
+            }
+        }
     }
 
     // If GitHub adapter is available, manage annotation lifecycle

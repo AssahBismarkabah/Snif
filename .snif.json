@@ -1,6 +1,6 @@
 {
   "model": {
-    "review_model": "kimi-k2.5",
+    "review_model": "gpt-5.3-codex",
     "summary_model": "deepseek-v3p2",
     "endpoint": "https://api.ai.camer.digital/v1"
   },

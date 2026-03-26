@@ -42,6 +42,10 @@ enum Commands {
         /// Path to a local diff file (development convenience)
         #[arg(long)]
         diff_file: Option<String>,
+
+        /// Output format: json (default) or sarif
+        #[arg(long, default_value = "json")]
+        format: String,
     },
 
     /// Remove all local runtime data (index, cache, feedback)
@@ -79,8 +83,9 @@ fn main() -> anyhow::Result<()> {
             repo,
             pr,
             diff_file,
+            format,
         } => {
-            commands::review::run(&path, repo.as_deref(), pr, diff_file.as_deref())?;
+            commands::review::run(&path, repo.as_deref(), pr, diff_file.as_deref(), &format)?;
         }
         Commands::Clean { path } => {
             commands::clean::run(&path)?;
