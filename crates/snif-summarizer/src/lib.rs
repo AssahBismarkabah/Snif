@@ -1,9 +1,8 @@
-mod client;
 mod prompt;
 
 use anyhow::{bail, Result};
-use client::LlmClient;
 use snif_config::ModelConfig;
+use snif_execution::LlmClient;
 use snif_store::Store;
 use std::collections::HashMap;
 use std::path::Path;
@@ -58,7 +57,7 @@ async fn summarize_all_async(
     api_key: &str,
 ) -> Result<SummarizeStats> {
     let start = Instant::now();
-    let client = Arc::new(LlmClient::new(&config.endpoint, &config.summary_model, api_key));
+    let client = Arc::new(LlmClient::from_config(config, api_key, false));
     let semaphore = Arc::new(Semaphore::new(5));
 
     let symbols = store.get_symbols_for_summarization()?;

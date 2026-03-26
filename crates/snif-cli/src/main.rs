@@ -26,7 +26,23 @@ enum Commands {
     },
 
     /// Review a code change
-    Review,
+    Review {
+        /// Path to the repository root
+        #[arg(long, default_value = ".")]
+        path: String,
+
+        /// GitHub repository (owner/repo)
+        #[arg(long)]
+        repo: Option<String>,
+
+        /// Pull request number
+        #[arg(long)]
+        pr: Option<u64>,
+
+        /// Path to a local diff file (development convenience)
+        #[arg(long)]
+        diff_file: Option<String>,
+    },
 
     /// Run the evaluation harness
     Eval,
@@ -43,8 +59,13 @@ fn main() -> anyhow::Result<()> {
         Commands::Index { path, full } => {
             commands::index::run(&path, full)?;
         }
-        Commands::Review => {
-            commands::review::run()?;
+        Commands::Review {
+            path,
+            repo,
+            pr,
+            diff_file,
+        } => {
+            commands::review::run(&path, repo.as_deref(), pr, diff_file.as_deref())?;
         }
         Commands::Eval => {
             commands::eval::run()?;

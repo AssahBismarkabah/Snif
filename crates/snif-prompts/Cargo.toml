@@ -4,3 +4,6 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+snif-types = { path = "../snif-types" }
+snif-config = { path = "../snif-config" }
+serde_json = { workspace = true }

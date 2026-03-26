@@ -800,6 +800,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07bbe89c50d7a535e539b8c17bc0b49bdb77747034daa8087407d655f3f7cc1d"
 dependencies = [
  "futures-core",
+ "futures-sink",
 ]
 
 [[package]]
@@ -2192,6 +2193,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2",
@@ -2497,11 +2499,18 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "serde_json",
  "snif-cochange",
  "snif-config",
+ "snif-context",
  "snif-embeddings",
+ "snif-execution",
  "snif-graph",
+ "snif-output",
  "snif-parser",
+ "snif-platform",
+ "snif-prompts",
+ "snif-retrieval",
  "snif-store",
  "snif-summarizer",
  "snif-types",
@@ -2556,6 +2565,15 @@ version = "0.1.0"
 [[package]]
 name = "snif-execution"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "snif-config",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "snif-feedback"
@@ -2575,6 +2593,15 @@ dependencies = [
 [[package]]
 name = "snif-output"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "sha2",
+ "snif-config",
+ "snif-types",
+ "tracing",
+]
 
 [[package]]
 name = "snif-parser"
@@ -2594,10 +2621,24 @@ dependencies = [
 [[package]]
 name = "snif-platform"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "snif-types",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "snif-prompts"
 version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "snif-config",
+ "snif-types",
+]
 
 [[package]]
 name = "snif-retrieval"
@@ -2630,10 +2671,8 @@ name = "snif-summarizer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "reqwest",
- "serde",
- "serde_json",
  "snif-config",
+ "snif-execution",
  "snif-store",
  "tokio",
  "tracing",
