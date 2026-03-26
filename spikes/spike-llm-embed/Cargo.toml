@@ -1,0 +1,17 @@
+[package]
+name = "spike-llm-embed"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+snif-common = { path = "../common" }
+rusqlite = { version = "0.32", features = ["bundled"] }
+sqlite-vec = "0.1.6"
+zerocopy = { version = "0.7", features = ["derive"] }
+fastembed = "4"
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+walkdir = "2"
+rand = "0.8"

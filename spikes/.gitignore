@@ -1,0 +1,15 @@
+# Build artifacts
+target/
+
+# Spike database outputs
+*.db
+
+# Test repo clones
+/test-repos/
+
+# ONNX model cache (fastembed downloads)
+*.onnx
+.fastembed_cache/
+
+# Spike JSON output
+*_output.json

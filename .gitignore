@@ -1,0 +1,21 @@
+# Build artifacts
+target/
+
+# Spike artifacts
+spikes/target/
+*.db
+
+.idea/
+.claude/
+.conductor/
+
+# OS files
+.DS_Store
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# Snif runtime data
+.snif/

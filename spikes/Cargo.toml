@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "common",
+    "spike-sqlite-vec",
+    "spike-treesitter",
+    "spike-llm-embed",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
