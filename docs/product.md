@@ -125,7 +125,7 @@ Phase 3 expands the command surface with commands like `suggest`, `migrate`, and
 7. Multi-method retrieval — structural, semantic, keyword
 8. Context builder and budget-aware ranked merging
 9. Platform adapter abstraction and first concrete adapter
-10. OpenCode execution integration
+10. LLM provider integration (OpenAI-compatible HTTP client)
 11. Prompt templates and output schema
 12. Response parsing and static filter policies
 13. Finding fingerprinting and lifecycle logic
