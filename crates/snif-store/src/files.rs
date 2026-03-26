@@ -19,16 +19,34 @@ impl Store {
     }
 
     pub fn get_file_hash(&self, path: &str) -> Result<Option<String>> {
-        let result = self.conn.query_row(
+        match self.conn.query_row(
             "SELECT hash FROM files WHERE path = ?1",
             [path],
             |row| row.get(0),
-        );
-
-        match result {
+        ) {
             Ok(hash) => Ok(Some(hash)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
+    }
+
+    pub fn get_file_id(&self, path: &str) -> Result<Option<i64>> {
+        match self.conn.query_row(
+            "SELECT id FROM files WHERE path = ?1",
+            [path],
+            |row| row.get(0),
+        ) {
+            Ok(id) => Ok(Some(id)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    pub fn get_all_file_paths(&self) -> Result<Vec<(i64, String)>> {
+        let mut stmt = self.conn.prepare("SELECT id, path FROM files")?;
+        let rows = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 }

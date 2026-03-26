@@ -13,6 +13,9 @@ snif-types = { path = "../snif-types" }
 snif-parser = { path = "../snif-parser" }
 snif-store = { path = "../snif-store" }
 snif-graph = { path = "../snif-graph" }
+snif-cochange = { path = "../snif-cochange" }
+snif-summarizer = { path = "../snif-summarizer" }
+snif-embeddings = { path = "../snif-embeddings" }
 clap = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }

@@ -4,3 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+snif-types = { path = "../snif-types" }
+snif-store = { path = "../snif-store" }
+snif-config = { path = "../snif-config" }
+anyhow = { workspace = true }
+tracing = { workspace = true }

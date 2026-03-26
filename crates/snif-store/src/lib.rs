@@ -5,6 +5,7 @@ pub mod imports;
 pub mod refs;
 pub mod cochange;
 pub mod summaries;
+pub mod embeddings;
 
 use anyhow::Result;
 use rusqlite::{ffi::sqlite3_auto_extension, Connection};
