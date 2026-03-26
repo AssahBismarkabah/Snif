@@ -108,7 +108,7 @@ data.
 
 # Documentation
 
-- [Configuration](./docs/configuration.md) — setup, config format, CLI reference
-- [Testing](./docs/testing.md) — local testing and evaluation
-- [Product](./docs/product.md) — scope, delivery plan, success criteria
+- [Configuration](./docs/configuration.md)  setup, config format, CLI reference
+- [Testing](./docs/testing.md)  local testing and evaluation
+- [Product](./docs/product.md)  scope, delivery plan, success criteria
 - [Architecture](./docs/architecture.md) — system design, modules, data flows
