@@ -6,12 +6,15 @@ AI code review tools fail for predictable reasons. They lack repository-specific
 context, so their findings are generic. They have no output discipline, so
 developers get noise. They have no rerun stability, so every push creates comment
 churn. They have no evaluation harness, so quality regressions ship silently.
+They do not learn from the teams that use them, so the same unwanted feedback
+keeps appearing.
 
 The result is the same every time: developers disable the tool within weeks.
 Once trust is lost, the tool becomes a tax rather than a multiplier.
 
 This is not primarily a model quality problem. It is a systems problem — weak
-context, permissive output, no lifecycle management, and no measurement.
+context, permissive output, no lifecycle management, no learning, and no
+measurement.
 
 
 # Solution
@@ -20,10 +23,17 @@ Snif owns the full review pipeline end-to-end. The model is a replaceable
 execution layer. Snif controls what context goes in, what findings come out, how
 they are filtered, and how they are published.
 
-Concretely, Snif owns context assembly (what the model sees), prompt
-construction (what the model is asked), output parsing and filtering (what
-survives), annotation lifecycle (what gets posted, updated, or resolved), and
-evaluation (whether quality is improving or regressing).
+Snif builds a deep understanding of the repository before it reviews a single
+line of code. It parses the codebase into a structural graph of imports,
+symbols, and dependencies. It generates natural language summaries of every code
+unit and embeds them for semantic search. When a change comes in, Snif retrieves
+context using three methods in parallel — structural graph traversal, semantic
+similarity, and keyword matching — to assemble the most relevant context
+possible within the token budget.
+
+Snif learns from the teams that use it. When developers accept, dismiss, or
+ignore findings, those signals are captured and used to tune what the filter lets
+through. Over time, the reviewer adapts to what each team actually cares about.
 
 
 # Users
@@ -43,24 +53,25 @@ environment variables.
 The primary trigger is a pull request or merge request event in CI. Snif can
 also be invoked by platform webhooks or manually from a developer's terminal
 with `snif review`. Configuration lives in the repository as `.snif.json`.
-Credentials come from environment variables. No external database or service is
-required.
+Credentials come from environment variables. The repository index and feedback
+store are local SQLite databases — no external vector database or hosted service
+is required.
 
 
 # Phase 1 Scope
 
-Phase 1 delivers one workflow: deterministic change review.
+Phase 1 delivers the full review system: deep codebase indexing, multi-method
+retrieval, strict filtering with feedback learning, platform adapters, and the
+evaluation harness.
 
-`snif review` reviews a code change. `snif eval` runs the benchmark evaluation
-harness. The system uses deterministic, diff-first context assembly, produces
-structured findings with confidence, evidence, and impact, publishes annotations
-through platform adapters with full lifecycle management, and enforces quality
-gates through benchmark fixtures.
+`snif index` builds the repository index — structural graph, LLM-generated
+summaries, and vector embeddings. `snif review` reviews a code change using
+context assembled from structural, semantic, and keyword retrieval. `snif eval`
+runs the benchmark evaluation harness.
 
-Semantic search, vector databases, multi-agent orchestration, chat workflows,
-and automated code modification are all out of scope for Phase 1. Deferring
-these is a product decision, not a capability gap. The first job is to prove the
-baseline reviewer is trustworthy.
+Multi-agent orchestration, chat workflows, and automated code modification are
+out of scope for Phase 1. The first job is to prove the single-agent reviewer
+with deep context is trustworthy.
 
 
 # Success Metrics
@@ -71,8 +82,10 @@ catch meaningful issues. The noise rate must stay under 10% — clean changes
 should produce no output. The false positive rate in production must remain below
 10%, and over 60% of findings must be directly actionable.
 
-Review time must stay under 120 seconds to fit CI time budgets. Token cost is
-tracked per review so cost regressions are visible immediately.
+Review time must stay under 120 seconds to fit CI time budgets. Indexing time is
+tracked separately — the index runs per-commit, not per-review, and can be
+amortized over CI setup. Token cost is tracked per review and per index run so
+cost regressions are visible immediately.
 
 Quality gates block shipping if precision drops below 70% or noise rate exceeds
 20%. These are minimum operating thresholds, not aspirational targets.
@@ -89,33 +102,34 @@ contents, conventions, and expected findings or expected silence.
 
 # Delivery Plan
 
-Phase 1 delivers the single-agent deterministic reviewer with strict filtering,
-platform adapters, and the evaluation harness. This is the foundation everything
-else builds on.
-
-Phase 1.5 adds a structural retrieval upgrade — a local import graph and symbol
-map — but only if baseline retrieval proves insufficient against the benchmark.
+Phase 1 delivers the complete reviewer — structural and semantic codebase index,
+multi-method retrieval, strict filtering with feedback learning, platform
+adapters, and the evaluation harness. This is the foundation.
 
 Phase 2 introduces specialized review dimensions such as security, logic, and
 conventions as separate review passes. This only happens if measured gaps in
 depth or latency justify the added complexity.
 
 Phase 3 expands the command surface with commands like `suggest`, `migrate`, and
-`document`, and introduces semantic retrieval as a secondary path alongside the
-structural baseline.
+`document`.
 
 
 # Implementation Order
 
 1. Scaffold the Rust CLI project
 2. Configuration loading and validation
-3. Platform adapter abstraction and first concrete adapter
-4. Deterministic related-file retrieval
-5. Context package assembler
-6. OpenCode execution integration
-7. Prompt templates and output schema
-8. Response parsing and filter policies
-9. Finding fingerprinting and lifecycle logic
-10. Evaluation harness and benchmark fixtures
-11. Tune until quality gates pass
-12. CI integration and first production deployment
+3. Tree-sitter parsing, structural graph, import and symbol extraction
+4. Co-change analysis from git history
+5. LLM summary generation for code units
+6. Vector embedding computation and SQLite vector storage
+7. Multi-method retrieval — structural, semantic, keyword
+8. Context builder and budget-aware ranked merging
+9. Platform adapter abstraction and first concrete adapter
+10. OpenCode execution integration
+11. Prompt templates and output schema
+12. Response parsing and static filter policies
+13. Finding fingerprinting and lifecycle logic
+14. Feedback signal collection and learned filtering
+15. Evaluation harness and benchmark fixtures
+16. Tune until quality gates pass
+17. CI integration and first production deployment
