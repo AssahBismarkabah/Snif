@@ -46,26 +46,14 @@ impl CostReport {
         println!("  Code units summarized:  {}", self.total_units);
         println!("  Total input chars:      {}", self.total_input_chars);
         println!("  Total output chars:     {}", self.total_output_chars);
-        println!(
-            "  Est. input tokens:      {}",
-            self.estimated_input_tokens
-        );
-        println!(
-            "  Est. output tokens:     {}",
-            self.estimated_output_tokens
-        );
+        println!("  Est. input tokens:      {}", self.estimated_input_tokens);
+        println!("  Est. output tokens:     {}", self.estimated_output_tokens);
         println!(
             "  Total summarization:    {:?}",
             self.total_summarization_time
         );
-        println!(
-            "  Avg per summary:        {:?}",
-            self.avg_summary_time
-        );
-        println!(
-            "  Total embedding time:   {:?}",
-            self.total_embedding_time
-        );
+        println!("  Avg per summary:        {:?}", self.avg_summary_time);
+        println!("  Total embedding time:   {:?}", self.total_embedding_time);
 
         // Cost estimate at Claude Sonnet pricing (Bedrock)
         // ~$3/1M input tokens, ~$15/1M output tokens
@@ -78,20 +66,12 @@ impl CostReport {
         if self.total_units > 0 {
             let cost_per_unit = total_cost / self.total_units as f64;
             println!("  Cost per unit:          ${:.6}", cost_per_unit);
-            println!(
-                "  Est. for 1k units:      ${:.2}",
-                cost_per_unit * 1000.0
-            );
-            println!(
-                "  Est. for 5k units:      ${:.2}",
-                cost_per_unit * 5000.0
-            );
-            println!(
-                "  Est. for 10k units:     ${:.2}",
-                cost_per_unit * 10000.0
-            );
+            println!("  Est. for 1k units:      ${:.2}", cost_per_unit * 1000.0);
+            println!("  Est. for 5k units:      ${:.2}", cost_per_unit * 5000.0);
+            println!("  Est. for 10k units:     ${:.2}", cost_per_unit * 10000.0);
 
-            let time_per_unit = self.total_summarization_time.as_secs_f64() / self.total_units as f64;
+            let time_per_unit =
+                self.total_summarization_time.as_secs_f64() / self.total_units as f64;
             println!(
                 "\n  Est. time for 1k units: {:.0}m",
                 time_per_unit * 1000.0 / 60.0

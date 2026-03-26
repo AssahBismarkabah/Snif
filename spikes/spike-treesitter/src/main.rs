@@ -47,18 +47,16 @@ fn parse_repo(repo_path: &str) -> Result<Vec<FileExtraction>> {
     let mut total_symbols = 0;
     let mut total_references = 0;
     let mut total_errors = 0;
-    let mut files_by_lang: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut files_by_lang: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
 
     let start = Instant::now();
 
-    for entry in WalkDir::new(repo_path)
-        .into_iter()
-        .filter_entry(|e| {
-            let name = e.file_name().to_str().unwrap_or("");
-            // Skip hidden dirs, target, node_modules, etc.
-            !name.starts_with('.') && name != "target" && name != "node_modules" && name != "vendor"
-        })
-    {
+    for entry in WalkDir::new(repo_path).into_iter().filter_entry(|e| {
+        let name = e.file_name().to_str().unwrap_or("");
+        // Skip hidden dirs, target, node_modules, etc.
+        !name.starts_with('.') && name != "target" && name != "node_modules" && name != "vendor"
+    }) {
         let entry = entry?;
         if !entry.file_type().is_file() {
             continue;
@@ -81,11 +79,8 @@ fn parse_repo(repo_path: &str) -> Result<Vec<FileExtraction>> {
         }
 
         let rel_path = path.strip_prefix(repo_path).unwrap_or(path);
-        let extraction = parser::parse_file(
-            adapter.as_ref(),
-            &rel_path.to_string_lossy(),
-            &source,
-        )?;
+        let extraction =
+            parser::parse_file(adapter.as_ref(), &rel_path.to_string_lossy(), &source)?;
 
         total_files += 1;
         total_imports += extraction.imports.len();
@@ -267,12 +262,20 @@ fn print_extraction(e: &FileExtraction) {
         if imp.names.is_empty() {
             println!("    L{}: {}", imp.line, imp.source);
         } else {
-            println!("    L{}: {} :: {}", imp.line, imp.source, imp.names.join(", "));
+            println!(
+                "    L{}: {} :: {}",
+                imp.line,
+                imp.source,
+                imp.names.join(", ")
+            );
         }
     }
     println!("  Symbols ({}):", e.symbols.len());
     for sym in &e.symbols {
-        println!("    L{}-{}: {:?} {}", sym.start_line, sym.end_line, sym.kind, sym.name);
+        println!(
+            "    L{}-{}: {:?} {}",
+            sym.start_line, sym.end_line, sym.kind, sym.name
+        );
     }
     println!("  References ({}):", e.references.len());
     for r in e.references.iter().take(10) {

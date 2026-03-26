@@ -1,8 +1,9 @@
-use rusqlite::Connection;
 use anyhow::Result;
+use rusqlite::Connection;
 
 pub fn create_schema(conn: &Connection) -> Result<()> {
-    conn.execute_batch("
+    conn.execute_batch(
+        "
         -- Structural graph tables
 
         CREATE TABLE IF NOT EXISTS files (
@@ -70,7 +71,8 @@ pub fn create_schema(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_refs_symbol ON refs(symbol_name);
         CREATE INDEX IF NOT EXISTS idx_cochange_a ON cochange(file_id_a);
         CREATE INDEX IF NOT EXISTS idx_cochange_b ON cochange(file_id_b);
-    ")?;
+    ",
+    )?;
 
     Ok(())
 }

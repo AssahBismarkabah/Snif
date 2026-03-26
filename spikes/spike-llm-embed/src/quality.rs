@@ -30,14 +30,17 @@ pub fn query_similar(
     )?;
 
     let results: Vec<MatchResult> = stmt
-        .query_map(rusqlite::params![query_embedding.as_bytes(), k as i64], |row| {
-            Ok(MatchResult {
-                name: row.get(1)?,
-                file_path: row.get(2)?,
-                distance: row.get(4)?,
-                summary: row.get(3)?,
-            })
-        })?
+        .query_map(
+            rusqlite::params![query_embedding.as_bytes(), k as i64],
+            |row| {
+                Ok(MatchResult {
+                    name: row.get(1)?,
+                    file_path: row.get(2)?,
+                    distance: row.get(4)?,
+                    summary: row.get(3)?,
+                })
+            },
+        )?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
     Ok(results)
@@ -55,10 +58,7 @@ pub fn print_similarity_results(results: &[SimilarityResult]) {
     println!("\n  --- Embedding Quality: Top-10 Similar ---\n");
 
     for result in results {
-        println!(
-            "  Query: {} ({})",
-            result.query_name, result.query_file
-        );
+        println!("  Query: {} ({})", result.query_name, result.query_file);
         for (i, m) in result.matches.iter().enumerate() {
             println!(
                 "    {:>2}. [{:.3}] {} ({}) - {}",

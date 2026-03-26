@@ -35,9 +35,8 @@ pub fn populate_structural(conn: &Connection, scale: &Scale) -> Result<()> {
     let mut rng = rand::thread_rng();
 
     // Insert files
-    let mut file_stmt = conn.prepare(
-        "INSERT INTO files (path, hash, language) VALUES (?1, ?2, ?3)",
-    )?;
+    let mut file_stmt =
+        conn.prepare("INSERT INTO files (path, hash, language) VALUES (?1, ?2, ?3)")?;
     for i in 0..scale.num_files {
         let module = i / 50;
         let path = format!("src/module_{}/file_{}.rs", module, i);
@@ -71,9 +70,8 @@ pub fn populate_structural(conn: &Connection, scale: &Scale) -> Result<()> {
     }
 
     // Insert imports (random edges between files)
-    let mut import_stmt = conn.prepare(
-        "INSERT INTO imports (file_id, source_path, kind) VALUES (?1, ?2, ?3)",
-    )?;
+    let mut import_stmt =
+        conn.prepare("INSERT INTO imports (file_id, source_path, kind) VALUES (?1, ?2, ?3)")?;
     for file_id in 1..=scale.num_files as i64 {
         for _ in 0..scale.imports_per_file {
             let target_file = rng.gen_range(0..scale.num_files);
@@ -119,9 +117,8 @@ pub fn populate_structural(conn: &Connection, scale: &Scale) -> Result<()> {
 
 pub fn populate_embeddings(conn: &Connection, count: usize, dim: usize) -> Result<()> {
     let mut rng = rand::thread_rng();
-    let mut stmt = conn.prepare(
-        "INSERT INTO summary_embeddings (summary_id, embedding) VALUES (?1, ?2)",
-    )?;
+    let mut stmt =
+        conn.prepare("INSERT INTO summary_embeddings (summary_id, embedding) VALUES (?1, ?2)")?;
 
     for i in 1..=count as i64 {
         let vec: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0f32..1.0f32)).collect();

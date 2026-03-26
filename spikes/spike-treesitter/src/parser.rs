@@ -10,20 +10,29 @@ pub trait LanguageAdapter: Send + Sync {
     fn import_query(&self) -> &str;
     fn symbol_query(&self) -> &str;
     fn reference_query(&self) -> &str;
-    fn extract_imports(&self, source: &[u8], query: &Query, root: tree_sitter::Node) -> Vec<Import>;
-    fn extract_symbols(&self, source: &[u8], query: &Query, root: tree_sitter::Node) -> Vec<Symbol>;
-    fn extract_references(&self, source: &[u8], query: &Query, root: tree_sitter::Node) -> Vec<Reference>;
+    fn extract_imports(&self, source: &[u8], query: &Query, root: tree_sitter::Node)
+        -> Vec<Import>;
+    fn extract_symbols(&self, source: &[u8], query: &Query, root: tree_sitter::Node)
+        -> Vec<Symbol>;
+    fn extract_references(
+        &self,
+        source: &[u8],
+        query: &Query,
+        root: tree_sitter::Node,
+    ) -> Vec<Reference>;
 }
 
-pub fn parse_file(adapter: &dyn LanguageAdapter, path: &str, source: &[u8]) -> Result<FileExtraction> {
+pub fn parse_file(
+    adapter: &dyn LanguageAdapter,
+    path: &str,
+    source: &[u8],
+) -> Result<FileExtraction> {
     let mut parser = Parser::new();
     parser
         .set_language(&adapter.ts_language())
         .context("Failed to set parser language")?;
 
-    let tree = parser
-        .parse(source, None)
-        .context("Failed to parse file")?;
+    let tree = parser.parse(source, None).context("Failed to parse file")?;
 
     let root = tree.root_node();
 
@@ -98,7 +107,11 @@ pub fn run_query_captures(
     source: &[u8],
 ) -> Vec<Vec<(String, tree_sitter::Range, String)>> {
     let mut cursor = QueryCursor::new();
-    let capture_names: Vec<String> = query.capture_names().iter().map(|s| s.to_string()).collect();
+    let capture_names: Vec<String> = query
+        .capture_names()
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
 
     let mut results = Vec::new();
     let mut matches = cursor.matches(query, root, source);

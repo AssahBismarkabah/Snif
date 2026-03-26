@@ -34,7 +34,12 @@ fn random_normalized_vec(dim: usize) -> Vec<f32> {
     vec.iter().map(|x| x / norm).collect()
 }
 
-pub fn bench_knn(conn: &Connection, dim: usize, k: usize, num_queries: usize) -> Result<BenchResult> {
+pub fn bench_knn(
+    conn: &Connection,
+    dim: usize,
+    k: usize,
+    num_queries: usize,
+) -> Result<BenchResult> {
     let mut latencies = Vec::with_capacity(num_queries);
 
     let mut stmt = conn.prepare(
@@ -71,7 +76,12 @@ pub fn bench_knn(conn: &Connection, dim: usize, k: usize, num_queries: usize) ->
     })
 }
 
-pub fn bench_knn_with_join(conn: &Connection, dim: usize, k: usize, num_queries: usize) -> Result<BenchResult> {
+pub fn bench_knn_with_join(
+    conn: &Connection,
+    dim: usize,
+    k: usize,
+    num_queries: usize,
+) -> Result<BenchResult> {
     let mut latencies = Vec::with_capacity(num_queries);
 
     let mut stmt = conn.prepare(
@@ -144,9 +154,10 @@ pub fn bench_hybrid_app_side(
              ORDER BY distance",
         )?;
         let knn_results: Vec<(i64, f64)> = knn_stmt
-            .query_map(rusqlite::params![query_vec.as_bytes(), (k * 5) as i64], |row| {
-                Ok((row.get(0)?, row.get(1)?))
-            })?
+            .query_map(
+                rusqlite::params![query_vec.as_bytes(), (k * 5) as i64],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )?
             .collect::<rusqlite::Result<Vec<_>>>()?;
 
         // Step 3: filter KNN results to structural candidates
@@ -179,7 +190,11 @@ pub fn bench_hybrid_app_side(
     })
 }
 
-pub fn bench_insert(conn: &Connection, count: usize, dim: usize) -> Result<(std::time::Duration, u64)> {
+pub fn bench_insert(
+    conn: &Connection,
+    count: usize,
+    dim: usize,
+) -> Result<(std::time::Duration, u64)> {
     // Drop and recreate to measure clean insert
     conn.execute("DROP TABLE IF EXISTS bench_insert_embeddings", [])?;
     conn.execute_batch(&format!(
@@ -192,9 +207,8 @@ pub fn bench_insert(conn: &Connection, count: usize, dim: usize) -> Result<(std:
     let mut rng = rand::thread_rng();
     let start = Instant::now();
 
-    let mut stmt = conn.prepare(
-        "INSERT INTO bench_insert_embeddings (id, embedding) VALUES (?1, ?2)",
-    )?;
+    let mut stmt =
+        conn.prepare("INSERT INTO bench_insert_embeddings (id, embedding) VALUES (?1, ?2)")?;
     for i in 1..=count as i64 {
         let vec: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0f32..1.0f32)).collect();
         let norm: f32 = vec.iter().map(|x| x * x).sum::<f32>().sqrt();

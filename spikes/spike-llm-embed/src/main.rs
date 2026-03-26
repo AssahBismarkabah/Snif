@@ -52,9 +52,8 @@ fn main() -> Result<()> {
     let db_path = "/tmp/snif_spike_llm_embed.db";
     let conn = store::create_db(db_path)?;
 
-    let mut insert_stmt = conn.prepare(
-        "INSERT INTO code_summaries (name, file_path, body) VALUES (?1, ?2, ?3)",
-    )?;
+    let mut insert_stmt =
+        conn.prepare("INSERT INTO code_summaries (name, file_path, body) VALUES (?1, ?2, ?3)")?;
     for unit in &units {
         insert_stmt.execute(rusqlite::params![unit.name, unit.file_path, unit.body])?;
     }
@@ -70,8 +69,7 @@ fn main() -> Result<()> {
     for (i, unit) in units.iter().enumerate() {
         print!("  [{}/{}] {} ... ", i + 1, units.len(), unit.name);
 
-        match summarizer::summarize_code_unit(&unit.body, &unit.file_path, &unit.name, &cli.model)
-        {
+        match summarizer::summarize_code_unit(&unit.body, &unit.file_path, &unit.name, &cli.model) {
             Ok(result) => {
                 let display: String = result.summary.chars().take(80).collect();
                 println!("OK ({:?}) - {}", result.duration, display);
@@ -127,16 +125,12 @@ fn main() -> Result<()> {
     );
 
     let mut embed_idx = 0;
-    let mut embed_stmt = conn.prepare(
-        "INSERT INTO summary_embeddings (summary_id, embedding) VALUES (?1, ?2)",
-    )?;
+    let mut embed_stmt =
+        conn.prepare("INSERT INTO summary_embeddings (summary_id, embedding) VALUES (?1, ?2)")?;
     for (i, summary) in summaries.iter().enumerate() {
         if !summary.is_empty() {
             let embedding = &embed_result.embeddings[embed_idx];
-            embed_stmt.execute(rusqlite::params![
-                (i + 1) as i64,
-                embedding.as_bytes()
-            ])?;
+            embed_stmt.execute(rusqlite::params![(i + 1) as i64, embedding.as_bytes()])?;
             embed_idx += 1;
         }
     }
