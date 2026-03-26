@@ -1,0 +1,62 @@
+{
+  "_comment": "Snif configuration — copy this file to .snif.json and adjust for your setup.",
+
+  "_provider_examples": {
+    "_openai": {
+      "review_model": "gpt-4o",
+      "summary_model": "gpt-4o-mini",
+      "endpoint": "https://api.openai.com/v1"
+    },
+    "_anthropic_via_bedrock": {
+      "review_model": "anthropic.claude-sonnet-4-6",
+      "summary_model": "anthropic.claude-haiku-4-5-20251001-v1:0",
+      "endpoint": "https://bedrock-runtime.us-west-2.amazonaws.com/v1"
+    },
+    "_azure_openai": {
+      "review_model": "gpt-4o",
+      "summary_model": "gpt-4o-mini",
+      "endpoint": "https://your-resource.openai.azure.com/openai/deployments/your-deployment/v1"
+    },
+    "_self_hosted": {
+      "review_model": "your-model-name",
+      "summary_model": "your-model-name",
+      "endpoint": "http://localhost:8080/v1"
+    }
+  },
+
+  "platform": {
+    "provider": "github"
+  },
+
+  "model": {
+    "review_model": "gpt-4o",
+    "summary_model": "gpt-4o-mini",
+    "endpoint": "https://api.openai.com/v1"
+  },
+
+  "index": {
+    "db_path": ".snif/index.db",
+    "embedding_dimension": 384,
+    "languages": ["rust", "typescript", "python"],
+    "exclude_patterns": ["target", "node_modules", "vendor", ".git", "dist", "build"]
+  },
+
+  "context": {
+    "max_tokens": 128000,
+    "max_files": 50,
+    "retrieval_weights": {
+      "structural": 1.0,
+      "semantic": 0.7,
+      "keyword": 0.3
+    }
+  },
+
+  "filter": {
+    "min_confidence": 0.7,
+    "suppress_style_only": true,
+    "feedback_min_signals": 20
+  },
+
+  "conventions_paths": [],
+  "eval_fixtures_path": null
+}
