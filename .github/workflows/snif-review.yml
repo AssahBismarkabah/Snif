@@ -28,6 +28,7 @@ jobs:
         run: ./target/release/snif index --path .
         env:
           SNIF_API_KEY: ${{ secrets.SNIF_API_KEY }}
+          RUST_LOG: info
 
       - name: Review pull request
         run: |
@@ -42,6 +43,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SNIF_PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUST_LOG: info
 
       - name: Upload SARIF
         if: always()
