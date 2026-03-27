@@ -93,7 +93,9 @@ pub fn run(
     );
 
     // Parse findings from LLM response
-    let mut findings = snif_output::parser::parse_response(&result.response)?;
+    let parsed = snif_output::parser::parse_response(&result.response)?;
+    let change_summary = parsed.summary;
+    let mut findings = parsed.findings;
 
     // Apply static filters
     findings = snif_output::filter::apply_filters(findings, &config.filter);
@@ -131,6 +133,21 @@ pub fn run(
 
             // Post new findings
             adapter.post_findings(&findings)?;
+
+            // Build and post summary comment
+            let summary = snif_output::summary::format_pr_summary(
+                &snif_output::summary::ReviewSummaryInput {
+                    change_summary: &change_summary,
+                    findings: &findings,
+                    changed_paths: &changed_paths,
+                    retrieval_results: &retrieval_results,
+                    diff_lines: diff.lines().count(),
+                    model_name: &config.model.review_model,
+                    duration_secs: result.duration.as_secs(),
+                },
+            );
+            adapter.post_summary(&summary)?;
+
             tracing::info!(posted = findings.len(), "Findings posted to GitHub PR");
 
             // Resolve stale findings (present before, absent now)

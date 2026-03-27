@@ -203,6 +203,30 @@ impl PlatformAdapter for GitHubAdapter {
         Ok(())
     }
 
+    fn post_summary(&self, summary: &str) -> Result<()> {
+        let body = serde_json::json!({
+            "body": format!("{}\n\n{}", BOT_MARKER, summary),
+        });
+
+        let url = self.api_url(&format!("issues/{}/comments", self.pr_number));
+        let response = self
+            .http
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github.v3+json")
+            .header("User-Agent", "snif-review-agent")
+            .json(&body)
+            .send()?;
+
+        if response.status().is_success() {
+            tracing::info!("Posted review summary");
+        } else {
+            tracing::warn!(status = %response.status(), "Failed to post summary");
+        }
+
+        Ok(())
+    }
+
     fn get_prior_fingerprints(&self) -> Result<Vec<Fingerprint>> {
         let response = self.get(&format!("pulls/{}/comments", self.pr_number))?;
         let comments: Vec<serde_json::Value> = response.json()?;

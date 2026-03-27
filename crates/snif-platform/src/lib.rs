@@ -8,6 +8,7 @@ pub trait PlatformAdapter {
     fn fetch_changed_paths(&self) -> Result<Vec<String>>;
     fn fetch_metadata(&self) -> Result<ChangeMetadata>;
     fn post_findings(&self, findings: &[Finding]) -> Result<()>;
+    fn post_summary(&self, summary: &str) -> Result<()>;
     fn get_prior_fingerprints(&self) -> Result<Vec<Fingerprint>>;
     fn resolve_stale(&self, stale: &[Fingerprint]) -> Result<()>;
 }

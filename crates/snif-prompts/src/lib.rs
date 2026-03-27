@@ -22,21 +22,29 @@ pub fn render_system_prompt(config: &SnifConfig) -> String {
     }
 
     prompt.push_str(
-        "\nRespond with a JSON array of findings. If the change is clean \
-         and you find no real issues, respond with an empty array: []\n\n\
+        "\nRespond with a JSON object containing two fields:\n\n\
+         1. \"summary\": A 2-3 sentence walkthrough of what this change does and why. \
+         Describe the intent and impact on the codebase, not the individual files.\n\n\
+         2. \"findings\": A JSON array of issues found. If the change is clean, \
+         use an empty array.\n\n\
          Line numbers MUST refer to the line numbers in the file content \
          provided in the Changed Files section, NOT the diff hunk headers.\n\n\
-         Each finding must follow this schema:\n\
+         Response format:\n\
          {\n\
-           \"file\": \"path/to/file\",\n\
-           \"start_line\": <line number in the file>,\n\
-           \"end_line\": <line number in the file or null>,\n\
-           \"category\": \"logic\" | \"security\" | \"convention\" | \"performance\" | \"style\" | \"other\",\n\
-           \"confidence\": <0.0 to 1.0>,\n\
-           \"evidence\": \"<quoted code from the diff or context>\",\n\
-           \"explanation\": \"<what is wrong and why>\",\n\
-           \"impact\": \"<what happens if this is not fixed>\",\n\
-           \"suggestion\": \"<optional fix suggestion or null>\"\n\
+           \"summary\": \"<2-3 sentence walkthrough of the change>\",\n\
+           \"findings\": [\n\
+             {\n\
+               \"file\": \"path/to/file\",\n\
+               \"start_line\": <line number in the file>,\n\
+               \"end_line\": <line number in the file or null>,\n\
+               \"category\": \"logic\" | \"security\" | \"convention\" | \"performance\" | \"style\" | \"other\",\n\
+               \"confidence\": <0.0 to 1.0>,\n\
+               \"evidence\": \"<quoted code from the diff or context>\",\n\
+               \"explanation\": \"<what is wrong and why>\",\n\
+               \"impact\": \"<what happens if this is not fixed>\",\n\
+               \"suggestion\": \"<optional fix suggestion or null>\"\n\
+             }\n\
+           ]\n\
          }\n",
     );
 

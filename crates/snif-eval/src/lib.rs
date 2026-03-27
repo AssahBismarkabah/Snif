@@ -57,7 +57,8 @@ pub fn run_evaluation(fixtures_path: &Path, config: &SnifConfig) -> Result<EvalR
 
         let result = snif_execution::execute_review(&system_prompt, &user_prompt, &config.model)?;
 
-        let mut findings = snif_output::parser::parse_response(&result.response)?;
+        let parsed = snif_output::parser::parse_response(&result.response)?;
+        let mut findings = parsed.findings;
         findings = snif_output::filter::apply_filters(findings, &config.filter);
 
         for f in &findings {
