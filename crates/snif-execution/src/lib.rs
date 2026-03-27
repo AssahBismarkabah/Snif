@@ -80,13 +80,14 @@ impl LlmClient {
             temperature: 0.0,
         };
 
-        let max_retries = 2;
+        let max_retries = 3;
         let mut last_error = String::new();
 
         for attempt in 0..=max_retries {
             if attempt > 0 {
-                tracing::warn!(attempt, "Retrying LLM request after server error");
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                let delay = std::time::Duration::from_secs(2u64.pow(attempt as u32));
+                tracing::warn!(attempt, delay_secs = delay.as_secs(), "Retrying LLM request after server error");
+                tokio::time::sleep(delay).await;
             }
 
             let response = match self

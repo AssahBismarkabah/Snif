@@ -60,7 +60,7 @@ async fn summarize_all_async(
 ) -> Result<SummarizeStats> {
     let start = Instant::now();
     let client = Arc::new(LlmClient::from_config(config, api_key, false));
-    let semaphore = Arc::new(Semaphore::new(5));
+    let semaphore = Arc::new(Semaphore::new(3));
 
     let symbols = store.get_symbols_for_summarization()?;
     tracing::info!(symbols = symbols.len(), "Starting summarization");
