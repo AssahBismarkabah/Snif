@@ -6,9 +6,9 @@ use snif_execution::LlmClient;
 use snif_store::Store;
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Semaphore;
-use std::sync::Arc;
 
 pub struct SummarizeStats {
     pub symbols_summarized: usize,
@@ -27,7 +27,9 @@ pub fn summarize_all(
         .unwrap_or_default();
 
     if api_key.is_empty() {
-        tracing::warn!("No API key found (SNIF_API_KEY or OPENAI_API_KEY). Skipping summarization.");
+        tracing::warn!(
+            "No API key found (SNIF_API_KEY or OPENAI_API_KEY). Skipping summarization."
+        );
         return Ok(SummarizeStats {
             symbols_summarized: 0,
             files_summarized: 0,
@@ -102,7 +104,13 @@ async fn summarize_all_async(
         match task.await {
             Ok((sym_id, name, Ok(summary))) => {
                 let token_count = (summary.len() / 4) as i32;
-                store.insert_summary(Some(sym_id), None, "function", &summary, Some(token_count))?;
+                store.insert_summary(
+                    Some(sym_id),
+                    None,
+                    "function",
+                    &summary,
+                    Some(token_count),
+                )?;
                 symbols_summarized += 1;
                 tracing::debug!(symbol = %name, "Summarized");
             }
@@ -118,7 +126,12 @@ async fn summarize_all_async(
     }
 
     // Batch 2: File-level summaries
-    let file_ids: Vec<i64> = symbols.iter().map(|s| s.file_id).collect::<std::collections::HashSet<_>>().into_iter().collect();
+    let file_ids: Vec<i64> = symbols
+        .iter()
+        .map(|s| s.file_id)
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
 
     tracing::info!(count = file_ids.len(), "Summarizing files");
 

@@ -17,8 +17,7 @@ pub fn run(
 
     // Get the diff — either from a file, GitHub API, or fail
     let (diff, metadata, changed_paths) = if let Some(diff_path) = diff_file {
-        let diff = std::fs::read_to_string(diff_path)
-            .context("Failed to read diff file")?;
+        let diff = std::fs::read_to_string(diff_path).context("Failed to read diff file")?;
         let paths = snif_platform::parse_changed_paths_from_diff(&diff);
         let metadata = snif_types::ChangeMetadata::default();
         (diff, metadata, paths)
@@ -33,9 +32,7 @@ pub fn run(
         let paths = adapter.fetch_changed_paths()?;
         (diff, metadata, paths)
     } else {
-        anyhow::bail!(
-            "Provide either --diff-file <path> or --repo <owner/repo> --pr <number>"
-        );
+        anyhow::bail!("Provide either --diff-file <path> or --repo <owner/repo> --pr <number>");
     };
 
     tracing::info!(

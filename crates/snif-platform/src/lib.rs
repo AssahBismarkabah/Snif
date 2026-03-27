@@ -33,7 +33,7 @@ pub fn extract_identifiers_from_diff(diff: &str) -> Vec<String> {
             let content = &line[1..];
             for word in content.split(|c: char| !c.is_alphanumeric() && c != '_') {
                 let word = word.trim();
-                if word.len() > 2 && word.chars().next().map_or(false, |c| c.is_alphabetic()) {
+                if word.len() > 2 && word.chars().next().is_some_and(|c| c.is_alphabetic()) {
                     identifiers.push(word.to_string());
                 }
             }

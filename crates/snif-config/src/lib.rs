@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SnifConfig {
     pub platform: PlatformConfig,
@@ -20,7 +20,7 @@ pub struct PlatformConfig {
     pub provider: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ModelConfig {
     pub review_model: String,
@@ -61,34 +61,10 @@ pub struct FilterConfig {
     pub feedback_min_signals: usize,
 }
 
-impl Default for SnifConfig {
-    fn default() -> Self {
-        Self {
-            platform: PlatformConfig::default(),
-            model: ModelConfig::default(),
-            index: IndexConfig::default(),
-            context: ContextConfig::default(),
-            filter: FilterConfig::default(),
-            conventions_paths: vec![],
-            eval_fixtures_path: None,
-        }
-    }
-}
-
 impl Default for PlatformConfig {
     fn default() -> Self {
         Self {
             provider: "github".to_string(),
-        }
-    }
-}
-
-impl Default for ModelConfig {
-    fn default() -> Self {
-        Self {
-            review_model: String::new(),
-            summary_model: String::new(),
-            endpoint: String::new(),
         }
     }
 }
@@ -148,10 +124,9 @@ impl SnifConfig {
         let config_path = repo_root.join(".snif.json");
 
         let mut config = if config_path.exists() {
-            let content = std::fs::read_to_string(&config_path)
-                .context("Failed to read .snif.json")?;
-            serde_json::from_str(&content)
-                .context("Failed to parse .snif.json")?
+            let content =
+                std::fs::read_to_string(&config_path).context("Failed to read .snif.json")?;
+            serde_json::from_str(&content).context("Failed to parse .snif.json")?
         } else {
             Self::default()
         };

@@ -62,11 +62,7 @@ impl LlmClient {
         Self::new(&config.endpoint, model, api_key)
     }
 
-    pub async fn chat_completion(
-        &self,
-        system_prompt: &str,
-        user_prompt: &str,
-    ) -> Result<String> {
+    pub async fn chat_completion(&self, system_prompt: &str, user_prompt: &str) -> Result<String> {
         let url = format!("{}/chat/completions", self.endpoint);
 
         let request = ChatRequest {
@@ -133,7 +129,11 @@ impl LlmClient {
                 .context("LLM provider returned no choices");
         }
 
-        bail!("LLM request failed after {} retries: {}", max_retries, last_error)
+        bail!(
+            "LLM request failed after {} retries: {}",
+            max_retries,
+            last_error
+        )
     }
 }
 

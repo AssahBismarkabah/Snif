@@ -12,6 +12,7 @@ static INIT_VEC: Once = Once::new();
 
 fn init_sqlite_vec() {
     INIT_VEC.call_once(|| unsafe {
+        #[allow(clippy::missing_transmute_annotations)]
         sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
     });
 }
@@ -98,20 +99,21 @@ impl FeedbackStore {
         )?;
 
         let knn_results: Vec<(i64, f64)> = knn_stmt
-            .query_map(rusqlite::params![query_embedding.as_bytes(), k as i64], |row| {
-                Ok((row.get(0)?, row.get(1)?))
-            })?
+            .query_map(
+                rusqlite::params![query_embedding.as_bytes(), k as i64],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )?
             .collect::<rusqlite::Result<Vec<_>>>()?;
 
         // Filter by team_id and get signal_type in application code
         let mut results = Vec::new();
-        let mut detail_stmt = self.conn.prepare(
-            "SELECT signal_type FROM feedback_signals WHERE id = ?1 AND team_id = ?2",
-        )?;
+        let mut detail_stmt = self
+            .conn
+            .prepare("SELECT signal_type FROM feedback_signals WHERE id = ?1 AND team_id = ?2")?;
 
         for (signal_id, distance) in knn_results {
-            if let Ok(signal_type) =
-                detail_stmt.query_row(rusqlite::params![signal_id, team_id], |row| {
+            if let Ok(signal_type) = detail_stmt
+                .query_row(rusqlite::params![signal_id, team_id], |row| {
                     row.get::<_, String>(0)
                 })
             {

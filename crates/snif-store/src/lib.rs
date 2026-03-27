@@ -1,11 +1,11 @@
-mod schema;
+pub mod cochange;
+pub mod embeddings;
 pub mod files;
-pub mod symbols;
 pub mod imports;
 pub mod refs;
-pub mod cochange;
+mod schema;
 pub mod summaries;
-pub mod embeddings;
+pub mod symbols;
 
 use anyhow::Result;
 use rusqlite::{ffi::sqlite3_auto_extension, Connection};
@@ -17,6 +17,7 @@ static INIT_VEC: Once = Once::new();
 
 fn init_sqlite_vec() {
     INIT_VEC.call_once(|| unsafe {
+        #[allow(clippy::missing_transmute_annotations)]
         sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
     });
 }

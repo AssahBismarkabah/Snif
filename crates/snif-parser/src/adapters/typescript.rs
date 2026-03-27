@@ -26,7 +26,11 @@ impl LanguageAdapter for TypeScriptAdapter {
     }
 
     fn file_extensions(&self) -> &[&str] {
-        if self.is_tsx { &["tsx"] } else { &["ts"] }
+        if self.is_tsx {
+            &["tsx"]
+        } else {
+            &["ts"]
+        }
     }
 
     fn import_query(&self) -> &str {
@@ -60,7 +64,12 @@ impl LanguageAdapter for TypeScriptAdapter {
         "#
     }
 
-    fn extract_imports(&self, source: &[u8], query: &Query, root: tree_sitter::Node) -> Vec<Import> {
+    fn extract_imports(
+        &self,
+        source: &[u8],
+        query: &Query,
+        root: tree_sitter::Node,
+    ) -> Vec<Import> {
         let matches = adapter::run_query_captures(query, root, source);
         let mut imports = Vec::new();
 
@@ -70,7 +79,9 @@ impl LanguageAdapter for TypeScriptAdapter {
 
             for (name, range, text) in captures {
                 match name.as_str() {
-                    "source" => source_path = text.trim_matches(|c| c == '\'' || c == '"').to_string(),
+                    "source" => {
+                        source_path = text.trim_matches(|c| c == '\'' || c == '"').to_string()
+                    }
                     "import" => line = range.start_point.row + 1,
                     _ => {}
                 }
@@ -89,7 +100,12 @@ impl LanguageAdapter for TypeScriptAdapter {
         imports
     }
 
-    fn extract_symbols(&self, source: &[u8], query: &Query, root: tree_sitter::Node) -> Vec<Symbol> {
+    fn extract_symbols(
+        &self,
+        source: &[u8],
+        query: &Query,
+        root: tree_sitter::Node,
+    ) -> Vec<Symbol> {
         let matches = adapter::run_query_captures(query, root, source);
         let mut symbols = Vec::new();
 
@@ -139,8 +155,13 @@ impl LanguageAdapter for TypeScriptAdapter {
 
             if !name.is_empty() {
                 symbols.push(Symbol {
-                    name, kind, start_line, end_line,
-                    signature: None, body_text, children: vec![],
+                    name,
+                    kind,
+                    start_line,
+                    end_line,
+                    signature: None,
+                    body_text,
+                    children: vec![],
                 });
             }
         }
@@ -148,7 +169,12 @@ impl LanguageAdapter for TypeScriptAdapter {
         symbols
     }
 
-    fn extract_references(&self, source: &[u8], query: &Query, root: tree_sitter::Node) -> Vec<Reference> {
+    fn extract_references(
+        &self,
+        source: &[u8],
+        query: &Query,
+        root: tree_sitter::Node,
+    ) -> Vec<Reference> {
         let matches = adapter::run_query_captures(query, root, source);
         let mut refs = Vec::new();
 

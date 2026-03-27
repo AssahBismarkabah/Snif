@@ -16,21 +16,19 @@ pub fn run(path: &str, fixtures: &str) -> Result<()> {
     for fr in &result.fixture_results {
         println!(
             "  {:<30} expected={} actual={} TP={} FP={} FN={}",
-            fr.fixture_name, fr.expected, fr.actual, fr.true_positives, fr.false_positives,
+            fr.fixture_name,
+            fr.expected,
+            fr.actual,
+            fr.true_positives,
+            fr.false_positives,
             fr.false_negatives
         );
     }
 
     println!();
-    println!(
-        "  Precision:   {:.1}%",
-        result.aggregate.precision * 100.0
-    );
+    println!("  Precision:   {:.1}%", result.aggregate.precision * 100.0);
     println!("  Recall:      {:.1}%", result.aggregate.recall * 100.0);
-    println!(
-        "  Noise rate:  {:.1}%",
-        result.aggregate.noise_rate * 100.0
-    );
+    println!("  Noise rate:  {:.1}%", result.aggregate.noise_rate * 100.0);
     println!();
 
     if result.gates_passed {

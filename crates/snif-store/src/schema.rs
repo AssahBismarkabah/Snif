@@ -2,7 +2,8 @@ use anyhow::Result;
 use rusqlite::Connection;
 
 pub fn run_migrations(conn: &Connection) -> Result<()> {
-    conn.execute_batch("
+    conn.execute_batch(
+        "
         CREATE TABLE IF NOT EXISTS schema_version (
             version INTEGER NOT NULL
         );
@@ -68,10 +69,12 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_refs_symbol ON refs(symbol_name);
         CREATE INDEX IF NOT EXISTS idx_cochange_a ON cochange(file_id_a);
         CREATE INDEX IF NOT EXISTS idx_cochange_b ON cochange(file_id_b);
-    ")?;
+    ",
+    )?;
 
     // Vec tables created separately — sqlite-vec virtual tables use different syntax
-    conn.execute_batch("
+    conn.execute_batch(
+        "
         CREATE VIRTUAL TABLE IF NOT EXISTS summary_embeddings USING vec0(
             summary_id INTEGER PRIMARY KEY,
             embedding float[384]
@@ -81,13 +84,15 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             finding_id INTEGER PRIMARY KEY,
             embedding float[384]
         );
-    ")?;
+    ",
+    )?;
 
     Ok(())
 }
 
 pub fn drop_all(conn: &Connection) -> Result<()> {
-    conn.execute_batch("
+    conn.execute_batch(
+        "
         DROP TABLE IF EXISTS finding_embeddings;
         DROP TABLE IF EXISTS summary_embeddings;
         DROP TABLE IF EXISTS summaries;
@@ -97,6 +102,7 @@ pub fn drop_all(conn: &Connection) -> Result<()> {
         DROP TABLE IF EXISTS symbols;
         DROP TABLE IF EXISTS files;
         DROP TABLE IF EXISTS schema_version;
-    ")?;
+    ",
+    )?;
     Ok(())
 }

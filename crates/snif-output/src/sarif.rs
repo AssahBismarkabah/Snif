@@ -3,12 +3,36 @@ use snif_types::Finding;
 
 pub fn to_sarif(findings: &[Finding]) -> serde_json::Value {
     let rules: Vec<serde_json::Value> = vec![
-        rule("snif/logic", "Logic Error", "Bug or incorrect behavior in code logic"),
-        rule("snif/security", "Security Vulnerability", "Code that introduces a security risk"),
-        rule("snif/convention", "Convention Violation", "Violation of project or language conventions"),
-        rule("snif/performance", "Performance Issue", "Code that may cause performance degradation"),
-        rule("snif/style", "Style Issue", "Code style or formatting concern"),
-        rule("snif/other", "Other Issue", "Issue that does not fit other categories"),
+        rule(
+            "snif/logic",
+            "Logic Error",
+            "Bug or incorrect behavior in code logic",
+        ),
+        rule(
+            "snif/security",
+            "Security Vulnerability",
+            "Code that introduces a security risk",
+        ),
+        rule(
+            "snif/convention",
+            "Convention Violation",
+            "Violation of project or language conventions",
+        ),
+        rule(
+            "snif/performance",
+            "Performance Issue",
+            "Code that may cause performance degradation",
+        ),
+        rule(
+            "snif/style",
+            "Style Issue",
+            "Code style or formatting concern",
+        ),
+        rule(
+            "snif/other",
+            "Other Issue",
+            "Issue that does not fit other categories",
+        ),
     ];
 
     let results: Vec<serde_json::Value> = findings

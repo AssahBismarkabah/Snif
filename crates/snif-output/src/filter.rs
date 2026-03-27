@@ -43,7 +43,12 @@ pub fn apply_filters(findings: Vec<Finding>, config: &FilterConfig) -> Vec<Findi
     let deduped = deduplicate(filtered);
 
     let after = deduped.len();
-    tracing::info!(before, after, filtered = before - after, "Findings filtered");
+    tracing::info!(
+        before,
+        after,
+        filtered = before - after,
+        "Findings filtered"
+    );
 
     deduped
 }

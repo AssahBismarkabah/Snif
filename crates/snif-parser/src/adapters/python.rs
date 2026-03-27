@@ -42,7 +42,12 @@ impl LanguageAdapter for PythonAdapter {
         "#
     }
 
-    fn extract_imports(&self, source: &[u8], query: &Query, root: tree_sitter::Node) -> Vec<Import> {
+    fn extract_imports(
+        &self,
+        source: &[u8],
+        query: &Query,
+        root: tree_sitter::Node,
+    ) -> Vec<Import> {
         let matches = adapter::run_query_captures(query, root, source);
         let mut imports = Vec::new();
 
@@ -71,7 +76,12 @@ impl LanguageAdapter for PythonAdapter {
         imports
     }
 
-    fn extract_symbols(&self, source: &[u8], query: &Query, root: tree_sitter::Node) -> Vec<Symbol> {
+    fn extract_symbols(
+        &self,
+        source: &[u8],
+        query: &Query,
+        root: tree_sitter::Node,
+    ) -> Vec<Symbol> {
         let matches = adapter::run_query_captures(query, root, source);
         let mut symbols = Vec::new();
 
@@ -103,8 +113,13 @@ impl LanguageAdapter for PythonAdapter {
 
             if !name.is_empty() {
                 symbols.push(Symbol {
-                    name, kind, start_line, end_line,
-                    signature: None, body_text, children: vec![],
+                    name,
+                    kind,
+                    start_line,
+                    end_line,
+                    signature: None,
+                    body_text,
+                    children: vec![],
                 });
             }
         }
@@ -112,7 +127,12 @@ impl LanguageAdapter for PythonAdapter {
         symbols
     }
 
-    fn extract_references(&self, source: &[u8], query: &Query, root: tree_sitter::Node) -> Vec<Reference> {
+    fn extract_references(
+        &self,
+        source: &[u8],
+        query: &Query,
+        root: tree_sitter::Node,
+    ) -> Vec<Reference> {
         let matches = adapter::run_query_captures(query, root, source);
         let mut refs = Vec::new();
 

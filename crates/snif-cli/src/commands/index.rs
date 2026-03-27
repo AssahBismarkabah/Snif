@@ -14,10 +14,7 @@ pub fn run(path: &str, full: bool) -> Result<()> {
     }
 
     // Step 3: Parse repository and build structural graph
-    let extractions = snif_parser::parse_repository(
-        repo_path,
-        &config.index.exclude_patterns,
-    )?;
+    let extractions = snif_parser::parse_repository(repo_path, &config.index.exclude_patterns)?;
 
     let graph_stats = snif_graph::build_graph(&store, &extractions)?;
 

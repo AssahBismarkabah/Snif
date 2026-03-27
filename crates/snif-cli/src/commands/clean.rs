@@ -4,10 +4,7 @@ use std::path::Path;
 pub fn run(path: &str) -> Result<()> {
     let repo_path = Path::new(path);
 
-    let targets = [
-        ".snif",
-        ".fastembed_cache",
-    ];
+    let targets = [".snif", ".fastembed_cache"];
 
     let mut cleaned = false;
 

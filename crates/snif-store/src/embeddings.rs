@@ -11,10 +11,7 @@ pub struct SimilarSummary {
 }
 
 impl Store {
-    pub fn insert_summary_embeddings_batch(
-        &self,
-        entries: &[(i64, Vec<f32>)],
-    ) -> Result<()> {
+    pub fn insert_summary_embeddings_batch(&self, entries: &[(i64, Vec<f32>)]) -> Result<()> {
         let tx = self.conn.unchecked_transaction()?;
         {
             let mut stmt = tx.prepare(
@@ -63,9 +60,9 @@ impl Store {
         let knn_results = self.query_similar_summaries(query_embedding, k)?;
 
         let mut results = Vec::with_capacity(knn_results.len());
-        let mut detail_stmt = self.conn.prepare(
-            "SELECT id, file_id, symbol_id, summary FROM summaries WHERE id = ?1",
-        )?;
+        let mut detail_stmt = self
+            .conn
+            .prepare("SELECT id, file_id, symbol_id, summary FROM summaries WHERE id = ?1")?;
 
         for (summary_id, distance) in knn_results {
             if let Ok(row) = detail_stmt.query_row([summary_id], |row| {

@@ -21,7 +21,7 @@ pub fn build_graph(store: &Store, extractions: &[FileExtraction]) -> Result<Grap
     };
 
     for extraction in extractions {
-        let content_hash = compute_hash(&extraction);
+        let content_hash = compute_hash(extraction);
 
         // Check if file is already indexed with the same hash
         if let Some(existing_hash) = store.get_file_hash(&extraction.path)? {

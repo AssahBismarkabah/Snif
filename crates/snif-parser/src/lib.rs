@@ -21,29 +21,19 @@ pub fn all_adapters() -> Vec<Box<dyn LanguageAdapter>> {
 
 pub fn detect_adapter(path: &Path) -> Option<Box<dyn LanguageAdapter>> {
     let ext = path.extension()?.to_str()?;
-    for a in all_adapters() {
-        if a.file_extensions().contains(&ext) {
-            return Some(a);
-        }
-    }
-    None
+    all_adapters()
+        .into_iter()
+        .find(|a| a.file_extensions().contains(&ext))
 }
 
-pub fn parse_repository(
-    root: &Path,
-    exclude_patterns: &[String],
-) -> Result<Vec<FileExtraction>> {
+pub fn parse_repository(root: &Path, exclude_patterns: &[String]) -> Result<Vec<FileExtraction>> {
     let mut extractions = Vec::new();
 
-    for entry in WalkDir::new(root)
-        .into_iter()
-        .filter_entry(|e| {
-            let name = e.file_name().to_str().unwrap_or("");
-            // Allow the root directory itself, filter hidden dirs and excluded patterns
-            e.depth() == 0
-                || (!name.starts_with('.') && !exclude_patterns.iter().any(|p| p == name))
-        })
-    {
+    for entry in WalkDir::new(root).into_iter().filter_entry(|e| {
+        let name = e.file_name().to_str().unwrap_or("");
+        // Allow the root directory itself, filter hidden dirs and excluded patterns
+        e.depth() == 0 || (!name.starts_with('.') && !exclude_patterns.iter().any(|p| p == name))
+    }) {
         let entry = entry?;
         if !entry.file_type().is_file() {
             continue;

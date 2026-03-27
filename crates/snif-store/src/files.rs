@@ -9,21 +9,21 @@ impl Store {
             rusqlite::params![path, hash, language],
         )?;
 
-        let id: i64 = self.conn.query_row(
-            "SELECT id FROM files WHERE path = ?1",
-            [path],
-            |row| row.get(0),
-        )?;
+        let id: i64 =
+            self.conn
+                .query_row("SELECT id FROM files WHERE path = ?1", [path], |row| {
+                    row.get(0)
+                })?;
 
         Ok(id)
     }
 
     pub fn get_file_hash(&self, path: &str) -> Result<Option<String>> {
-        match self.conn.query_row(
-            "SELECT hash FROM files WHERE path = ?1",
-            [path],
-            |row| row.get(0),
-        ) {
+        match self
+            .conn
+            .query_row("SELECT hash FROM files WHERE path = ?1", [path], |row| {
+                row.get(0)
+            }) {
             Ok(hash) => Ok(Some(hash)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
@@ -31,11 +31,11 @@ impl Store {
     }
 
     pub fn get_file_id(&self, path: &str) -> Result<Option<i64>> {
-        match self.conn.query_row(
-            "SELECT id FROM files WHERE path = ?1",
-            [path],
-            |row| row.get(0),
-        ) {
+        match self
+            .conn
+            .query_row("SELECT id FROM files WHERE path = ?1", [path], |row| {
+                row.get(0)
+            }) {
             Ok(id) => Ok(Some(id)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
