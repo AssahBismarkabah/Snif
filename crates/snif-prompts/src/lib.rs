@@ -63,6 +63,21 @@ pub fn render_user_prompt(context: &ContextPackage) -> String {
     if let Some(branch) = &context.metadata.base_branch {
         prompt.push_str(&format!("Base branch: {}\n", branch));
     }
+    if let Some(description) = &context.metadata.description {
+        prompt.push_str(&format!("\nDescription:\n{}\n", description));
+    }
+    if !context.metadata.labels.is_empty() {
+        prompt.push_str(&format!(
+            "\nLabels: {}\n",
+            context.metadata.labels.join(", ")
+        ));
+    }
+    if !context.metadata.commit_messages.is_empty() {
+        prompt.push_str("\nCommits:\n");
+        for msg in &context.metadata.commit_messages {
+            prompt.push_str(&format!("- {}\n", msg));
+        }
+    }
     prompt.push('\n');
 
     prompt.push_str("## Diff\n\n```diff\n");

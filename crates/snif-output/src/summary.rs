@@ -20,10 +20,10 @@ pub fn format_pr_summary(input: &ReviewSummaryInput) -> String {
 
     // Outcome
     if input.findings.is_empty() {
-        summary.push_str(":white_check_mark: **No issues found.** Change looks clean.\n\n");
+        summary.push_str("**No issues found.** Change looks clean.\n\n");
     } else {
         summary.push_str(&format!(
-            ":mag: **Found {} issue{}.** See inline comments for details.\n\n",
+            "**Found {} issue{}.** See inline comments for details.\n\n",
             input.findings.len(),
             if input.findings.len() == 1 { "" } else { "s" }
         ));

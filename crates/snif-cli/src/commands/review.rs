@@ -113,7 +113,10 @@ pub fn run(
     match format {
         "sarif" => {
             let sarif = snif_output::sarif::to_sarif(&findings);
-            println!("{}", serde_json::to_string_pretty(&sarif)?);
+            let sarif_json = serde_json::to_string_pretty(&sarif)?;
+            // Write to findings.sarif file for CI upload, and also to stdout
+            std::fs::write("findings.sarif", &sarif_json)?;
+            println!("{}", sarif_json);
         }
         _ => {
             if !findings.is_empty() {

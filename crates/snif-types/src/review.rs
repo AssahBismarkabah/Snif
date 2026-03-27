@@ -46,6 +46,9 @@ pub struct ChangeMetadata {
     pub title: Option<String>,
     pub author: Option<String>,
     pub base_branch: Option<String>,
+    pub description: Option<String>,
+    pub labels: Vec<String>,
+    pub commit_messages: Vec<String>,
 }
 
 #[derive(Debug)]

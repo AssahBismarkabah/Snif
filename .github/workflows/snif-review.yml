@@ -43,7 +43,7 @@ jobs:
             --path . \
             --repo "$GITHUB_REPO" \
             --pr "$PR_NUMBER" \
-            --format sarif > findings.sarif
+            --format sarif
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SNIF_API_KEY: ${{ secrets.SNIF_API_KEY }}

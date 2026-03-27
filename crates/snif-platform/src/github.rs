@@ -156,10 +156,47 @@ impl PlatformAdapter for GitHubAdapter {
             .and_then(serde_json::Value::as_str)
             .map(String::from);
 
+        let description = pr
+            .get("body")
+            .and_then(serde_json::Value::as_str)
+            .filter(|s| !s.is_empty())
+            .map(String::from);
+
+        let labels = pr
+            .get("labels")
+            .and_then(serde_json::Value::as_array)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|l| l.get("name").and_then(serde_json::Value::as_str))
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        // Fetch commit messages
+        let commit_messages = match self.get(&format!("pulls/{}/commits", self.pr_number)) {
+            Ok(resp) => {
+                let commits: Vec<serde_json::Value> = resp.json().unwrap_or_default();
+                commits
+                    .iter()
+                    .filter_map(|c| {
+                        c.get("commit")
+                            .and_then(|cm: &serde_json::Value| cm.get("message"))
+                            .and_then(serde_json::Value::as_str)
+                            .map(|s| s.lines().next().unwrap_or(s).to_string())
+                    })
+                    .collect()
+            }
+            Err(_) => vec![],
+        };
+
         Ok(ChangeMetadata {
             title,
             author,
             base_branch,
+            description,
+            labels,
+            commit_messages,
         })
     }
 

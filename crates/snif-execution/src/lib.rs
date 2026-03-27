@@ -86,7 +86,11 @@ impl LlmClient {
         for attempt in 0..=max_retries {
             if attempt > 0 {
                 let delay = std::time::Duration::from_secs(2u64.pow(attempt as u32));
-                tracing::warn!(attempt, delay_secs = delay.as_secs(), "Retrying LLM request after server error");
+                tracing::warn!(
+                    attempt,
+                    delay_secs = delay.as_secs(),
+                    "Retrying LLM request after server error"
+                );
                 tokio::time::sleep(delay).await;
             }
 
