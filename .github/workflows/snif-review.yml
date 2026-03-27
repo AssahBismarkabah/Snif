@@ -45,6 +45,9 @@ jobs:
             --pr "$PR_NUMBER" \
             --format sarif
         env:
+          SNIF_APP_ID: ${{ secrets.SNIF_APP_ID }}
+          SNIF_APP_PRIVATE_KEY: ${{ secrets.SNIF_APP_PRIVATE_KEY }}
+          SNIF_APP_INSTALLATION_ID: ${{ secrets.SNIF_APP_INSTALLATION_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SNIF_API_KEY: ${{ secrets.SNIF_API_KEY }}
           GITHUB_REPO: ${{ github.repository }}

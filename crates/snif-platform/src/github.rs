@@ -15,8 +15,7 @@ pub struct GitHubAdapter {
 
 impl GitHubAdapter {
     pub fn new(owner: &str, repo: &str, pr_number: u64) -> Result<Self> {
-        let token = std::env::var("GITHUB_TOKEN")
-            .context("GITHUB_TOKEN environment variable must be set")?;
+        let token = resolve_token()?;
 
         Ok(Self {
             token,
@@ -51,12 +50,16 @@ impl GitHubAdapter {
         )
     }
 
+    fn auth_header(&self) -> String {
+        format!("Bearer {}", self.token)
+    }
+
     fn get(&self, path: &str) -> Result<reqwest::blocking::Response> {
         let url = self.api_url(path);
         let response = self
             .http
             .get(&url)
-            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Authorization", self.auth_header())
             .header("Accept", "application/vnd.github.v3+json")
             .header("User-Agent", "snif-review-agent")
             .send()
@@ -69,6 +72,18 @@ impl GitHubAdapter {
         }
 
         Ok(response)
+    }
+
+    fn post(&self, path: &str, body: &serde_json::Value) -> Result<reqwest::blocking::Response> {
+        let url = self.api_url(path);
+        self.http
+            .post(&url)
+            .header("Authorization", self.auth_header())
+            .header("Accept", "application/vnd.github.v3+json")
+            .header("User-Agent", "snif-review-agent")
+            .json(body)
+            .send()
+            .context("Failed to call GitHub API")
     }
 
     fn format_finding_body(finding: &Finding) -> String {
@@ -100,13 +115,93 @@ impl GitHubAdapter {
     }
 }
 
+/// Resolve a GitHub API token. Tries GitHub App auth first, falls back to GITHUB_TOKEN.
+fn resolve_token() -> Result<String> {
+    // Try GitHub App authentication
+    if let (Ok(app_id), Ok(private_key), Ok(installation_id)) = (
+        std::env::var("SNIF_APP_ID"),
+        std::env::var("SNIF_APP_PRIVATE_KEY"),
+        std::env::var("SNIF_APP_INSTALLATION_ID"),
+    ) {
+        tracing::info!("Authenticating as GitHub App");
+        return get_installation_token(&app_id, &private_key, &installation_id);
+    }
+
+    // Fall back to GITHUB_TOKEN
+    std::env::var("GITHUB_TOKEN").context(
+        "No GitHub credentials found. Set GITHUB_TOKEN or SNIF_APP_ID + SNIF_APP_PRIVATE_KEY + SNIF_APP_INSTALLATION_ID",
+    )
+}
+
+fn get_installation_token(
+    app_id: &str,
+    private_key: &str,
+    installation_id: &str,
+) -> Result<String> {
+    let jwt = generate_jwt(app_id, private_key)?;
+
+    let url = format!(
+        "https://api.github.com/app/installations/{}/access_tokens",
+        installation_id
+    );
+
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", jwt))
+        .header("Accept", "application/vnd.github.v3+json")
+        .header("User-Agent", "snif-review-agent")
+        .send()
+        .context("Failed to get installation token")?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().unwrap_or_default();
+        bail!("Failed to get installation token: {} {}", status, body);
+    }
+
+    let body: serde_json::Value = response.json()?;
+    body.get("token")
+        .and_then(serde_json::Value::as_str)
+        .map(String::from)
+        .context("Installation token response missing 'token' field")
+}
+
+fn generate_jwt(app_id: &str, private_key: &str) -> Result<String> {
+    use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    struct Claims {
+        iat: u64,
+        exp: u64,
+        iss: String,
+    }
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let claims = Claims {
+        iat: now - 60,        // 60 seconds in the past to account for clock drift
+        exp: now + (10 * 60), // 10 minutes
+        iss: app_id.to_string(),
+    };
+
+    let key = EncodingKey::from_rsa_pem(private_key.as_bytes())
+        .context("Failed to parse GitHub App private key")?;
+
+    encode(&Header::new(Algorithm::RS256), &claims, &key).context("Failed to sign JWT")
+}
+
 impl PlatformAdapter for GitHubAdapter {
     fn fetch_diff(&self) -> Result<String> {
         let url = self.api_url(&format!("pulls/{}", self.pr_number));
         let response = self
             .http
             .get(&url)
-            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Authorization", self.auth_header())
             .header("Accept", "application/vnd.github.v3.diff")
             .header("User-Agent", "snif-review-agent")
             .send()
@@ -173,7 +268,6 @@ impl PlatformAdapter for GitHubAdapter {
             })
             .unwrap_or_default();
 
-        // Fetch commit messages
         let commit_messages = match self.get(&format!("pulls/{}/commits", self.pr_number)) {
             Ok(resp) => {
                 let commits: Vec<serde_json::Value> = resp.json().unwrap_or_default();
@@ -212,28 +306,25 @@ impl PlatformAdapter for GitHubAdapter {
                 "side": "RIGHT",
             });
 
-            let url = self.api_url(&format!("pulls/{}/comments", self.pr_number));
-            let response = self
-                .http
-                .post(&url)
-                .header("Authorization", format!("Bearer {}", self.token))
-                .header("Accept", "application/vnd.github.v3+json")
-                .header("User-Agent", "snif-review-agent")
-                .json(&body)
-                .send()?;
-
-            if response.status().is_success() {
-                tracing::info!(
-                    file = %finding.location.file,
-                    line = finding.location.start_line,
-                    "Posted finding"
-                );
-            } else {
-                tracing::warn!(
-                    file = %finding.location.file,
-                    status = %response.status(),
-                    "Failed to post finding"
-                );
+            let path = format!("pulls/{}/comments", self.pr_number);
+            match self.post(&path, &body) {
+                Ok(r) if r.status().is_success() => {
+                    tracing::info!(
+                        file = %finding.location.file,
+                        line = finding.location.start_line,
+                        "Posted finding"
+                    );
+                }
+                Ok(r) => {
+                    tracing::warn!(
+                        file = %finding.location.file,
+                        status = %r.status(),
+                        "Failed to post finding"
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(file = %finding.location.file, error = %e, "Failed to post finding");
+                }
             }
         }
 
@@ -245,20 +336,17 @@ impl PlatformAdapter for GitHubAdapter {
             "body": format!("{}\n\n{}", BOT_MARKER, summary),
         });
 
-        let url = self.api_url(&format!("issues/{}/comments", self.pr_number));
-        let response = self
-            .http
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", self.token))
-            .header("Accept", "application/vnd.github.v3+json")
-            .header("User-Agent", "snif-review-agent")
-            .json(&body)
-            .send()?;
-
-        if response.status().is_success() {
-            tracing::info!("Posted review summary");
-        } else {
-            tracing::warn!(status = %response.status(), "Failed to post summary");
+        let path = format!("issues/{}/comments", self.pr_number);
+        match self.post(&path, &body) {
+            Ok(r) if r.status().is_success() => {
+                tracing::info!("Posted review summary");
+            }
+            Ok(r) => {
+                tracing::warn!(status = %r.status(), "Failed to post summary");
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to post summary");
+            }
         }
 
         Ok(())
@@ -275,12 +363,10 @@ impl PlatformAdapter for GitHubAdapter {
                 None => continue,
             };
 
-            // Only process comments posted by snif
             if !body.contains(BOT_MARKER) {
                 continue;
             }
 
-            // Extract fingerprint from marker
             if let Some(start) = body.find(FINGERPRINT_MARKER) {
                 let after = &body[start + FINGERPRINT_MARKER.len()..];
                 if let Some(end) = after.find(" -->") {
@@ -301,7 +387,6 @@ impl PlatformAdapter for GitHubAdapter {
             return Ok(());
         }
 
-        // Fetch all comments to find the ones matching stale fingerprints
         let response = self.get(&format!("pulls/{}/comments", self.pr_number))?;
         let comments: Vec<serde_json::Value> = response.json()?;
 
@@ -317,7 +402,6 @@ impl PlatformAdapter for GitHubAdapter {
                 continue;
             }
 
-            // Check if this comment's fingerprint is in the stale list
             let is_stale = if let Some(start) = body.find(FINGERPRINT_MARKER) {
                 let after = &body[start + FINGERPRINT_MARKER.len()..];
                 if let Some(end) = after.find(" -->") {
@@ -331,29 +415,17 @@ impl PlatformAdapter for GitHubAdapter {
             };
 
             if is_stale {
-                // Post a reply indicating the issue is resolved
                 if let Some(comment_id) = comment.get("id").and_then(serde_json::Value::as_i64) {
                     let reply_body = serde_json::json!({
                         "body": format!(
-                            "{}\n\n:white_check_mark: **Resolved** — this issue is no longer present in the current change.",
+                            "{}\n\n**Resolved** — this issue is no longer present in the current change.",
                             BOT_MARKER
                         ),
                     });
 
-                    let url = self.api_url(&format!(
-                        "pulls/{}/comments/{}/replies",
-                        self.pr_number, comment_id
-                    ));
+                    let path = format!("pulls/{}/comments/{}/replies", self.pr_number, comment_id);
 
-                    match self
-                        .http
-                        .post(&url)
-                        .header("Authorization", format!("Bearer {}", self.token))
-                        .header("Accept", "application/vnd.github.v3+json")
-                        .header("User-Agent", "snif-review-agent")
-                        .json(&reply_body)
-                        .send()
-                    {
+                    match self.post(&path, &reply_body) {
                         Ok(r) if r.status().is_success() => {
                             tracing::info!(comment_id, "Resolved stale finding");
                         }
