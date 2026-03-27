@@ -1,0 +1,37 @@
+--- a/src/formatter.rs
++++ b/src/formatter.rs
+@@ -0,0 +1,35 @@
++pub fn format_report(title: &str, sections: &[(String, Vec<String>)]) -> String {
++    let mut output = String::new();
++
++    output.push_str("========================================\n");
++    output.push_str(&format!("  {}\n", title.to_uppercase()));
++    output.push_str("========================================\n");
++    output.push('\n');
++
++    let total_items: usize = sections.iter().map(|(_, items)| items.len()).sum();
++    output.push_str(&format!("Total sections: {}\n", sections.len()));
++    output.push_str(&format!("Total items: {}\n", total_items));
++    output.push('\n');
++
++    for (i, (section_name, items)) in sections.iter().enumerate() {
++        output.push_str(&format!("--- Section {}: {} ---\n", i + 1, section_name));
++
++        if items.is_empty() {
++            output.push_str("  (no items)\n");
++        } else {
++            for (j, item) in items.iter().enumerate() {
++                let prefix = if j == items.len() - 1 { "└" } else { "├" };
++                output.push_str(&format!("  {} {}\n", prefix, item));
++            }
++        }
++
++        output.push('\n');
++    }
++
++    output.push_str("========================================\n");
++    output.push_str(&format!("  END OF {}\n", title.to_uppercase()));
++    output.push_str("========================================\n");
++
++    output
++}

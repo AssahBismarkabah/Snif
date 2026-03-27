@@ -1,0 +1,21 @@
+pub fn process(value: Option<i32>) -> String {
+    match value {
+        Some(v) => format!("Got: {}", v),
+        None => "Nothing".to_string(),
+    }
+}
+
+pub fn describe(result: Result<String, String>) -> String {
+    match result {
+        Ok(s) => format!("Success: {}", s),
+        Err(e) => format!("Error: {}", e),
+    }
+}
+
+pub fn check_flag(flag: Option<bool>) -> bool {
+    match flag {
+        Some(true) => true,
+        Some(false) => false,
+        None => false,
+    }
+}

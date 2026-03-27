@@ -1,0 +1,11 @@
+pub fn factorial(n: u32) -> u64 {
+    let mut result: u64 = 1;
+    for i in 2..=n as u64 {
+        result = result * i;
+    }
+    result
+}
+
+pub fn safe_add(a: u64, b: u64) -> Option<u64> {
+    a.checked_add(b)
+}

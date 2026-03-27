@@ -1,0 +1,1 @@
+{"name":"integer-overflow","description":"Unchecked multiplication that panics on large input in debug mode or wraps in release","conventions":null,"expected_findings":[{"file":"src/math.rs","start_line":2,"category":"logic"}]}

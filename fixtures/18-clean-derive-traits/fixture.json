@@ -1,0 +1,6 @@
+{
+  "name": "clean-derive-traits",
+  "description": "Adding derive macros to structs for serialization",
+  "conventions": null,
+  "expected_findings": []
+}

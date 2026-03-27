@@ -1,0 +1,1 @@
+{"name":"style-inconsistent-returns","description":"Mixing explicit return statements with implicit returns. Both are valid Rust.","conventions":null,"expected_findings":[]}

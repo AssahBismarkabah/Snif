@@ -1,0 +1,10 @@
+--- a/src/auth.rs
++++ b/src/auth.rs
+@@ -1,5 +1,5 @@
+-use crate::utils::crypto::hash_password;
+-use crate::utils::crypto::verify_password;
++use crate::crypto::hash_password;
++use crate::crypto::verify_password;
+ 
+ pub fn authenticate(stored_hash: &str, password: &str) -> bool {
+     verify_password(stored_hash, password)

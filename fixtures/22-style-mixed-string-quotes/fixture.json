@@ -1,0 +1,1 @@
+{"name":"style-unnecessary-turbofish","description":"Code uses unnecessary turbofish syntax where type inference works. Style only.","conventions":null,"expected_findings":[]}

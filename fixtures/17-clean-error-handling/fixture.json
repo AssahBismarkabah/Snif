@@ -1,0 +1,6 @@
+{
+  "name": "clean-error-handling",
+  "description": "Converting unwrap calls to proper Result handling",
+  "conventions": null,
+  "expected_findings": []
+}

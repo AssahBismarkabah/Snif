@@ -1,0 +1,12 @@
+{
+  "name": "off-by-one-loop",
+  "description": "Loop uses <= instead of < causing index out of bounds on the last iteration",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/processor.rs",
+      "start_line": 4,
+      "category": "logic"
+    }
+  ]
+}

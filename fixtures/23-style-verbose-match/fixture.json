@@ -1,0 +1,1 @@
+{"name":"style-verbose-match","description":"Using verbose match instead of if-let. Correct but not idiomatic.","conventions":null,"expected_findings":[]}

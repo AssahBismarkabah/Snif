@@ -1,0 +1,6 @@
+use std::path::PathBuf;
+
+pub fn read_user_file(base_dir: &str, filename: &str) -> Result<String, String> {
+    let path = PathBuf::from(base_dir).join(filename);
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}

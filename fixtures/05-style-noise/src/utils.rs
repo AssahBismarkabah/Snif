@@ -1,15 +1,16 @@
-pub fn calculateTotal(items: &[f64]) -> f64 {
-    let mut total = 0.0;
-    for item in items {
-        total += item;
-    }
-    total
+pub fn double_value(x: i32) -> i32 {
+    return x * 2;
 }
 
-pub fn IS_VALID(input: &str) -> bool {
-    !input.is_empty() && input.len() < 256
+pub fn triple_value(x: i32) -> i32 {
+    x * 3
 }
 
-pub fn   format_output(   data: &str   ) -> String {
-    format!("[OUTPUT] {}", data)
+pub fn   add_values(   a: i32,    b: i32   ) -> i32 {
+    let result = a + b;
+    return result;
+}
+
+pub fn subtract_values(a: i32, b: i32) -> i32 {
+    a - b
 }

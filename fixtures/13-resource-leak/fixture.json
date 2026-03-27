@@ -1,0 +1,1 @@
+{"name":"resource-leak","description":"File opened but not closed on the error path","conventions":null,"expected_findings":[{"file":"src/io.rs","start_line":7,"category":"logic"}]}

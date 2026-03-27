@@ -1,0 +1,12 @@
+{
+  "name": "missing-error-propagation",
+  "description": "Function silently discards an error with let _ = instead of propagating it",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/config.rs",
+      "start_line": 8,
+      "category": "logic"
+    }
+  ]
+}

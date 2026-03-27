@@ -1,0 +1,15 @@
+pub fn sum_elements(data: &[i32]) -> i32 {
+    let mut total = 0;
+    let len = data.len();
+    for i in 0..=len {
+        total += data[i];
+    }
+    total
+}
+
+pub fn average(data: &[i32]) -> f64 {
+    if data.is_empty() {
+        return 0.0;
+    }
+    sum_elements(data) as f64 / data.len() as f64
+}

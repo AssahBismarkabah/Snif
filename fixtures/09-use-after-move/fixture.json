@@ -1,0 +1,1 @@
+{"name":"buffer-overread","description":"Reading from a buffer after resizing invalidates prior references","conventions":null,"expected_findings":[{"file":"src/buffer.rs","start_line":5,"category":"logic"}]}

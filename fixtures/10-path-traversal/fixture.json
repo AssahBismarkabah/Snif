@@ -1,0 +1,1 @@
+{"name":"path-traversal","description":"User-supplied filename passed directly to file read without sanitization","conventions":null,"expected_findings":[{"file":"src/files.rs","start_line":5,"category":"security"}]}

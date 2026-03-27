@@ -1,0 +1,12 @@
+{
+  "name": "race-condition",
+  "description": "Shared counter incremented without synchronization across threads",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/counter.rs",
+      "start_line": 7,
+      "category": "logic"
+    }
+  ]
+}
