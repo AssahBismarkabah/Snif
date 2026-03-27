@@ -1,20 +1,6 @@
 # TODO
 
-Outstanding work to take Snif from a working implementation to a deployed
-product.
-
-
-# Deployment
-
-First release has not been published yet. The CI workflows are in place but no
-version tag has been pushed.
-
-- Push the first version tag (`cargo release patch`) to trigger the release
-  workflow and publish binaries to GitHub Releases
-- Verify the release artifacts (Linux, macOS, Windows) download and run
-  correctly
-- Verify the shell and Homebrew installers work
-- Test the Docker image build and push to GHCR
+Outstanding work for Snif beyond v1.0.0.
 
 
 # GitHub App
@@ -56,7 +42,7 @@ time with real-world examples.
 
 # Production Hardening
 
-- Add unit and integration tests to the main codebase (currently zero tests)
+- Add unit and integration tests to the main codebase
 - Handle edge cases: very large diffs, binary files in PRs, empty PRs
 - Rate limit handling: detect provider rate limits and back off gracefully
   (beyond the current retry logic)
@@ -68,6 +54,4 @@ time with real-world examples.
 
 # Documentation
 
-- Add a CHANGELOG for tracking releases
-- Add CONTRIBUTING.md for external contributors
 - Update docs/ci.md with GitHub App setup instructions once the App exists
