@@ -1,0 +1,51 @@
+name: Snif Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Index repository
+        run: ./target/release/snif index --path .
+        env:
+          SNIF_API_KEY: ${{ secrets.SNIF_API_KEY }}
+
+      - name: Review pull request
+        run: |
+          ./target/release/snif review \
+            --path . \
+            --repo "$GITHUB_REPO" \
+            --pr "$PR_NUMBER" \
+            --format sarif > findings.sarif
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SNIF_API_KEY: ${{ secrets.SNIF_API_KEY }}
+          GITHUB_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SNIF_PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: findings.sarif
+          category: snif

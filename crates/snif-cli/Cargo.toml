@@ -2,6 +2,9 @@
 name = "snif"
 version.workspace = true
 edition.workspace = true
+description = "Repository-aware code review agent for CI pipelines"
+homepage = "https://github.com/AssahBismarkabah/Snif"
+repository = "https://github.com/AssahBismarkabah/Snif"
 
 [[bin]]
 name = "snif"

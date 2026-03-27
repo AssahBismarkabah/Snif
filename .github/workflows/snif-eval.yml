@@ -1,0 +1,33 @@
+name: Snif Eval
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/snif-prompts/**'
+      - 'crates/snif-output/**'
+      - 'crates/snif-execution/**'
+      - 'crates/snif-config/**'
+      - 'fixtures/**'
+      - '.snif.json'
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Run evaluation
+        run: ./target/release/snif eval --fixtures ./fixtures/
+        env:
+          SNIF_API_KEY: ${{ secrets.SNIF_API_KEY }}
