@@ -9,6 +9,9 @@ cargo-dist-version = "0.30.3"
 # CI backends to support
 ci = "github"
 
+# Use dynamic CRT linking on Windows to match ONNX Runtime pre-built binaries
+msvc-crt-static = false
+
 # The installers to generate for each app
 installers = [
     "shell",
