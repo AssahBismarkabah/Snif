@@ -25,6 +25,16 @@ impl Store {
         Ok(())
     }
 
+    pub fn get_embedded_summary_ids(&self) -> Result<Vec<i64>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT summary_id FROM summary_embeddings")?;
+        let ids = stmt
+            .query_map([], |row| row.get(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(ids)
+    }
+
     pub fn delete_all_summary_embeddings(&self) -> Result<()> {
         self.conn.execute("DELETE FROM summary_embeddings", [])?;
         Ok(())

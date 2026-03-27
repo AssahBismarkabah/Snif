@@ -78,7 +78,14 @@ async fn summarize_all_async(
     tracing::info!(count = functions.len(), "Summarizing functions");
 
     let mut tasks = Vec::new();
+    let mut skipped = 0;
     for sym in &functions {
+        // Skip if summary already exists
+        if store.get_summary_for_symbol(sym.id)?.is_some() {
+            skipped += 1;
+            continue;
+        }
+
         let body = match read_symbol_body(repo_root, &sym.file_path, sym.start_line, sym.end_line) {
             Ok(b) => b,
             Err(_) => continue,
@@ -125,6 +132,10 @@ async fn summarize_all_async(
         }
     }
 
+    if skipped > 0 {
+        tracing::info!(skipped, "Skipped already-summarized functions");
+    }
+
     // Batch 2: File-level summaries
     let file_ids: Vec<i64> = symbols
         .iter()
@@ -142,7 +153,14 @@ async fn summarize_all_async(
         .collect();
 
     let mut file_tasks = Vec::new();
+    let mut files_skipped = 0;
     for file_id in &file_ids {
+        // Skip if file-level summary already exists
+        if store.get_summary_for_file(*file_id)?.is_some() {
+            files_skipped += 1;
+            continue;
+        }
+
         let child_summaries = store.get_summaries_for_file_symbols(*file_id)?;
         if child_summaries.is_empty() {
             continue;
@@ -170,6 +188,10 @@ async fn summarize_all_async(
                 .await;
             (fid, result)
         }));
+    }
+
+    if files_skipped > 0 {
+        tracing::info!(skipped = files_skipped, "Skipped already-summarized files");
     }
 
     for task in file_tasks {

@@ -21,6 +21,13 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Cache Snif index
+        uses: actions/cache@v4
+        with:
+          path: .snif
+          key: snif-index-${{ hashFiles('**/*.rs', '**/*.ts', '**/*.py') }}
+          restore-keys: snif-index-
+
       - name: Build
         run: cargo build --release
 
@@ -47,7 +54,7 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: findings.sarif
           category: snif

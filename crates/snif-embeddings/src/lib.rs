@@ -47,9 +47,27 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
         });
     }
 
-    tracing::info!(count = summaries.len(), "Embedding summaries");
+    // Filter out summaries that already have embeddings
+    let existing_ids = store.get_embedded_summary_ids()?;
+    let summaries: Vec<_> = summaries
+        .into_iter()
+        .filter(|(id, _)| !existing_ids.contains(id))
+        .collect();
 
-    store.delete_all_summary_embeddings()?;
+    if summaries.is_empty() {
+        tracing::info!("All summaries already embedded, skipping");
+        return Ok(EmbedStats {
+            summaries_embedded: 0,
+            dimension: 384,
+            duration: start.elapsed(),
+        });
+    }
+
+    tracing::info!(
+        count = summaries.len(),
+        skipped = existing_ids.len(),
+        "Embedding new summaries"
+    );
 
     // Batch in groups of 64
     let batch_size = 64;
