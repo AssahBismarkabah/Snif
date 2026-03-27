@@ -1,1 +1,6 @@
-{"name":"clean-add-tests","description":"Adding unit tests for existing functions","conventions":null,"expected_findings":[]}
+{
+  "name": "clean-add-tests",
+  "description": "Adding unit tests for existing functions",
+  "conventions": null,
+  "expected_findings": []
+}
