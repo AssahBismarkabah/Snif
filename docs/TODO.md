@@ -5,16 +5,11 @@ Outstanding work for Snif beyond v1.0.0.
 
 # GitHub App
 
-The bot currently posts as "github-actions" with the default GitHub logo.
-Creating a GitHub App gives Snif its own identity.
+GitHub App created and installed. The adapter supports dual auth — App
+credentials (SNIF_APP_ID, SNIF_APP_PRIVATE_KEY, SNIF_APP_INSTALLATION_ID)
+or fallback to GITHUB_TOKEN.
 
-- Create a GitHub App at github.com/settings/apps with the name "Snif"
 - Upload a logo/avatar for the app
-- Configure permissions: read pull requests, write pull request comments, read
-  contents
-- Update the GitHub adapter to authenticate as the App (JWT to installation
-  token) instead of using GITHUB_TOKEN
-- Install the App on the Snif repo for testing
 - Publish to GitHub Marketplace when ready
 
 
