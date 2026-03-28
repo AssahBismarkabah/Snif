@@ -1,7 +1,41 @@
 pub mod github;
+pub mod gitlab;
 
 use anyhow::Result;
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
+
+// Shared constants used by all platform adapters
+pub(crate) const FINGERPRINT_MARKER: &str = "<!-- snif:fingerprint:";
+pub(crate) const BOT_MARKER: &str = "<!-- snif:review -->";
+
+// Shared comment formatting used by all adapters
+pub(crate) fn format_finding_body(finding: &Finding) -> String {
+    let fingerprint_tag = finding
+        .fingerprint
+        .as_ref()
+        .map(|fp| format!("{}{} -->", FINGERPRINT_MARKER, fp.id))
+        .unwrap_or_default();
+
+    format!(
+        "{}\n{}\n\
+         **[{}]** (confidence: {:.0}%)\n\n\
+         {}\n\n\
+         **Impact:** {}\n\n\
+         **Evidence:**\n```\n{}\n```\
+         {}\n",
+        BOT_MARKER,
+        fingerprint_tag,
+        finding.category,
+        finding.confidence * 100.0,
+        finding.explanation,
+        finding.impact,
+        finding.evidence,
+        finding
+            .suggestion
+            .as_ref()
+            .map_or(String::new(), |s| format!("\n\n**Suggestion:** {}", s))
+    )
+}
 
 pub trait PlatformAdapter {
     fn fetch_diff(&self) -> Result<String>;

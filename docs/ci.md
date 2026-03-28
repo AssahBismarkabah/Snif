@@ -90,49 +90,88 @@ needed. Grants permission to post PR comments and fetch PR data.
 
 ## SARIF integration
 
-When the review outputs SARIF (`--format sarif`), upload it with the
-`github/codeql-action/upload-sarif` action. Findings appear in the
-repository's Security tab under Code scanning alerts. This provides a
-persistent record of all findings across PRs.
+Snif outputs findings in SARIF 2.1.0 format with `--format sarif`. This is
+an industry-standard format supported by GitHub, GitLab, and most security
+dashboards.
+
+On GitHub, upload with the `github/codeql-action/upload-sarif` action.
+Findings appear in the repository's Security tab under Code scanning alerts.
+
+On GitLab, upload the SARIF file as a CI artifact or use GitLab's SAST report
+integration to display findings in the merge request security widget.
+
+On any platform, the SARIF file can be consumed by tools like SonarQube,
+DefectDojo, or custom dashboards.
 
 
 # GitLab CI
 
-The GitLab adapter is planned but not yet implemented. In the meantime, use
-the diff-file approach to run Snif in GitLab merge request pipelines.
+Snif supports GitLab natively. It posts findings as inline merge request
+discussions and summary comments. Works with gitlab.com, self-hosted GitLab,
+and enterprise instances with LDAP/SSO authentication.
 
 ```yaml
 snif-review:
   stage: review
   image: ghcr.io/assahbismarkabah/snif:latest
   script:
-    - git diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME..HEAD > change.patch
     - snif index --path .
-    - snif review --path . --diff-file change.patch --format json
+    - snif review --path .
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
     SNIF_API_KEY: $SNIF_API_KEY
+    GITLAB_TOKEN: $GITLAB_TOKEN
 ```
 
-Findings are printed to the pipeline log as JSON. When the GitLab adapter
-ships, it will post findings as merge request discussion threads directly.
+Snif auto-detects GitLab from the `CI_PROJECT_PATH` and
+`CI_MERGE_REQUEST_IID` environment variables provided by GitLab CI. No
+`--platform` flag needed.
+
+## Required variables
+
+Set these as CI/CD variables in the project settings (Settings > CI/CD >
+Variables):
+
+`SNIF_API_KEY` is the LLM provider API key.
+
+`GITLAB_TOKEN` is a project or personal access token with `api` scope. This
+is needed to post merge request comments. Alternatively, `CI_JOB_TOKEN` works
+if the project allows it, but it has limited permissions on some GitLab
+configurations.
+
+## Self-hosted GitLab
+
+For self-hosted instances (e.g., `https://git.example.com`), Snif reads the
+`CI_API_V4_URL` variable that GitLab CI provides automatically. No additional
+configuration is needed — the pipeline already knows the instance URL.
+
+For projects that want to be explicit, add the instance URL to `.snif.json`:
+
+```json
+{
+  "platform": {
+    "provider": "gitlab",
+    "api_base": "https://git.example.com/api/v4"
+  }
+}
+```
 
 
 # Generic CI (Jenkins, CircleCI, etc.)
 
-For any CI system that can run a binary and set environment variables, use the
-diff-file approach.
+For CI systems without a native Snif adapter, generate a diff from git and
+pass it directly. Snif runs the full review pipeline and outputs findings as
+JSON or SARIF to stdout.
 
 1. Download the Snif binary for your platform from GitHub releases
 2. Set `SNIF_API_KEY` as an environment variable
 3. Run `snif index --path .` to build the repository index
 4. Generate a diff: `git diff origin/main..HEAD > change.patch`
-5. Run `snif review --path . --diff-file change.patch`
-6. Parse the JSON output for your reporting system
+5. Run `snif review --path . --diff-file change.patch --format sarif`
+6. Feed the SARIF output to your reporting system or security dashboard
 
-The `--format sarif` flag produces SARIF 2.1.0 output that can be consumed
-by any SARIF-compatible tool or dashboard.
+JSON output is also available with `--format json` for custom integrations.
 
 
 # Docker
