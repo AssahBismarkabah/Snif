@@ -1,16 +1,9 @@
 # TODO
 
-Outstanding work for Snif beyond v1.0.0.
+Outstanding work for Snif beyond v2.0.0.
 
 
-# GitHub App
 
-GitHub App created and installed. The adapter supports dual auth — App
-credentials (SNIF_APP_ID, SNIF_APP_PRIVATE_KEY, SNIF_APP_INSTALLATION_ID)
-or fallback to GITHUB_TOKEN.
-
-- Upload a logo/avatar for the app
-- Publish to GitHub Marketplace when ready
 
 
 # GitLab Adapter

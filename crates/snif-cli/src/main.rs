@@ -31,13 +31,25 @@ enum Commands {
         #[arg(long, default_value = ".")]
         path: String,
 
+        /// Platform: github or gitlab (auto-detected from CI env)
+        #[arg(long)]
+        platform: Option<String>,
+
         /// GitHub repository (owner/repo)
         #[arg(long)]
         repo: Option<String>,
 
-        /// Pull request number
+        /// Pull request number (GitHub) or merge request IID (GitLab)
         #[arg(long)]
         pr: Option<u64>,
+
+        /// GitLab project path (group/project)
+        #[arg(long)]
+        project: Option<String>,
+
+        /// GitLab merge request IID (alias for --pr)
+        #[arg(long)]
+        mr: Option<u64>,
 
         /// Path to a local diff file (development convenience)
         #[arg(long)]
@@ -81,12 +93,23 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::Review {
             path,
+            platform,
             repo,
             pr,
+            project,
+            mr,
             diff_file,
             format,
         } => {
-            commands::review::run(&path, repo.as_deref(), pr, diff_file.as_deref(), &format)?;
+            commands::review::run(
+                &path,
+                platform.as_deref(),
+                repo.as_deref(),
+                pr.or(mr),
+                project.as_deref(),
+                diff_file.as_deref(),
+                &format,
+            )?;
         }
         Commands::Clean { path } => {
             commands::clean::run(&path)?;
