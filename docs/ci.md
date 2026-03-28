@@ -126,18 +126,14 @@ snif-review:
 
 Snif auto-detects GitLab from the `CI_PROJECT_PATH` and
 `CI_MERGE_REQUEST_IID` environment variables provided by GitLab CI. No
-`--platform` flag needed in CI.
-
-For explicit control or manual runs outside CI:
-
-```
-snif review --platform gitlab --project group/project --mr 42
-```
+`--platform` flag needed.
 
 ## Required variables
 
-`SNIF_API_KEY` is the LLM provider API key. Set it as a CI/CD variable in
-the project settings.
+Set these as CI/CD variables in the project settings (Settings > CI/CD >
+Variables):
+
+`SNIF_API_KEY` is the LLM provider API key.
 
 `GITLAB_TOKEN` is a project or personal access token with `api` scope. This
 is needed to post merge request comments. Alternatively, `CI_JOB_TOKEN` works
@@ -146,16 +142,11 @@ configurations.
 
 ## Self-hosted GitLab
 
-For self-hosted instances, Snif reads the `CI_API_V4_URL` variable that
-GitLab CI provides automatically. No additional configuration is needed. For
-manual runs, pass the API base explicitly:
+For self-hosted instances (e.g., `https://git.example.com`), Snif reads the
+`CI_API_V4_URL` variable that GitLab CI provides automatically. No additional
+configuration is needed — the pipeline already knows the instance URL.
 
-```
-snif review --platform gitlab --project group/project --mr 42
-```
-
-And set `CI_API_V4_URL=https://git.example.com/api/v4` in the environment,
-or configure it in `.snif.json`:
+For projects that want to be explicit, add the instance URL to `.snif.json`:
 
 ```json
 {
