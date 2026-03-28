@@ -110,6 +110,7 @@ data.
 
 - [Configuration](./docs/configuration.md)  setup, config format, CLI reference
 - [CI Integration](./docs/ci.md)  GitHub Actions, GitLab CI, Docker, generic CI
+- [Bot Identity](./docs/bot-identity.md)  GitHub App and GitLab bot user setup
 - [Testing](./docs/testing.md)  local testing and evaluation
 - [Product](./docs/product.md)  scope, delivery plan, success criteria
 - [Architecture](./docs/architecture.md)  system design, modules, data flows

@@ -6,14 +6,6 @@ Outstanding work for Snif beyond v2.0.0.
 
 
 
-# GitLab Adapter
-
-GitLab adapter implemented. Supports gitlab.com, self-hosted, and enterprise
-instances. Auto-detects GitLab from CI environment variables.
-
-- Test against a real GitLab merge request
-
-
 # Evaluation and Tuning
 
 The eval harness passes with 25 fixtures but the fixture set should grow over
