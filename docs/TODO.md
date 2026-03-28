@@ -8,13 +8,10 @@ Outstanding work for Snif beyond v2.0.0.
 
 # GitLab Adapter
 
-The platform adapter trait is defined but only GitHub is implemented.
+GitLab adapter implemented. Supports gitlab.com, self-hosted, and enterprise
+instances. Auto-detects GitLab from CI environment variables.
 
-- Implement `platform::gitlab` adapter using the GitLab merge request API
-- Support: fetch diff, fetch metadata (title, description, labels), post
-  discussion threads, resolve stale threads
 - Test against a real GitLab merge request
-- Document GitLab setup in docs/ci.md
 
 
 # Evaluation and Tuning

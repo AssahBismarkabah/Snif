@@ -98,25 +98,65 @@ persistent record of all findings across PRs.
 
 # GitLab CI
 
-The GitLab adapter is planned but not yet implemented. In the meantime, use
-the diff-file approach to run Snif in GitLab merge request pipelines.
+Snif supports GitLab natively. It posts findings as inline merge request
+discussions and summary comments. Works with gitlab.com, self-hosted GitLab,
+and enterprise instances with LDAP/SSO authentication.
 
 ```yaml
 snif-review:
   stage: review
   image: ghcr.io/assahbismarkabah/snif:latest
   script:
-    - git diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME..HEAD > change.patch
     - snif index --path .
-    - snif review --path . --diff-file change.patch --format json
+    - snif review --path .
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
     SNIF_API_KEY: $SNIF_API_KEY
+    GITLAB_TOKEN: $GITLAB_TOKEN
 ```
 
-Findings are printed to the pipeline log as JSON. When the GitLab adapter
-ships, it will post findings as merge request discussion threads directly.
+Snif auto-detects GitLab from the `CI_PROJECT_PATH` and
+`CI_MERGE_REQUEST_IID` environment variables provided by GitLab CI. No
+`--platform` flag needed in CI.
+
+For explicit control or manual runs outside CI:
+
+```
+snif review --platform gitlab --project group/project --mr 42
+```
+
+## Required variables
+
+`SNIF_API_KEY` is the LLM provider API key. Set it as a CI/CD variable in
+the project settings.
+
+`GITLAB_TOKEN` is a project or personal access token with `api` scope. This
+is needed to post merge request comments. Alternatively, `CI_JOB_TOKEN` works
+if the project allows it, but it has limited permissions on some GitLab
+configurations.
+
+## Self-hosted GitLab
+
+For self-hosted instances, Snif reads the `CI_API_V4_URL` variable that
+GitLab CI provides automatically. No additional configuration is needed. For
+manual runs, pass the API base explicitly:
+
+```
+snif review --platform gitlab --project group/project --mr 42
+```
+
+And set `CI_API_V4_URL=https://git.example.com/api/v4` in the environment,
+or configure it in `.snif.json`:
+
+```json
+{
+  "platform": {
+    "provider": "gitlab",
+    "api_base": "https://git.example.com/api/v4"
+  }
+}
+```
 
 
 # Generic CI (Jenkins, CircleCI, etc.)

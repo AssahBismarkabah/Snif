@@ -83,8 +83,14 @@ set for `snif index` to generate summaries.
 
 ## platform
 
-`provider` specifies the code hosting platform. Currently supported: `github`.
-GitLab support follows the same adapter pattern. Default: `github`.
+`provider` specifies the code hosting platform. Supported values: `github` and
+`gitlab`. Default: `github`. In CI, the platform is auto-detected from
+environment variables (`GITHUB_REPOSITORY` for GitHub, `CI_PROJECT_PATH` for
+GitLab).
+
+`api_base` is the GitLab API base URL for self-hosted instances. Default:
+`https://gitlab.com/api/v4`. Not needed for GitHub or gitlab.com. In GitLab
+CI, the `CI_API_V4_URL` variable is read automatically.
 
 ## index
 
@@ -164,6 +170,22 @@ access to pull requests and write access to review comments.
 
 `SNIF_PR_NUMBER` or `GITHUB_PR_NUMBER` is the pull request number. Used by the
 GitHub adapter when running in CI.
+
+`SNIF_PLATFORM` overrides platform auto-detection. Set to `github` or `gitlab`.
+
+`GITLAB_TOKEN` is a GitLab personal or project access token with `api` scope.
+Required for posting merge request comments. Falls back to `CI_JOB_TOKEN` in
+GitLab CI if not set.
+
+`CI_PROJECT_PATH` is automatically set by GitLab CI. Format: `group/project`.
+Used for auto-detecting GitLab platform and as the project identifier.
+
+`CI_MERGE_REQUEST_IID` is automatically set by GitLab CI in merge request
+pipelines. Used as the merge request identifier.
+
+`CI_API_V4_URL` is automatically set by GitLab CI. Points to the instance's
+API base (e.g., `https://gitlab.com/api/v4` or
+`https://git.example.com/api/v4`). Used for self-hosted GitLab support.
 
 
 # CLI Commands
