@@ -90,10 +90,18 @@ needed. Grants permission to post PR comments and fetch PR data.
 
 ## SARIF integration
 
-When the review outputs SARIF (`--format sarif`), upload it with the
-`github/codeql-action/upload-sarif` action. Findings appear in the
-repository's Security tab under Code scanning alerts. This provides a
-persistent record of all findings across PRs.
+Snif outputs findings in SARIF 2.1.0 format with `--format sarif`. This is
+an industry-standard format supported by GitHub, GitLab, and most security
+dashboards.
+
+On GitHub, upload with the `github/codeql-action/upload-sarif` action.
+Findings appear in the repository's Security tab under Code scanning alerts.
+
+On GitLab, upload the SARIF file as a CI artifact or use GitLab's SAST report
+integration to display findings in the merge request security widget.
+
+On any platform, the SARIF file can be consumed by tools like SonarQube,
+DefectDojo, or custom dashboards.
 
 
 # GitLab CI
@@ -161,18 +169,18 @@ or configure it in `.snif.json`:
 
 # Generic CI (Jenkins, CircleCI, etc.)
 
-For any CI system that can run a binary and set environment variables, use the
-diff-file approach.
+For CI systems without a native Snif adapter, generate a diff from git and
+pass it directly. Snif runs the full review pipeline and outputs findings as
+JSON or SARIF to stdout.
 
 1. Download the Snif binary for your platform from GitHub releases
 2. Set `SNIF_API_KEY` as an environment variable
 3. Run `snif index --path .` to build the repository index
 4. Generate a diff: `git diff origin/main..HEAD > change.patch`
-5. Run `snif review --path . --diff-file change.patch`
-6. Parse the JSON output for your reporting system
+5. Run `snif review --path . --diff-file change.patch --format sarif`
+6. Feed the SARIF output to your reporting system or security dashboard
 
-The `--format sarif` flag produces SARIF 2.1.0 output that can be consumed
-by any SARIF-compatible tool or dashboard.
+JSON output is also available with `--format json` for custom integrations.
 
 
 # Docker
