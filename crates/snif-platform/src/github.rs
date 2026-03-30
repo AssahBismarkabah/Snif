@@ -1,9 +1,6 @@
-use crate::PlatformAdapter;
+use crate::{PlatformAdapter, BOT_MARKER, FINGERPRINT_MARKER};
 use anyhow::{bail, Context, Result};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
-
-const FINGERPRINT_MARKER: &str = "<!-- snif:fingerprint:";
-const BOT_MARKER: &str = "<!-- snif:review -->";
 
 pub struct GitHubAdapter {
     token: String,
@@ -84,34 +81,6 @@ impl GitHubAdapter {
             .json(body)
             .send()
             .context("Failed to call GitHub API")
-    }
-
-    fn format_finding_body(finding: &Finding) -> String {
-        let fingerprint_tag = finding
-            .fingerprint
-            .as_ref()
-            .map(|fp| format!("{}{} -->", FINGERPRINT_MARKER, fp.id))
-            .unwrap_or_default();
-
-        format!(
-            "{}\n{}\n\
-             **[{}]** (confidence: {:.0}%)\n\n\
-             {}\n\n\
-             **Impact:** {}\n\n\
-             **Evidence:**\n```\n{}\n```\
-             {}\n",
-            BOT_MARKER,
-            fingerprint_tag,
-            finding.category,
-            finding.confidence * 100.0,
-            finding.explanation,
-            finding.impact,
-            finding.evidence,
-            finding
-                .suggestion
-                .as_ref()
-                .map_or(String::new(), |s| format!("\n\n**Suggestion:** {}", s))
-        )
     }
 }
 
@@ -295,12 +264,23 @@ impl PlatformAdapter for GitHubAdapter {
     }
 
     fn post_findings(&self, findings: &[Finding]) -> Result<()> {
+        if findings.is_empty() {
+            return Ok(());
+        }
+
+        // Fetch the PR head commit SHA (required for inline comments)
+        let head_sha = self
+            .get(&format!("pulls/{}", self.pr_number))
+            .ok()
+            .and_then(|resp| resp.json::<serde_json::Value>().ok())
+            .and_then(|pr| pr.get("head")?.get("sha")?.as_str().map(String::from));
+
         for finding in findings {
-            let comment_body = Self::format_finding_body(finding);
+            let comment_body = crate::format_finding_body(finding);
 
             let body = serde_json::json!({
                 "body": comment_body,
-                "commit_id": serde_json::Value::Null,
+                "commit_id": head_sha,
                 "path": finding.location.file,
                 "line": finding.location.start_line,
                 "side": "RIGHT",

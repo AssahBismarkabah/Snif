@@ -4,8 +4,10 @@ use std::path::Path;
 
 pub fn run(
     path: &str,
+    platform: Option<&str>,
     repo: Option<&str>,
     pr: Option<u64>,
+    project: Option<&str>,
     diff_file: Option<&str>,
     format: &str,
 ) -> Result<()> {
@@ -15,24 +17,33 @@ pub fn run(
     let config = snif_config::SnifConfig::load(repo_path)?;
     let store = snif_store::Store::open(Path::new(&config.index.db_path))?;
 
-    // Get the diff — either from a file, GitHub API, or fail
-    let (diff, metadata, changed_paths) = if let Some(diff_path) = diff_file {
+    // Detect platform
+    let detected_platform = detect_platform(platform, &config.platform.provider);
+    tracing::info!(platform = %detected_platform, "Platform detected");
+
+    // Get diff and metadata — either from a file or from the platform adapter
+    let (diff, metadata, changed_paths, adapter): (
+        String,
+        snif_types::ChangeMetadata,
+        Vec<String>,
+        Option<Box<dyn PlatformAdapter>>,
+    ) = if let Some(diff_path) = diff_file {
         let diff = std::fs::read_to_string(diff_path).context("Failed to read diff file")?;
         let paths = snif_platform::parse_changed_paths_from_diff(&diff);
         let metadata = snif_types::ChangeMetadata::default();
-        (diff, metadata, paths)
-    } else if let (Some(repo_str), Some(pr_num)) = (repo, pr) {
-        let parts: Vec<&str> = repo_str.splitn(2, '/').collect();
-        if parts.len() != 2 {
-            anyhow::bail!("--repo must be in owner/repo format");
-        }
-        let adapter = snif_platform::github::GitHubAdapter::new(parts[0], parts[1], pr_num)?;
+        (diff, metadata, paths, None)
+    } else {
+        let adapter = create_adapter(
+            &detected_platform,
+            repo,
+            pr,
+            project,
+            config.platform.api_base.as_deref(),
+        )?;
         let diff = adapter.fetch_diff()?;
         let metadata = adapter.fetch_metadata()?;
         let paths = adapter.fetch_changed_paths()?;
-        (diff, metadata, paths)
-    } else {
-        anyhow::bail!("Provide either --diff-file <path> or --repo <owner/repo> --pr <number>");
+        (diff, metadata, paths, Some(adapter))
     };
 
     tracing::info!(
@@ -114,7 +125,6 @@ pub fn run(
         "sarif" => {
             let sarif = snif_output::sarif::to_sarif(&findings);
             let sarif_json = serde_json::to_string_pretty(&sarif)?;
-            // Write to findings.sarif file for CI upload, and also to stdout
             std::fs::write("findings.sarif", &sarif_json)?;
             println!("{}", sarif_json);
         }
@@ -125,50 +135,108 @@ pub fn run(
         }
     }
 
-    // If GitHub adapter is available, manage annotation lifecycle
-    if let (Some(repo_str), Some(pr_num)) = (repo, pr) {
-        let parts: Vec<&str> = repo_str.splitn(2, '/').collect();
-        if parts.len() == 2 {
-            let adapter = snif_platform::github::GitHubAdapter::new(parts[0], parts[1], pr_num)?;
+    // Post to platform if adapter is available
+    if let Some(adapter) = &adapter {
+        let prior = adapter.get_prior_fingerprints()?;
 
-            // Fetch prior findings for lifecycle management
-            let prior = adapter.get_prior_fingerprints()?;
+        adapter.post_findings(&findings)?;
 
-            // Post new findings
-            adapter.post_findings(&findings)?;
+        let summary =
+            snif_output::summary::format_pr_summary(&snif_output::summary::ReviewSummaryInput {
+                change_summary: &change_summary,
+                findings: &findings,
+                changed_paths: &changed_paths,
+                retrieval_results: &retrieval_results,
+                diff_lines: diff.lines().count(),
+                model_name: &config.model.review_model,
+                duration_secs: result.duration.as_secs(),
+            });
+        adapter.post_summary(&summary)?;
 
-            // Build and post summary comment
-            let summary = snif_output::summary::format_pr_summary(
-                &snif_output::summary::ReviewSummaryInput {
-                    change_summary: &change_summary,
-                    findings: &findings,
-                    changed_paths: &changed_paths,
-                    retrieval_results: &retrieval_results,
-                    diff_lines: diff.lines().count(),
-                    model_name: &config.model.review_model,
-                    duration_secs: result.duration.as_secs(),
-                },
-            );
-            adapter.post_summary(&summary)?;
+        tracing::info!(posted = findings.len(), "Findings posted");
 
-            tracing::info!(posted = findings.len(), "Findings posted to GitHub PR");
+        let current_ids: Vec<&str> = findings
+            .iter()
+            .filter_map(|f| f.fingerprint.as_ref().map(|fp| fp.id.as_str()))
+            .collect();
+        let stale: Vec<_> = prior
+            .into_iter()
+            .filter(|fp| !current_ids.contains(&fp.id.as_str()))
+            .collect();
 
-            // Resolve stale findings (present before, absent now)
-            let current_ids: Vec<&str> = findings
-                .iter()
-                .filter_map(|f| f.fingerprint.as_ref().map(|fp| fp.id.as_str()))
-                .collect();
-            let stale: Vec<_> = prior
-                .into_iter()
-                .filter(|fp| !current_ids.contains(&fp.id.as_str()))
-                .collect();
-
-            if !stale.is_empty() {
-                tracing::info!(count = stale.len(), "Resolving stale findings");
-                adapter.resolve_stale(&stale)?;
-            }
+        if !stale.is_empty() {
+            tracing::info!(count = stale.len(), "Resolving stale findings");
+            adapter.resolve_stale(&stale)?;
         }
     }
 
     Ok(())
+}
+
+fn detect_platform(explicit: Option<&str>, config_default: &str) -> String {
+    if let Some(p) = explicit {
+        return p.to_string();
+    }
+    if let Ok(p) = std::env::var("SNIF_PLATFORM") {
+        return p;
+    }
+    if std::env::var("CI_PROJECT_PATH").is_ok() {
+        return "gitlab".to_string();
+    }
+    if std::env::var("GITHUB_REPOSITORY").is_ok() {
+        return "github".to_string();
+    }
+    config_default.to_string()
+}
+
+fn create_adapter(
+    platform: &str,
+    repo: Option<&str>,
+    pr: Option<u64>,
+    project: Option<&str>,
+    config_api_base: Option<&str>,
+) -> Result<Box<dyn PlatformAdapter>> {
+    match platform {
+        "gitlab" => {
+            let project_path = project
+                .map(String::from)
+                .or_else(|| std::env::var("CI_PROJECT_PATH").ok())
+                .context("--project or CI_PROJECT_PATH required for GitLab")?;
+            let mr_iid = pr
+                .or_else(|| {
+                    std::env::var("CI_MERGE_REQUEST_IID")
+                        .ok()
+                        .and_then(|s| s.parse().ok())
+                })
+                .context("--pr/--mr or CI_MERGE_REQUEST_IID required for GitLab")?;
+            let api_base = config_api_base
+                .map(String::from)
+                .or_else(|| std::env::var("CI_API_V4_URL").ok());
+            Ok(Box::new(snif_platform::gitlab::GitLabAdapter::new(
+                &project_path,
+                mr_iid,
+                api_base.as_deref(),
+            )?))
+        }
+        _ => {
+            let repo_str = repo
+                .map(String::from)
+                .or_else(|| std::env::var("GITHUB_REPOSITORY").ok())
+                .context("--repo or GITHUB_REPOSITORY required for GitHub")?;
+            let pr_num = pr
+                .or_else(|| {
+                    std::env::var("SNIF_PR_NUMBER")
+                        .ok()
+                        .and_then(|s| s.parse().ok())
+                })
+                .context("--pr or SNIF_PR_NUMBER required for GitHub")?;
+            let parts: Vec<&str> = repo_str.splitn(2, '/').collect();
+            if parts.len() != 2 {
+                anyhow::bail!("--repo must be in owner/repo format");
+            }
+            Ok(Box::new(snif_platform::github::GitHubAdapter::new(
+                parts[0], parts[1], pr_num,
+            )?))
+        }
+    }
 }
