@@ -18,6 +18,7 @@ pub struct SnifConfig {
 #[serde(default)]
 pub struct PlatformConfig {
     pub provider: String,
+    pub api_base: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -65,6 +66,7 @@ impl Default for PlatformConfig {
     fn default() -> Self {
         Self {
             provider: "github".to_string(),
+            api_base: None,
         }
     }
 }

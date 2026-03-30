@@ -33,7 +33,13 @@ pub fn run(
         let metadata = snif_types::ChangeMetadata::default();
         (diff, metadata, paths, None)
     } else {
-        let adapter = create_adapter(&detected_platform, repo, pr, project)?;
+        let adapter = create_adapter(
+            &detected_platform,
+            repo,
+            pr,
+            project,
+            config.platform.api_base.as_deref(),
+        )?;
         let diff = adapter.fetch_diff()?;
         let metadata = adapter.fetch_metadata()?;
         let paths = adapter.fetch_changed_paths()?;
@@ -188,6 +194,7 @@ fn create_adapter(
     repo: Option<&str>,
     pr: Option<u64>,
     project: Option<&str>,
+    config_api_base: Option<&str>,
 ) -> Result<Box<dyn PlatformAdapter>> {
     match platform {
         "gitlab" => {
@@ -202,7 +209,9 @@ fn create_adapter(
                         .and_then(|s| s.parse().ok())
                 })
                 .context("--pr/--mr or CI_MERGE_REQUEST_IID required for GitLab")?;
-            let api_base = std::env::var("CI_API_V4_URL").ok();
+            let api_base = config_api_base
+                .map(String::from)
+                .or_else(|| std::env::var("CI_API_V4_URL").ok());
             Ok(Box::new(snif_platform::gitlab::GitLabAdapter::new(
                 &project_path,
                 mr_iid,

@@ -264,12 +264,23 @@ impl PlatformAdapter for GitHubAdapter {
     }
 
     fn post_findings(&self, findings: &[Finding]) -> Result<()> {
+        if findings.is_empty() {
+            return Ok(());
+        }
+
+        // Fetch the PR head commit SHA (required for inline comments)
+        let head_sha = self
+            .get(&format!("pulls/{}", self.pr_number))
+            .ok()
+            .and_then(|resp| resp.json::<serde_json::Value>().ok())
+            .and_then(|pr| pr.get("head")?.get("sha")?.as_str().map(String::from));
+
         for finding in findings {
             let comment_body = crate::format_finding_body(finding);
 
             let body = serde_json::json!({
                 "body": comment_body,
-                "commit_id": serde_json::Value::Null,
+                "commit_id": head_sha,
                 "path": finding.location.file,
                 "line": finding.location.start_line,
                 "side": "RIGHT",
