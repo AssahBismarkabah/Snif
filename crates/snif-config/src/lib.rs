@@ -89,6 +89,7 @@ impl Default for IndexConfig {
                 ".git".to_string(),
                 "build".to_string(),
                 ".gradle".to_string(),
+                ".mvn".to_string(),
             ],
         }
     }
