@@ -80,12 +80,16 @@ impl Default for IndexConfig {
                 "rust".to_string(),
                 "typescript".to_string(),
                 "python".to_string(),
+                "java".to_string(),
             ],
             exclude_patterns: vec![
                 "target".to_string(),
                 "node_modules".to_string(),
                 "vendor".to_string(),
                 ".git".to_string(),
+                "build".to_string(),
+                ".gradle".to_string(),
+                ".mvn".to_string(),
             ],
         }
     }

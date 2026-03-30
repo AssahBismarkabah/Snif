@@ -2,7 +2,9 @@ pub mod adapter;
 pub mod adapters;
 
 use adapter::LanguageAdapter;
-use adapters::{python::PythonAdapter, rust::RustAdapter, typescript::TypeScriptAdapter};
+use adapters::{
+    java::JavaAdapter, python::PythonAdapter, rust::RustAdapter, typescript::TypeScriptAdapter,
+};
 use anyhow::Result;
 use snif_types::FileExtraction;
 use std::path::Path;
@@ -16,6 +18,7 @@ pub fn all_adapters() -> Vec<Box<dyn LanguageAdapter>> {
         Box::new(TypeScriptAdapter::new(false)),
         Box::new(TypeScriptAdapter::new(true)),
         Box::new(PythonAdapter),
+        Box::new(JavaAdapter),
     ]
 }
 
