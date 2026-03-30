@@ -5,6 +5,7 @@ pub enum Language {
     Rust,
     TypeScript,
     Python,
+    Java,
 }
 
 impl std::fmt::Display for Language {
@@ -13,6 +14,7 @@ impl std::fmt::Display for Language {
             Language::Rust => write!(f, "rust"),
             Language::TypeScript => write!(f, "typescript"),
             Language::Python => write!(f, "python"),
+            Language::Java => write!(f, "java"),
         }
     }
 }
