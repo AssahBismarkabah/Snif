@@ -10,6 +10,10 @@ pull request, it retrieves related code using structural, semantic, and keyword
 methods, then runs a single review call and posts only findings that survive
 aggressive filtering.
 
+<p align="center">
+  <img src="docs/Snif.gif" alt="Snif reviewing a pull request" width="720">
+</p>
+
 
 # Getting Started
 
