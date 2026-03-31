@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix cosign certificate identity in CI docs — uses `refs/heads/main` not `refs/tags` (matches workflow_run trigger)
+
 ## 3.1.6
 
 - Fix sign-release workflow trigger — use workflow_run instead of release event (GITHUB_TOKEN limitation)
