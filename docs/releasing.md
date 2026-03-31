@@ -15,23 +15,37 @@ cargo install cargo-dist
 
 # Creating a Release
 
-Run one of the following from the main branch:
+Two steps. Write the changelog first, then run the release command.
+
+## Step 1: Update the changelog
+
+Edit `CHANGELOG.md`. Move entries from `## Unreleased` into a new version
+section. Commit and push.
 
 ```
-cargo release patch   # 1.0.0 → 1.0.1
-cargo release minor   # 1.0.0 → 1.1.0
-cargo release major   # 1.0.0 → 2.0.0
+git add CHANGELOG.md
+git commit -m "docs: update changelog for vX.Y.Z"
+git push origin main
 ```
 
-This command:
+## Step 2: Run cargo release
+
+```
+cargo release patch   # 3.1.0 → 3.1.1
+cargo release minor   # 3.1.0 → 3.2.0
+cargo release major   # 3.1.0 → 4.0.0
+```
+
+This command handles everything else automatically:
 
 1. Bumps the version in the root `Cargo.toml` (all crates inherit it)
-2. Runs `dist generate` to regenerate the release workflow
+2. Runs `dist generate` to regenerate the release workflow (pre-release hook)
 3. Creates a commit with the message "release: v{version}"
 4. Creates an annotated git tag "v{version}"
 5. Pushes the commit and tag to the remote
 
-The tag push triggers the GitHub Actions release workflow.
+The tag push triggers the GitHub Actions release workflow. Do not manually
+edit versions, create tags, or push tags — `cargo release` does all of it.
 
 
 # What the Release Workflow Does
