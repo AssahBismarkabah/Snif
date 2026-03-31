@@ -106,13 +106,7 @@ snif index --path /path/to/any/repo
 
 Snif follows semantic versioning:
 
-- Patch releases (1.0.x) for bug fixes and minor improvements
-- Minor releases (1.x.0) for new features that don't break existing behavior
-- Major releases (x.0.0) for breaking changes to the CLI, config format, or
+- Patch releases for bug fixes and minor improvements
+- Minor releases for new features that don't break existing behavior
+- Major releases for breaking changes to the CLI, config format, or
   output schema
-
-
-# Changelog
-
-Update `CHANGELOG.md` before each release with a summary of changes. The
-release workflow uses the changelog for GitHub Release notes.
