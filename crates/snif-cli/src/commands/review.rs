@@ -74,7 +74,7 @@ pub fn run(
     );
 
     // Build context package
-    let context = snif_context::build_context(
+    let mut context = snif_context::build_context(
         &diff,
         &changed_paths,
         &retrieval_results,
@@ -84,13 +84,39 @@ pub fn run(
         metadata,
     )?;
 
-    // Render prompts
-    let system_prompt = snif_prompts::render_system_prompt(&config);
-    let user_prompt = snif_prompts::render_user_prompt(&context);
+    // Render prompts and enforce budget on the rendered output
+    let output_reserve = 4096;
+    let (system_prompt, user_prompt) = loop {
+        let sys = snif_prompts::render_system_prompt(&config);
+        let usr = snif_prompts::render_user_prompt(&context);
+        let total_tokens = snif_context::budget::estimate_tokens(&sys)
+            + snif_context::budget::estimate_tokens(&usr);
+
+        if total_tokens + output_reserve <= config.context.max_tokens {
+            break (sys, usr);
+        }
+
+        if context.related_files.pop().is_some() {
+            tracing::warn!(
+                tokens = total_tokens,
+                budget = config.context.max_tokens,
+                remaining_files = context.related_files.len(),
+                "Prompt exceeds budget, trimming context"
+            );
+        } else {
+            tracing::warn!(
+                tokens = total_tokens,
+                budget = config.context.max_tokens,
+                "Prompt still exceeds budget after removing all related files"
+            );
+            break (sys, usr);
+        }
+    };
 
     tracing::info!(
-        system_len = system_prompt.len(),
-        user_len = user_prompt.len(),
+        system_tokens = snif_context::budget::estimate_tokens(&system_prompt),
+        user_tokens = snif_context::budget::estimate_tokens(&user_prompt),
+        related_files = context.related_files.len(),
         "Prompts rendered"
     );
 

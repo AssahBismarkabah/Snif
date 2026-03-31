@@ -1,4 +1,4 @@
-mod budget;
+pub mod budget;
 
 use anyhow::Result;
 use snif_config::ContextConfig;
