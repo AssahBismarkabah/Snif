@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 3.1.4
+
+- Update cargo-dist to 0.31.0 — fixes Node.js 20 deprecation warnings in release workflow
+- Release workflow now uses actions/checkout@v6, upload-artifact@v6, download-artifact@v7
+- Clean up releasing doc — single changelog step, remove duplicate section
+
 ## 3.1.3
 
 - Remove musl target from release — sqlite-vec uses BSD types incompatible with musl libc
