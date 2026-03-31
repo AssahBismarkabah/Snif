@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 3.1.6
+
+- Fix sign-release workflow trigger — use workflow_run instead of release event (GITHUB_TOKEN limitation)
+
 ## 3.1.5
 
 - Add Sigstore cosign keyless signing for all release artifacts
