@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 3.1.3
+
+- Remove musl target from release — sqlite-vec uses BSD types incompatible with musl libc
+- Switch TLS from native-tls to rustls — eliminates OpenSSL system dependency
+- Alpine users should use `debian:bookworm-slim` base image with the glibc binary
+
 ## 3.1.2
 
 - improve GitLab CI support, update documentation, and switch to Alpine base image
