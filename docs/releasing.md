@@ -85,6 +85,11 @@ PowerShell (Windows):
 irm https://github.com/AssahBismarkabah/Snif/releases/latest/download/snif-installer.ps1 | iex
 ```
 
+Each release artifact includes a `.sha256` checksum file. For CI pipelines
+or environments that require integrity verification, download the archive
+and checksum separately and verify before extracting. See the CI
+documentation for examples.
+
 
 # Verifying a Release
 

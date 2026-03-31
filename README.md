@@ -10,10 +10,6 @@ pull request, it retrieves related code using structural, semantic, and keyword
 methods, then runs a single review call and posts only findings that survive
 aggressive filtering.
 
-<p align="center">
-  <img src="docs/Snif-gitlab-example.png" alt="Snif reviewing a GitLab merge request" width="720">
-</p>
-
 
 # Getting Started
 
