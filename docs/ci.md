@@ -121,6 +121,8 @@ snif-review:
   image: debian:bookworm-slim
   variables:
     SNIF_VERSION: "3.1.4"
+    SNIF_API_KEY: $SNIF_API_KEY
+    GITLAB_TOKEN: $GITLAB_TOKEN
   before_script:
     - apt-get update && apt-get install -y curl git xz-utils ca-certificates
     - curl -sL "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz" -o snif.tar.xz
@@ -133,9 +135,6 @@ snif-review:
     - snif review --path .
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"  # Required
-  variables:
-    SNIF_API_KEY: $SNIF_API_KEY
-    GITLAB_TOKEN: $GITLAB_TOKEN
 ```
 
 Snif auto-detects GitLab from the `CI_PROJECT_PATH` and
