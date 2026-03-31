@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 3.1.5
+
+- Add Sigstore cosign keyless signing for all release artifacts
+- Release checksums are now signed with GitHub OIDC identity and recorded in Sigstore transparency log
+- CI docs updated with cosign signature verification for both GitHub Actions and GitLab CI
+- No more `curl | sh` — all installation examples use pinned versions with checksum and signature verification
+
 ## 3.1.4
 
 - Update cargo-dist to 0.31.0 — fixes Node.js 20 deprecation warnings in release workflow
