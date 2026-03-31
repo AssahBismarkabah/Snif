@@ -101,15 +101,39 @@ pub fn run(
                 tokens = total_tokens,
                 budget = config.context.max_tokens,
                 remaining_files = context.related_files.len(),
-                "Prompt exceeds budget, trimming context"
+                "Prompt exceeds budget, trimming related files"
             );
         } else {
-            tracing::warn!(
-                tokens = total_tokens,
-                budget = config.context.max_tokens,
-                "Prompt still exceeds budget after removing all related files"
-            );
-            break (sys, usr);
+            // No more related files — truncate the largest changed file
+            if let Some(largest) = context
+                .changed_files
+                .iter_mut()
+                .max_by_key(|f| f.content.len())
+            {
+                if largest.content.len() > 1000 {
+                    let truncated_len = largest.content.len() / 2;
+                    let truncated: String = largest.content.chars().take(truncated_len).collect();
+                    tracing::warn!(
+                        file = %largest.path,
+                        original_chars = largest.content.len(),
+                        truncated_chars = truncated.len(),
+                        "Truncating large changed file to fit budget"
+                    );
+                    largest.content = format!(
+                        "{}\n\n... [truncated — file too large for context budget]",
+                        truncated
+                    );
+                } else {
+                    tracing::warn!(
+                        tokens = total_tokens,
+                        budget = config.context.max_tokens,
+                        "Prompt exceeds budget, cannot trim further"
+                    );
+                    break (sys, usr);
+                }
+            } else {
+                break (sys, usr);
+            }
         }
     };
 

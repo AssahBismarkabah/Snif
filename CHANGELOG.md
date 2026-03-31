@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 3.1.8
+
+- Fix prompt overflow when changed files are very large (lock files, generated code)
+- Trim loop now truncates oversized changed files after exhausting related files
+- Prevents 400 errors from LLM providers when diff includes large non-source files
+
 ## 3.1.7
 
 - Fix context budget enforcement — budget now checked on rendered prompt, not raw content
