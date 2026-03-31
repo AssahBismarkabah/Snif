@@ -85,7 +85,7 @@ pub fn run(
     )?;
 
     // Render prompts and enforce budget on the rendered output
-    let output_reserve = 4096;
+    let output_reserve = config.context.output_reserve_tokens;
     let (system_prompt, user_prompt) = loop {
         let sys = snif_prompts::render_system_prompt(&config);
         let usr = snif_prompts::render_user_prompt(&context);

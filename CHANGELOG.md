@@ -2,7 +2,14 @@
 
 ## Unreleased
 
-- Fix cosign certificate identity in CI docs — uses `refs/heads/main` not `refs/tags` (matches workflow_run trigger)
+## 3.1.7
+
+- Fix context budget enforcement — budget now checked on rendered prompt, not raw content
+- Token estimation changed from /4 to /3 (conservative, prevents underestimation on formatted code)
+- Post-render trim loop removes lowest-ranked related files until prompt fits within `max_tokens`
+- New config field `output_reserve_tokens` (default 4096) reserves space for model response
+- No more hardcoded values — output reserve is configurable via `.snif.json`
+- Fix cosign certificate identity in CI docs — uses `refs/heads/main` not `refs/tags`
 
 ## 3.1.6
 
