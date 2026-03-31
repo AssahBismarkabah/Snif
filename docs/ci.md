@@ -125,10 +125,10 @@ snif-review:
     GITLAB_TOKEN: $GITLAB_TOKEN
   before_script:
     - apt-get update && apt-get install -y curl git xz-utils ca-certificates
-    - curl -sL "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz" -o snif.tar.xz
-    - curl -sL "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256" -o snif.tar.xz.sha256
-    - sha256sum -c snif.tar.xz.sha256
-    - tar xJf snif.tar.xz
+    - curl -sL "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz" -O
+    - curl -sL "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256" -O
+    - sha256sum -c snif-x86_64-unknown-linux-gnu.tar.xz.sha256
+    - tar xJf snif-x86_64-unknown-linux-gnu.tar.xz
     - mv snif-x86_64-unknown-linux-gnu/snif /usr/local/bin/snif
   script:
     - snif index --path .
