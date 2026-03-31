@@ -135,7 +135,14 @@ snif-review:
 
 Snif auto-detects GitLab from the `CI_PROJECT_PATH` and
 `CI_MERGE_REQUEST_IID` environment variables provided by GitLab CI. No
-`--platform` flag needed.
+flags needed. If auto-detection does not work in your environment, pass the
+values explicitly:
+
+```yaml
+  script:
+    - snif index --path .
+    - snif review --path . --repo "$CI_PROJECT_PATH" --pr "$CI_MERGE_REQUEST_IID"
+```
 
 ## Required variables
 

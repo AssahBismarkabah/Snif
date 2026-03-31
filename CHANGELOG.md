@@ -6,6 +6,7 @@
 
 - improve GitLab CI support, update documentation, and switch to Alpine base image
 - update CI docs to replace Docker image with manual Snif installation steps
+-  allow `--repo` flag fallback for GitLab auto-detection, update CI docs for clarity
 
 ## 2.0.0
 

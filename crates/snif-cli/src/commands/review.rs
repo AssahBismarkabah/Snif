@@ -199,6 +199,7 @@ fn create_adapter(
     match platform {
         "gitlab" => {
             let project_path = project
+                .or(repo)
                 .map(String::from)
                 .or_else(|| std::env::var("CI_PROJECT_PATH").ok())
                 .context(
