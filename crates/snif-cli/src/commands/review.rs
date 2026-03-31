@@ -201,14 +201,21 @@ fn create_adapter(
             let project_path = project
                 .map(String::from)
                 .or_else(|| std::env::var("CI_PROJECT_PATH").ok())
-                .context("--project or CI_PROJECT_PATH required for GitLab")?;
+                .context(
+                    "--project or CI_PROJECT_PATH required for GitLab. \
+                     Make sure the pipeline runs with: rules: - if: $CI_PIPELINE_SOURCE == \"merge_request_event\"",
+                )?;
             let mr_iid = pr
                 .or_else(|| {
                     std::env::var("CI_MERGE_REQUEST_IID")
                         .ok()
                         .and_then(|s| s.parse().ok())
                 })
-                .context("--pr/--mr or CI_MERGE_REQUEST_IID required for GitLab")?;
+                .context(
+                    "--pr/--mr or CI_MERGE_REQUEST_IID required for GitLab. \
+                     CI_MERGE_REQUEST_IID is only available in merge request pipelines. \
+                     Add this rule to your .gitlab-ci.yml: rules: - if: $CI_PIPELINE_SOURCE == \"merge_request_event\"",
+                )?;
             let api_base = config_api_base
                 .map(String::from)
                 .or_else(|| std::env::var("CI_API_V4_URL").ok());

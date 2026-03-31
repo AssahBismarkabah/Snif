@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 3.1.0
+
+- improve GitLab CI support, update documentation, and switch to Alpine base image
+
 ## 2.0.0
 
 ### GitHub App

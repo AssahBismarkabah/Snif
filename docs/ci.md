@@ -110,6 +110,11 @@ Snif supports GitLab natively. It posts findings as inline merge request
 discussions and summary comments. Works with gitlab.com, self-hosted GitLab,
 and enterprise instances with LDAP/SSO authentication.
 
+The pipeline must run as a merge request pipeline. Snif reads
+`CI_PROJECT_PATH` and `CI_MERGE_REQUEST_IID` from the environment, which
+GitLab only provides in merge request pipelines. Without the merge request
+rule, these variables are not set and `snif review` will fail.
+
 ```yaml
 snif-review:
   stage: review
@@ -118,7 +123,7 @@ snif-review:
     - snif index --path .
     - snif review --path .
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"  # Required
   variables:
     SNIF_API_KEY: $SNIF_API_KEY
     GITLAB_TOKEN: $GITLAB_TOKEN
