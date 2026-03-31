@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 3.1.0
+## 3.1.1
 
 - improve GitLab CI support, update documentation, and switch to Alpine base image
 - update CI docs to replace Docker image with manual Snif installation steps
