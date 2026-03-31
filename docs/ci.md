@@ -118,7 +118,11 @@ rule, these variables are not set and `snif review` will fail.
 ```yaml
 snif-review:
   stage: review
-  image: ghcr.io/assahbismarkabah/snif:latest
+  image: debian:bookworm-slim
+  before_script:
+    - apt-get update && apt-get install -y curl git xz-utils ca-certificates
+    - curl -sL "https://github.com/AssahBismarkabah/Snif/releases/latest/download/snif-x86_64-unknown-linux-gnu.tar.xz" | tar xJ
+    - mv snif-x86_64-unknown-linux-gnu/snif /usr/local/bin/snif
   script:
     - snif index --path .
     - snif review --path .
@@ -179,28 +183,6 @@ JSON or SARIF to stdout.
 JSON output is also available with `--format json` for custom integrations.
 
 
-# Docker
-
-The Snif container image includes the binary and all dependencies. Use it in
-any CI system that supports Docker.
-
-```
-docker run --rm \
-  -v "$(pwd):/workspace" \
-  -e SNIF_API_KEY \
-  ghcr.io/assahbismarkabah/snif:latest \
-  review --path /workspace --diff-file /workspace/change.patch
-```
-
-For indexing:
-
-```
-docker run --rm \
-  -v "$(pwd):/workspace" \
-  -e SNIF_API_KEY \
-  ghcr.io/assahbismarkabah/snif:latest \
-  index --path /workspace
-```
 
 
 # Configuration
