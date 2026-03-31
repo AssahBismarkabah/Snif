@@ -50,8 +50,7 @@ cargo-dist. When triggered by a version tag, it:
 
 Each release produces binaries for:
 
-- Linux x86_64 glibc (`x86_64-unknown-linux-gnu`)
-- Linux x86_64 musl (`x86_64-unknown-linux-musl`) — for Alpine and static linking
+- Linux x86_64 (`x86_64-unknown-linux-gnu`)
 - macOS x86_64 (`x86_64-apple-darwin`)
 - macOS aarch64 / Apple Silicon (`aarch64-apple-darwin`)
 - Windows x86_64 (`x86_64-pc-windows-msvc`)
