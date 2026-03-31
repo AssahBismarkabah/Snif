@@ -34,10 +34,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: sigstore/cosign-installer@v3
+
       - name: Install Snif
+        env:
+          SNIF_VERSION: "3.1.4"
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf \
-            https://github.com/AssahBismarkabah/Snif/releases/latest/download/snif-installer.sh | sh
+          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz" -O
+          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256" -O
+          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig" -O
+          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem" -O
+          cosign verify-blob snif-x86_64-unknown-linux-gnu.tar.xz.sha256 \
+            --signature snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig \
+            --certificate snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem \
+            --certificate-identity "https://github.com/AssahBismarkabah/Snif/.github/workflows/sign-release.yml@refs/tags/v${SNIF_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+          sha256sum -c snif-x86_64-unknown-linux-gnu.tar.xz.sha256
+          tar xJf snif-x86_64-unknown-linux-gnu.tar.xz
+          mv snif-x86_64-unknown-linux-gnu/snif /usr/local/bin/snif
 
       - name: Index repository
         run: snif index --path .
