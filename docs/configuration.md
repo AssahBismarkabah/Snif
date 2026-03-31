@@ -110,12 +110,19 @@ Default: `["target", "node_modules", "vendor", ".git"]`.
 
 ## context
 
-`max_tokens` is the maximum token budget for the context package sent to the
-LLM during review. Default: 128000. Token count is estimated at 4 characters
-per token.
+`max_tokens` is the maximum token budget for the rendered prompt sent to the
+LLM during review. The budget is enforced on the fully formatted prompt
+including line numbers, markdown, and headers. If the rendered prompt exceeds
+this limit, Snif removes the lowest-ranked related files until it fits.
+Default: 128000. Token count is estimated at 3 characters per token
+(conservative).
 
 `max_files` is the maximum number of related files to include in the context.
 Default: 50.
+
+`output_reserve_tokens` is the number of tokens reserved for the model's
+response output. The prompt budget is `max_tokens - output_reserve_tokens`.
+Default: 4096.
 
 `retrieval_weights` controls how structural, semantic, and keyword retrieval
 results are weighted when ranking related files. Default: structural 1.0,

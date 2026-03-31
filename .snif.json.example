@@ -44,6 +44,7 @@
   "context": {
     "max_tokens": 128000,
     "max_files": 50,
+    "output_reserve_tokens": 4096,
     "retrieval_weights": {
       "structural": 1.0,
       "semantic": 0.7,
