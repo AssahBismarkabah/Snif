@@ -11,7 +11,7 @@ methods, then runs a single review call and posts only findings that survive
 aggressive filtering.
 
 <p align="center">
-  <img src="docs/Snif.gif" alt="Snif reviewing a pull request" width="720">
+  <img src="docs/Snif-gitlab-example.png" alt="Snif reviewing a GitLab merge request" width="720">
 </p>
 
 
