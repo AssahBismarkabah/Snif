@@ -1,22 +1,14 @@
 # cargo-release configuration
-# Install: cargo install cargo-release
-# Usage: cargo release patch/minor/major
+# Usage: cargo release patch/minor/major --execute
 
-[workspace]
 allow-branch = ["main"]
 sign-commit = false
 sign-tag = false
 push = true
 publish = false
-
-# Pre-release hook to regenerate dist workflow
 pre-release-hook = ["dist", "generate"]
-
-# Commit message format
 pre-release-commit-message = "release: v{{version}}"
 tag-message = "v{{version}}"
 tag-name = "v{{version}}"
-
-# Update all workspace members together
 consolidate-commits = true
 dependent-version = "upgrade"
