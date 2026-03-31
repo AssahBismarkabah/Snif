@@ -1,0 +1,44 @@
+name: Sign Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Download checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh release download "$RELEASE_TAG" \
+            --repo "$REPO" \
+            --pattern '*.sha256'
+
+      - name: Sign checksums with cosign (keyless)
+        run: |
+          for f in *.sha256; do
+            cosign sign-blob "$f" \
+              --yes \
+              --output-signature "${f}.sig" \
+              --output-certificate "${f}.pem"
+          done
+
+      - name: Upload signatures
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            --repo "$REPO" \
+            *.sig *.pem

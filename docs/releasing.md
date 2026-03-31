@@ -107,6 +107,26 @@ snif index --path /path/to/any/repo
 ```
 
 
+# Verifying Release Signatures
+
+Each release is signed with Sigstore cosign using keyless OIDC signing from
+GitHub Actions. The signature proves the artifact was built by the Snif CI
+workflow, not tampered with after publishing.
+
+To verify a release artifact:
+
+```
+cosign verify-blob snif-x86_64-unknown-linux-gnu.tar.xz.sha256 \
+  --signature snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig \
+  --certificate snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem \
+  --certificate-identity "https://github.com/AssahBismarkabah/Snif/.github/workflows/sign-release.yml@refs/tags/vX.Y.Z" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+```
+
+Replace `vX.Y.Z` with the release version. The `.sig` and `.pem` files are
+published alongside each release archive.
+
+
 # Versioning
 
 Snif follows semantic versioning:

@@ -125,8 +125,16 @@ snif-review:
     GITLAB_TOKEN: $GITLAB_TOKEN
   before_script:
     - apt-get update && apt-get install -y curl git xz-utils ca-certificates
-    - curl -sL "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz" -O
-    - curl -sL "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256" -O
+    - curl -sSLf "https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64" -o /usr/local/bin/cosign && chmod +x /usr/local/bin/cosign
+    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz" -O
+    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256" -O
+    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig" -O
+    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem" -O
+    - cosign verify-blob snif-x86_64-unknown-linux-gnu.tar.xz.sha256
+        --signature snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig
+        --certificate snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem
+        --certificate-identity "https://github.com/AssahBismarkabah/Snif/.github/workflows/sign-release.yml@refs/tags/v${SNIF_VERSION}"
+        --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
     - sha256sum -c snif-x86_64-unknown-linux-gnu.tar.xz.sha256
     - tar xJf snif-x86_64-unknown-linux-gnu.tar.xz
     - mv snif-x86_64-unknown-linux-gnu/snif /usr/local/bin/snif
