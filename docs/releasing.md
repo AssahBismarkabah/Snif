@@ -119,7 +119,7 @@ To verify a release artifact:
 cosign verify-blob snif-x86_64-unknown-linux-gnu.tar.xz.sha256 \
   --signature snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig \
   --certificate snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem \
-  --certificate-identity "https://github.com/AssahBismarkabah/Snif/.github/workflows/sign-release.yml@refs/tags/vX.Y.Z" \
+  --certificate-identity "https://github.com/AssahBismarkabah/Snif/.github/workflows/sign-release.yml@refs/heads/main" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
