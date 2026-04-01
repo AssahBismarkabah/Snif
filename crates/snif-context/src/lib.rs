@@ -8,6 +8,29 @@ use snif_types::{
 };
 use std::path::Path;
 
+const MAX_CHANGED_FILE_BYTES: usize = 50_000;
+
+const NON_REVIEWABLE_FILES: &[&str] = &[
+    "pnpm-lock.yaml",
+    "package-lock.json",
+    "yarn.lock",
+    "Cargo.lock",
+    "Gemfile.lock",
+    "poetry.lock",
+    "composer.lock",
+    "go.sum",
+    "flake.lock",
+];
+
+fn is_non_reviewable(path: &str) -> bool {
+    let filename = path.rsplit('/').next().unwrap_or(path);
+    NON_REVIEWABLE_FILES.contains(&filename)
+        || filename.ends_with(".lock")
+        || filename.ends_with(".min.js")
+        || filename.ends_with(".min.css")
+        || filename.ends_with(".bundle.js")
+}
+
 pub fn build_context(
     diff: &str,
     changed_paths: &[String],
@@ -30,7 +53,22 @@ pub fn build_context(
 
     for path in changed_paths {
         let full_path = repo_root.join(path);
-        let content = std::fs::read_to_string(&full_path).unwrap_or_default();
+
+        let file_size = std::fs::metadata(&full_path)
+            .map(|m| m.len() as usize)
+            .unwrap_or(0);
+
+        let content = if is_non_reviewable(path) || file_size > MAX_CHANGED_FILE_BYTES {
+            tracing::info!(
+                path = %path,
+                size = file_size,
+                "Skipping full content — large or non-reviewable file"
+            );
+            "[File content excluded — large or generated file. See diff for changes.]".to_string()
+        } else {
+            std::fs::read_to_string(&full_path).unwrap_or_default()
+        };
+
         let tokens = budget::estimate_tokens(&content);
         changed_files_tokens += tokens;
         remaining = remaining.saturating_sub(tokens);

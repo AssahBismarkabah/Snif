@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 3.1.8
+
+- Skip full content for lock files and generated files in changed file context
+- Non-reviewable files (pnpm-lock.yaml, package-lock.json, yarn.lock, Cargo.lock, *.min.js, etc.) use diff only
+- Enforce 50KB per-file size limit — files exceeding limit get placeholder instead of full content
+- Prevents prompt overflow when PRs include large generated files
+
 ## 3.1.7
 
 - Fix context budget enforcement — budget now checked on rendered prompt, not raw content
