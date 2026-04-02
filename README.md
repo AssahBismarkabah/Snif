@@ -1,8 +1,5 @@
 # **Snif**
 
-<p align="left">
-  <img src="./docs/assets/context-depth-vs-quality.png" width="680" alt="Review quality vs context depth">
-</p>
 
 
 <div align="left">
@@ -24,6 +21,11 @@ methods, then runs a single review call and posts only findings that survive
 aggressive filtering.
 
 <hr>
+
+
+<p align="left">
+  <img src="./docs/assets/context-depth-vs-quality.png" width="680" alt="Review quality vs context depth">
+</p>
 
 # Getting Started
 
