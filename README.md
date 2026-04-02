@@ -1,14 +1,8 @@
 <a name="readme-top"></a>
 
-<div align="center">
-  <img src="docs/assets/Snif-asst.png" alt="Snif" width="120">
-  <h1 align="center" style="border-bottom: none">Snif: Context-Aware AI Code Review Agent</h1>
-</div>
-
-<div align="center">
+<div align="left">
   <a href="https://github.com/AssahBismarkabah/Snif/blob/main/LICENSE"><img src="https://img.shields.io/badge/LICENSE-MIT-20B2AA?style=for-the-badge" alt="MIT License"></a>
   <a href="https://github.com/AssahBismarkabah/Snif/releases/latest"><img src="https://img.shields.io/github/v/release/AssahBismarkabah/Snif?style=for-the-badge&color=blue" alt="Latest Release"></a>
-  <br/>
   <a href="./docs"><img src="https://img.shields.io/badge/Documentation-000?logo=googledocs&logoColor=FFE165&style=for-the-badge" alt="Documentation"></a>
 </div>
 
