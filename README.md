@@ -1,4 +1,4 @@
-# Snif 
+# **Snif**
 
 <div align="left">
   <a href="https://github.com/AssahBismarkabah/Snif/blob/main/LICENSE"><img src="https://img.shields.io/badge/LICENSE-MIT-20B2AA?style=for-the-badge" alt="MIT License"></a>
@@ -6,8 +6,7 @@
   <a href="./docs"><img src="https://img.shields.io/badge/Documentation-000?logo=googledocs&logoColor=FFE165&style=for-the-badge" alt="Documentation"></a>
 </div>
 
- Context-Aware AI Code Review Agent
----
+# Context-Aware AI Code Review Agent
 
 Snif is a code review agent that understands your codebase. It indexes the
 repository structure, generates semantic summaries, and uses that context to
