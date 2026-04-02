@@ -1,5 +1,10 @@
 # **Snif**
 
+<p align="left">
+  <img src="./docs/assets/context-depth-vs-quality.png" width="680" alt="Review quality vs context depth">
+</p>
+
+
 <div align="left">
   <a href="https://github.com/AssahBismarkabah/Snif/blob/main/LICENSE"><img src="https://img.shields.io/badge/LICENSE-MIT-20B2AA?style=for-the-badge" alt="MIT License"></a>
   <a href="https://github.com/AssahBismarkabah/Snif/releases/latest"><img src="https://img.shields.io/github/v/release/AssahBismarkabah/Snif?style=for-the-badge&color=blue" alt="Latest Release"></a>
