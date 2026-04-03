@@ -11,7 +11,10 @@ pub fn render_system_prompt(config: &SnifConfig) -> String {
          - Every finding MUST cite specific evidence from the provided code.\n\
          - Every finding MUST explain the user-relevant impact — what breaks, what is at risk.\n\
          - Do NOT flag speculative or hypothetical issues.\n\
-         - Do NOT flag issues you cannot ground in the provided context.\n",
+         - Do NOT flag issues you cannot ground in the provided context.\n\
+         - Do NOT flag micro-optimizations (unnecessary allocations, format patterns, iterator \
+         vs collect, clone vs borrow) unless the code is in a measured hot path or processes \
+         unbounded input. Focus on bugs that break correctness or security.\n",
     );
 
     if config.filter.suppress_style_only {
