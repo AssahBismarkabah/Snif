@@ -1,5 +1,5 @@
 use snif_config::SnifConfig;
-use snif_types::ContextPackage;
+use snif_types::{ContentTier, ContextPackage};
 
 pub fn render_system_prompt(config: &SnifConfig) -> String {
     let mut prompt = String::from(
@@ -11,7 +11,9 @@ pub fn render_system_prompt(config: &SnifConfig) -> String {
          - Every finding MUST cite specific evidence from the provided code.\n\
          - Every finding MUST explain the user-relevant impact — what breaks, what is at risk.\n\
          - Do NOT flag speculative or hypothetical issues.\n\
-         - Do NOT flag issues you cannot ground in the provided context.\n",
+         - Do NOT flag issues you cannot ground in the provided context.\n\
+         - If full file content is not provided for a changed file, use the diff hunks to review \
+         that file's changes. Reference diff hunk line numbers in that case.\n",
     );
 
     if config.filter.suppress_style_only {
@@ -90,11 +92,25 @@ pub fn render_user_prompt(context: &ContextPackage) -> String {
         if let Some(summary) = &file.summary {
             prompt.push_str(&format!("Summary: {}\n", summary));
         }
-        prompt.push_str("```\n");
-        for (i, line) in file.content.lines().enumerate() {
-            prompt.push_str(&format!("{:>4} | {}\n", i + 1, line));
+        match file.content_tier {
+            ContentTier::Full => {
+                prompt.push_str("```\n");
+                for (i, line) in file.content.lines().enumerate() {
+                    prompt.push_str(&format!("{:>4} | {}\n", i + 1, line));
+                }
+                prompt.push_str("```\n\n");
+            }
+            ContentTier::SummaryOnly => {
+                prompt.push_str(
+                    "*[Full content omitted — budget exceeded. Refer to the diff for changes.]*\n\n",
+                );
+            }
+            ContentTier::DiffOnly => {
+                prompt.push_str(
+                    "*[Content omitted — budget exceeded. All changes visible in the diff above.]*\n\n",
+                );
+            }
         }
-        prompt.push_str("```\n\n");
     }
 
     if !context.related_files.is_empty() {

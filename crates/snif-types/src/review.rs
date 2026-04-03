@@ -51,12 +51,20 @@ pub struct ChangeMetadata {
     pub commit_messages: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentTier {
+    Full,
+    SummaryOnly,
+    DiffOnly,
+}
+
 #[derive(Debug)]
 pub struct ContextFile {
     pub path: String,
     pub content: String,
     pub summary: Option<String>,
     pub retrieval_score: Option<f64>,
+    pub content_tier: ContentTier,
 }
 
 #[derive(Debug)]
@@ -75,4 +83,7 @@ pub struct BudgetReport {
     pub remaining_tokens: usize,
     pub files_included: usize,
     pub files_omitted: usize,
+    pub files_full: usize,
+    pub files_summary_only: usize,
+    pub files_diff_only: usize,
 }
