@@ -7,7 +7,6 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  security-events: write
 
 jobs:
   review:
@@ -43,7 +42,7 @@ jobs:
             --path . \
             --repo "$GITHUB_REPO" \
             --pr "$PR_NUMBER" \
-            --format sarif
+            --format json
         env:
           SNIF_APP_ID: ${{ secrets.SNIF_APP_ID }}
           SNIF_APP_PRIVATE_KEY: ${{ secrets.SNIF_APP_PRIVATE_KEY }}
@@ -54,10 +53,3 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SNIF_PR_NUMBER: ${{ github.event.pull_request.number }}
           RUST_LOG: info
-
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: findings.sarif
-          category: snif
