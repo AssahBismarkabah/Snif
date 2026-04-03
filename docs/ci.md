@@ -7,7 +7,7 @@ platforms.
 # GitHub Actions
 
 GitHub Actions is the primary supported platform. Snif posts findings as
-inline PR review comments and uploads SARIF results to GitHub's security tab.
+inline PR review comments.
 
 ## Using a pre-built binary (recommended)
 
@@ -24,7 +24,6 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  security-events: write
 
 jobs:
   review:
@@ -63,21 +62,13 @@ jobs:
           snif review \
             --path . \
             --repo "$GITHUB_REPO" \
-            --pr "$PR_NUMBER" \
-            --format sarif > findings.sarif
+            --pr "$PR_NUMBER"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SNIF_API_KEY: ${{ secrets.SNIF_API_KEY }}
           GITHUB_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SNIF_PR_NUMBER: ${{ github.event.pull_request.number }}
-
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: findings.sarif
-          category: snif
 ```
 
 ## Building from source
@@ -101,22 +92,6 @@ settings under Settings > Secrets and variables > Actions.
 
 `GITHUB_TOKEN` — provided automatically by GitHub Actions. No configuration
 needed. Grants permission to post PR comments and fetch PR data.
-
-## SARIF integration
-
-Snif outputs findings in SARIF 2.1.0 format with `--format sarif`. This is
-an industry-standard format supported by GitHub, GitLab, and most security
-dashboards.
-
-On GitHub, upload with the `github/codeql-action/upload-sarif` action.
-Findings appear in the repository's Security tab under Code scanning alerts.
-
-On GitLab, upload the SARIF file as a CI artifact or use GitLab's SAST report
-integration to display findings in the merge request security widget.
-
-On any platform, the SARIF file can be consumed by tools like SonarQube,
-DefectDojo, or custom dashboards.
-
 
 # GitLab CI
 
@@ -204,16 +179,14 @@ For projects that want to be explicit, add the instance URL to `.snif.json`:
 
 For CI systems without a native Snif adapter, generate a diff from git and
 pass it directly. Snif runs the full review pipeline and outputs findings as
-JSON or SARIF to stdout.
+JSON to stdout.
 
 1. Download the Snif binary for your platform from GitHub releases
 2. Set `SNIF_API_KEY` as an environment variable
 3. Run `snif index --path .` to build the repository index
 4. Generate a diff: `git diff origin/main..HEAD > change.patch`
-5. Run `snif review --path . --diff-file change.patch --format sarif`
-6. Feed the SARIF output to your reporting system or security dashboard
-
-JSON output is also available with `--format json` for custom integrations.
+5. Run `snif review --path . --diff-file change.patch`
+6. Findings are printed to stdout as JSON
 
 
 

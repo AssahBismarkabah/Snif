@@ -41,8 +41,7 @@ jobs:
           ./target/release/snif review \
             --path . \
             --repo "$GITHUB_REPO" \
-            --pr "$PR_NUMBER" \
-            --format json
+            --pr "$PR_NUMBER"
         env:
           SNIF_APP_ID: ${{ secrets.SNIF_APP_ID }}
           SNIF_APP_PRIVATE_KEY: ${{ secrets.SNIF_APP_PRIVATE_KEY }}
