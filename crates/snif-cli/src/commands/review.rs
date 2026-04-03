@@ -125,6 +125,7 @@ pub fn run(
             );
             file.content = "[See diff for changes to this file.]".to_string();
             file.content_tier = ContentTier::DiffOnly;
+            file.summary = None;
             continue;
         }
 

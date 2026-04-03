@@ -43,6 +43,8 @@ fn count_hunks_per_file(diff: &str) -> HashMap<String, usize> {
             if path != "/dev/null" {
                 current_file = Some(path.to_string());
             }
+        } else if line.starts_with("+++ /dev/null") {
+            current_file = None;
         } else if line.starts_with("@@") {
             if let Some(ref file) = current_file {
                 *counts.entry(file.clone()).or_insert(0) += 1;
@@ -58,6 +60,7 @@ struct FileCandidate {
     summary: Option<String>,
     full_tokens: usize,
     hunk_count: usize,
+    forced_exclude: bool,
 }
 
 pub fn build_context(
@@ -117,26 +120,17 @@ pub fn build_context(
             .and_then(|fid| store.get_summary_for_file(fid).ok().flatten())
             .map(|(_, text)| text);
 
-        if forced_exclude {
-            // Non-reviewable files always go to DiffOnly — no budget competition
-            candidates.push(FileCandidate {
-                path: path.clone(),
-                full_content: String::new(),
-                summary,
-                full_tokens: 0,
-                hunk_count: 0,
-            });
-        } else {
-            let full_tokens = budget::estimate_tokens(&full_content);
-            let hunk_count = hunk_counts.get(path.as_str()).copied().unwrap_or(0);
-            candidates.push(FileCandidate {
-                path: path.clone(),
-                full_content,
-                summary,
-                full_tokens,
-                hunk_count,
-            });
-        }
+        let full_tokens = budget::estimate_tokens(&full_content)
+            + summary.as_ref().map(|s| budget::estimate_tokens(s)).unwrap_or(0);
+        let hunk_count = hunk_counts.get(path.as_str()).copied().unwrap_or(0);
+        candidates.push(FileCandidate {
+            path: path.clone(),
+            full_content,
+            summary,
+            full_tokens,
+            hunk_count,
+            forced_exclude,
+        });
     }
 
     // Pass 2: Sort by hunk count descending (most changed files get priority)
@@ -154,8 +148,8 @@ pub fn build_context(
     let diff_only_tokens = budget::estimate_tokens(diff_only_placeholder);
 
     for candidate in candidates {
-        // Non-reviewable files (full_tokens == 0 and empty content) always DiffOnly
-        if candidate.full_tokens == 0 && candidate.full_content.is_empty() {
+        // Non-reviewable/large files always go to DiffOnly
+        if candidate.forced_exclude {
             let content =
                 "[File content excluded — large or generated file. See diff for changes.]";
             let tokens = budget::estimate_tokens(content);
@@ -165,7 +159,7 @@ pub fn build_context(
             changed_files.push(ContextFile {
                 path: candidate.path,
                 content: content.to_string(),
-                summary: candidate.summary,
+                summary: None,
                 retrieval_score: None,
                 content_tier: ContentTier::DiffOnly,
             });
@@ -222,7 +216,7 @@ pub fn build_context(
         changed_files.push(ContextFile {
             path: candidate.path,
             content: diff_only_placeholder.to_string(),
-            summary: candidate.summary,
+            summary: None,
             retrieval_score: None,
             content_tier: ContentTier::DiffOnly,
         });
