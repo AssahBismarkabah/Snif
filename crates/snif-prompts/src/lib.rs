@@ -13,7 +13,7 @@ pub fn render_system_prompt(config: &SnifConfig) -> String {
          - Do NOT flag speculative or hypothetical issues.\n\
          - Do NOT flag issues you cannot ground in the provided context.\n\
          - If full file content is not provided for a changed file, use the diff hunks to review \
-         that file's changes. Reference diff hunk line numbers in that case.\n",
+         that file's changes.\n",
     );
 
     if config.filter.suppress_style_only {
@@ -30,7 +30,8 @@ pub fn render_system_prompt(config: &SnifConfig) -> String {
          2. \"findings\": A JSON array of issues found. If the change is clean, \
          use an empty array.\n\n\
          Line numbers MUST refer to the line numbers in the file content \
-         provided in the Changed Files section, NOT the diff hunk headers.\n\n\
+         provided in the Changed Files section. If file content is omitted, \
+         use the line numbers from the diff hunks.\n\n\
          Response format:\n\
          {\n\
            \"summary\": \"<2-3 sentence walkthrough of the change>\",\n\
@@ -100,15 +101,8 @@ pub fn render_user_prompt(context: &ContextPackage) -> String {
                 }
                 prompt.push_str("```\n\n");
             }
-            ContentTier::SummaryOnly => {
-                prompt.push_str(
-                    "*[Full content omitted — budget exceeded. Refer to the diff for changes.]*\n\n",
-                );
-            }
-            ContentTier::DiffOnly => {
-                prompt.push_str(
-                    "*[Content omitted — budget exceeded. All changes visible in the diff above.]*\n\n",
-                );
+            ContentTier::SummaryOnly | ContentTier::DiffOnly => {
+                prompt.push_str(&format!("*{}*\n\n", file.content));
             }
         }
     }
