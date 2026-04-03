@@ -121,7 +121,10 @@ pub fn build_context(
             .map(|(_, text)| text);
 
         let full_tokens = budget::estimate_tokens(&full_content)
-            + summary.as_ref().map(|s| budget::estimate_tokens(s)).unwrap_or(0);
+            + summary
+                .as_ref()
+                .map(|s| budget::estimate_tokens(s))
+                .unwrap_or(0);
         let hunk_count = hunk_counts.get(path.as_str()).copied().unwrap_or(0);
         candidates.push(FileCandidate {
             path: path.clone(),
