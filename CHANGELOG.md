@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 3.1.9
+
+- introduce ContentTier and prioritize file content tiers for budget management
 ## 3.1.8
 
 - Skip full content for lock files and generated files in changed file context
