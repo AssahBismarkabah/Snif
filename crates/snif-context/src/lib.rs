@@ -198,8 +198,8 @@ pub fn build_context(
                 });
                 changed_files.push(ContextFile {
                     path: candidate.path,
-                    content: summary.clone(),
-                    summary: candidate.summary,
+                    content: format!("[Summary — full content omitted.]\n{}", summary),
+                    summary: None,
                     retrieval_score: None,
                     content_tier: ContentTier::SummaryOnly,
                 });
