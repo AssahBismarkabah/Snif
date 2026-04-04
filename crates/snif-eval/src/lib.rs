@@ -3,7 +3,7 @@ pub mod metrics;
 
 use anyhow::Result;
 use snif_config::SnifConfig;
-use snif_types::{BudgetReport, ChangeMetadata, ContextFile, ContextPackage};
+use snif_types::{BudgetReport, ChangeMetadata, ContentTier, ContextFile, ContextPackage};
 use std::path::Path;
 
 pub struct EvalResult {
@@ -32,6 +32,7 @@ pub fn run_evaluation(fixtures_path: &Path, config: &SnifConfig) -> Result<EvalR
                 content: content.clone(),
                 summary: None,
                 retrieval_score: None,
+                content_tier: ContentTier::Full,
             })
             .collect();
 
@@ -49,6 +50,9 @@ pub fn run_evaluation(fixtures_path: &Path, config: &SnifConfig) -> Result<EvalR
                 remaining_tokens: 128_000,
                 files_included: fix.files.len(),
                 files_omitted: 0,
+                files_full: fix.files.len(),
+                files_summary_only: 0,
+                files_diff_only: 0,
             },
         };
 

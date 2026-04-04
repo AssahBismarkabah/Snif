@@ -1,5 +1,5 @@
 use snif_config::SnifConfig;
-use snif_types::ContextPackage;
+use snif_types::{ContentTier, ContextPackage};
 
 pub fn render_system_prompt(config: &SnifConfig) -> String {
     let mut prompt = String::from(
@@ -14,7 +14,9 @@ pub fn render_system_prompt(config: &SnifConfig) -> String {
          - Do NOT flag issues you cannot ground in the provided context.\n\
          - Do NOT flag micro-optimizations (unnecessary allocations, format patterns, iterator \
          vs collect, clone vs borrow) unless the code is in a measured hot path or processes \
-         unbounded input. Focus on bugs that break correctness or security.\n",
+         unbounded input. Focus on bugs that break correctness or security.\n\
+         - If full file content is not provided for a changed file, use the diff hunks to review \
+         that file's changes.\n",
     );
 
     if config.filter.suppress_style_only {
@@ -31,7 +33,8 @@ pub fn render_system_prompt(config: &SnifConfig) -> String {
          2. \"findings\": A JSON array of issues found. If the change is clean, \
          use an empty array.\n\n\
          Line numbers MUST refer to the line numbers in the file content \
-         provided in the Changed Files section, NOT the diff hunk headers.\n\n\
+         provided in the Changed Files section. If file content is omitted, \
+         use the line numbers from the diff hunks.\n\n\
          Response format:\n\
          {\n\
            \"summary\": \"<2-3 sentence walkthrough of the change>\",\n\
@@ -93,11 +96,18 @@ pub fn render_user_prompt(context: &ContextPackage) -> String {
         if let Some(summary) = &file.summary {
             prompt.push_str(&format!("Summary: {}\n", summary));
         }
-        prompt.push_str("```\n");
-        for (i, line) in file.content.lines().enumerate() {
-            prompt.push_str(&format!("{:>4} | {}\n", i + 1, line));
+        match file.content_tier {
+            ContentTier::Full => {
+                prompt.push_str("```\n");
+                for (i, line) in file.content.lines().enumerate() {
+                    prompt.push_str(&format!("{:>4} | {}\n", i + 1, line));
+                }
+                prompt.push_str("```\n\n");
+            }
+            ContentTier::SummaryOnly | ContentTier::DiffOnly => {
+                prompt.push_str(&format!("*{}*\n\n", file.content));
+            }
         }
-        prompt.push_str("```\n\n");
     }
 
     if !context.related_files.is_empty() {

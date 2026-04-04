@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+### Budget-Aware Content Degradation
+
+- Three content tiers for changed files: Full, SummaryOnly, DiffOnly. When
+  the token budget is tight, files are progressively degraded instead of
+  sending an over-budget prompt that fails with a 400 error.
+- Files prioritized by diff hunk count — files with more changes get full
+  content first.
+- Non-reviewable file detection uses explicit flag instead of inferring from
+  empty content. Empty files (e.g. __init__.py) are no longer misclassified
+  as generated files.
+- Summary cleared on DiffOnly tier to prevent unbudgeted tokens leaking into
+  the rendered prompt.
+- Trim loop extended as safety net — degrades the largest full-content
+  changed file when the rendered prompt still exceeds budget after removing
+  all related files.
+- Token estimation for Full tier includes summary cost, preventing systematic
+  underestimation.
+- Hunk counter handles deleted files (+++ /dev/null) correctly — no longer
+  inflates the preceding file's hunk count.
+
+### Review Quality
+
+- System prompt explicitly blocks micro-optimizations (unnecessary allocations,
+  format patterns, iterator vs collect) unless code is in a hot path or
+  processes unbounded input.
+- Filter suppresses convention findings when style suppression is enabled.
+  Convention findings without an explicit conventions file are style opinions.
+- Prompt rendering uses file.content for degraded tiers, preserving the
+  distinction between non-reviewable files and budget-degraded files.
+- Line number instructions no longer contradictory for degraded files.
+
+### CI and Workflow
+
+- Removed SARIF upload from review workflow — snif-dev inline comments are
+  the single source of findings. Eliminates duplicate Code Scanning alerts.
+- Switched review model to gemini-3.1-pro.
+- Removed security-events permission from review workflow.
+- Removed SARIF references from CI docs.
+
 ## 3.1.8
 
 - Skip full content for lock files and generated files in changed file context

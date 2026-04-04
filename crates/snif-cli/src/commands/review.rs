@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use snif_platform::PlatformAdapter;
+use snif_types::ContentTier;
 use std::path::Path;
 
 pub fn run(
@@ -96,21 +97,45 @@ pub fn run(
             break (sys, usr);
         }
 
+        // Try removing related files first
         if context.related_files.pop().is_some() {
             tracing::warn!(
                 tokens = total_tokens,
                 budget = config.context.max_tokens,
                 remaining_files = context.related_files.len(),
-                "Prompt exceeds budget, trimming context"
+                "Prompt exceeds budget, trimming related file"
             );
-        } else {
-            tracing::warn!(
-                tokens = total_tokens,
-                budget = config.context.max_tokens,
-                "Prompt still exceeds budget after removing all related files"
-            );
-            break (sys, usr);
+            continue;
         }
+
+        // Then degrade the largest Full-tier changed file to DiffOnly
+        let largest_full = context
+            .changed_files
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| f.content_tier == ContentTier::Full)
+            .max_by_key(|(_, f)| f.content.len());
+
+        if let Some((idx, _)) = largest_full {
+            let file = &mut context.changed_files[idx];
+            tracing::warn!(
+                path = %file.path,
+                content_bytes = file.content.len(),
+                "Degrading changed file to diff-only to fit budget"
+            );
+            file.content = "[See diff for changes to this file.]".to_string();
+            file.content_tier = ContentTier::DiffOnly;
+            file.summary = None;
+            continue;
+        }
+
+        // Nothing left to trim
+        tracing::warn!(
+            tokens = total_tokens,
+            budget = config.context.max_tokens,
+            "Prompt still exceeds budget after all degradation"
+        );
+        break (sys, usr);
     };
 
     tracing::info!(
