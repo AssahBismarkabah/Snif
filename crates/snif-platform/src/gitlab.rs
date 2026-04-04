@@ -382,7 +382,6 @@ impl PlatformAdapter for GitLabAdapter {
         }
 
         let stale_content_ids: Vec<&str> = stale.iter().map(|fp| fp.id.as_str()).collect();
-        let stale_line_ids: Vec<&str> = stale.iter().map(|fp| fp.line_id.as_str()).collect();
 
         // Fetch discussions to find threads with stale fingerprints
         let response = self.get(&format!("merge_requests/{}/discussions", self.mr_iid))?;
@@ -412,12 +411,10 @@ impl PlatformAdapter for GitLabAdapter {
                     return false;
                 }
 
-                let (content_id, line_id) = extract_fingerprints(body);
-                content_id.as_deref().is_some_and(|id| {
-                    stale_content_ids.contains(&id) || stale_line_ids.contains(&id)
-                }) || line_id
+                let (content_id, _line_id) = extract_fingerprints(body);
+                content_id
                     .as_deref()
-                    .is_some_and(|id| stale_line_ids.contains(&id))
+                    .is_some_and(|id| stale_content_ids.contains(&id))
             });
 
             if is_stale {

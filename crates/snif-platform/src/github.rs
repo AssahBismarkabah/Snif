@@ -381,7 +381,6 @@ impl PlatformAdapter for GitHubAdapter {
         let comments: Vec<serde_json::Value> = response.json()?;
 
         let stale_content_ids: Vec<&str> = stale.iter().map(|fp| fp.id.as_str()).collect();
-        let stale_line_ids: Vec<&str> = stale.iter().map(|fp| fp.line_id.as_str()).collect();
 
         for comment in &comments {
             let body = match comment.get("body").and_then(serde_json::Value::as_str) {
@@ -393,13 +392,10 @@ impl PlatformAdapter for GitHubAdapter {
                 continue;
             }
 
-            let (content_id, line_id) = extract_fingerprints(body);
+            let (content_id, _line_id) = extract_fingerprints(body);
             let is_stale = content_id
                 .as_deref()
-                .is_some_and(|id| stale_content_ids.contains(&id) || stale_line_ids.contains(&id))
-                || line_id
-                    .as_deref()
-                    .is_some_and(|id| stale_line_ids.contains(&id));
+                .is_some_and(|id| stale_content_ids.contains(&id));
 
             if is_stale {
                 if let Some(comment_id) = comment.get("id").and_then(serde_json::Value::as_i64) {
