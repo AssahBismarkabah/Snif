@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix stale finding resolution marking unfixed bugs as resolved after rebases; switch from line-based fingerprints to content/fuzzy matching.
+
 ### Budget-Aware Content Degradation
 
 - Three content tiers for changed files: Full, SummaryOnly, DiffOnly. When

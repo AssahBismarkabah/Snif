@@ -1,4 +1,4 @@
-use crate::{PlatformAdapter, BOT_MARKER, FINGERPRINT_MARKER};
+use crate::{extract_fingerprints, PlatformAdapter, BOT_MARKER};
 use anyhow::{bail, Context, Result};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
@@ -353,14 +353,22 @@ impl PlatformAdapter for GitLabAdapter {
                 continue;
             }
 
-            if let Some(start) = body.find(FINGERPRINT_MARKER) {
-                let after = &body[start + FINGERPRINT_MARKER.len()..];
-                if let Some(end) = after.find(" -->") {
-                    let fp_id = after[..end].trim().to_string();
-                    if !fp_id.is_empty() {
-                        fingerprints.push(Fingerprint { id: fp_id });
-                    }
+            let (content_id, line_id) = extract_fingerprints(body);
+            match (content_id, line_id) {
+                (Some(cid), Some(lid)) => {
+                    fingerprints.push(Fingerprint {
+                        id: cid,
+                        line_id: lid,
+                    });
                 }
+                (Some(cid), None) => {
+                    // Old format: single fingerprint was line-based
+                    fingerprints.push(Fingerprint {
+                        id: cid.clone(),
+                        line_id: cid,
+                    });
+                }
+                _ => {}
             }
         }
 
@@ -373,7 +381,7 @@ impl PlatformAdapter for GitLabAdapter {
             return Ok(());
         }
 
-        let stale_ids: Vec<&str> = stale.iter().map(|fp| fp.id.as_str()).collect();
+        let stale_content_ids: Vec<&str> = stale.iter().map(|fp| fp.id.as_str()).collect();
 
         // Fetch discussions to find threads with stale fingerprints
         let response = self.get(&format!("merge_requests/{}/discussions", self.mr_iid))?;
@@ -403,14 +411,10 @@ impl PlatformAdapter for GitLabAdapter {
                     return false;
                 }
 
-                if let Some(start) = body.find(FINGERPRINT_MARKER) {
-                    let after = &body[start + FINGERPRINT_MARKER.len()..];
-                    if let Some(end) = after.find(" -->") {
-                        let fp_id = after[..end].trim();
-                        return stale_ids.contains(&fp_id);
-                    }
-                }
-                false
+                let (content_id, _line_id) = extract_fingerprints(body);
+                content_id
+                    .as_deref()
+                    .is_some_and(|id| stale_content_ids.contains(&id))
             });
 
             if is_stale {

@@ -53,5 +53,10 @@ impl std::fmt::Display for FindingCategory {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fingerprint {
+    /// Primary: content-based hash (file + category + normalized evidence).
+    /// Stable across rebases — survives line number shifts.
     pub id: String,
+    /// Secondary: line-based hash (file + start_line + end_line + category).
+    /// Backward compatible with prior comments.
+    pub line_id: String,
 }
