@@ -1,4 +1,4 @@
-use crate::{PlatformAdapter, BOT_MARKER, FINGERPRINT_MARKER};
+use crate::{extract_fingerprints, PlatformAdapter, BOT_MARKER};
 use anyhow::{bail, Context, Result};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
@@ -347,14 +347,24 @@ impl PlatformAdapter for GitHubAdapter {
                 continue;
             }
 
-            if let Some(start) = body.find(FINGERPRINT_MARKER) {
-                let after = &body[start + FINGERPRINT_MARKER.len()..];
-                if let Some(end) = after.find(" -->") {
-                    let fp_id = after[..end].trim().to_string();
-                    if !fp_id.is_empty() {
-                        fingerprints.push(Fingerprint { id: fp_id });
-                    }
+            let (content_id, line_id) = extract_fingerprints(body);
+            // Backward compat: old comments have only snif:fingerprint (line-based).
+            // New comments have both snif:fingerprint (content) + snif:line-fingerprint.
+            match (content_id, line_id) {
+                (Some(cid), Some(lid)) => {
+                    fingerprints.push(Fingerprint {
+                        id: cid,
+                        line_id: lid,
+                    });
                 }
+                (Some(cid), None) => {
+                    // Old format: the single fingerprint was line-based
+                    fingerprints.push(Fingerprint {
+                        id: cid.clone(),
+                        line_id: cid,
+                    });
+                }
+                _ => {}
             }
         }
 
@@ -370,7 +380,8 @@ impl PlatformAdapter for GitHubAdapter {
         let response = self.get(&format!("pulls/{}/comments", self.pr_number))?;
         let comments: Vec<serde_json::Value> = response.json()?;
 
-        let stale_ids: Vec<&str> = stale.iter().map(|fp| fp.id.as_str()).collect();
+        let stale_content_ids: Vec<&str> = stale.iter().map(|fp| fp.id.as_str()).collect();
+        let stale_line_ids: Vec<&str> = stale.iter().map(|fp| fp.line_id.as_str()).collect();
 
         for comment in &comments {
             let body = match comment.get("body").and_then(serde_json::Value::as_str) {
@@ -382,17 +393,13 @@ impl PlatformAdapter for GitHubAdapter {
                 continue;
             }
 
-            let is_stale = if let Some(start) = body.find(FINGERPRINT_MARKER) {
-                let after = &body[start + FINGERPRINT_MARKER.len()..];
-                if let Some(end) = after.find(" -->") {
-                    let fp_id = after[..end].trim();
-                    stale_ids.contains(&fp_id)
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
+            let (content_id, line_id) = extract_fingerprints(body);
+            let is_stale = content_id
+                .as_deref()
+                .is_some_and(|id| stale_content_ids.contains(&id) || stale_line_ids.contains(&id))
+                || line_id
+                    .as_deref()
+                    .is_some_and(|id| stale_line_ids.contains(&id));
 
             if is_stale {
                 if let Some(comment_id) = comment.get("id").and_then(serde_json::Value::as_i64) {

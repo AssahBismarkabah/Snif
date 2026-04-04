@@ -6,10 +6,7 @@ Outstanding work for Snif beyond v2.0.0.
 
 ### from gitlab setup what went wrong and needs to be addressed
 
-- Stale finding resolution marks unfixed bugs as "Resolved" after a rebase.
-  Fingerprints include line numbers, so a rebase shifts the line, changes the
-  fingerprint, and Snif assumes the issue was fixed. Resolution should use
-  content-based or fuzzy matching instead of exact line numbers.
+
 - Large diffs with many real file changes still fail when the diff alone
   exceeds the token budget. Phase 2 chunked parallel review needed — split
   the diff by file boundaries, run parallel LLM calls, merge findings.

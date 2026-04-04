@@ -1,14 +1,45 @@
 use sha2::{Digest, Sha256};
 use snif_types::{Finding, Fingerprint};
+use std::collections::HashMap;
 
 pub fn compute_fingerprints(findings: &mut [Finding]) {
+    let mut content_counts: HashMap<String, usize> = HashMap::new();
+
     for finding in findings.iter_mut() {
-        let fingerprint = compute_fingerprint(finding);
-        finding.fingerprint = Some(fingerprint);
+        let content_hash = compute_content_hash(finding);
+        let line_hash = compute_line_hash(finding);
+
+        // Disambiguate when the same content hash appears multiple times
+        let count = content_counts.entry(content_hash.clone()).or_insert(0);
+        let id = if *count == 0 {
+            content_hash.clone()
+        } else {
+            format!("{}:{}", content_hash, count)
+        };
+        *content_counts.get_mut(&content_hash).unwrap() += 1;
+
+        finding.fingerprint = Some(Fingerprint {
+            id,
+            line_id: line_hash,
+        });
     }
 }
 
-fn compute_fingerprint(finding: &Finding) -> Fingerprint {
+/// Content-based hash: stable across rebases.
+/// SHA256(file + category + normalize(evidence)) → 16 hex chars.
+fn compute_content_hash(finding: &Finding) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(finding.location.file.as_bytes());
+    hasher.update(finding.category.to_string().as_bytes());
+    hasher.update(normalize_evidence(&finding.evidence).as_bytes());
+
+    let hash = format!("{:x}", hasher.finalize());
+    hash[..16].to_string()
+}
+
+/// Line-based hash: backward compatible with prior fingerprints.
+/// SHA256(file + start_line + end_line + category) → 16 hex chars.
+fn compute_line_hash(finding: &Finding) -> String {
     let mut hasher = Sha256::new();
     hasher.update(finding.location.file.as_bytes());
     hasher.update(finding.location.start_line.to_string().as_bytes());
@@ -18,8 +49,15 @@ fn compute_fingerprint(finding: &Finding) -> Fingerprint {
     hasher.update(finding.category.to_string().as_bytes());
 
     let hash = format!("{:x}", hasher.finalize());
-    // Use first 16 chars for a compact fingerprint
-    Fingerprint {
-        id: hash[..16].to_string(),
-    }
+    hash[..16].to_string()
+}
+
+/// Normalize evidence text for stable hashing:
+/// lowercase, collapse whitespace, trim.
+fn normalize_evidence(evidence: &str) -> String {
+    evidence
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }

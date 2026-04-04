@@ -206,13 +206,27 @@ pub fn run(
 
         tracing::info!(posted = findings.len(), "Findings posted");
 
-        let current_ids: Vec<&str> = findings
+        // Collect both content-based and line-based IDs from current findings
+        let current_content_ids: std::collections::HashSet<&str> = findings
             .iter()
             .filter_map(|f| f.fingerprint.as_ref().map(|fp| fp.id.as_str()))
             .collect();
+        let current_line_ids: std::collections::HashSet<&str> = findings
+            .iter()
+            .filter_map(|f| f.fingerprint.as_ref().map(|fp| fp.line_id.as_str()))
+            .collect();
+
+        // A prior finding is stale only if NEITHER its content hash NOR its
+        // line hash matches any current finding. Conservative — biases toward
+        // keeping findings rather than incorrectly resolving them.
         let stale: Vec<_> = prior
             .into_iter()
-            .filter(|fp| !current_ids.contains(&fp.id.as_str()))
+            .filter(|fp| {
+                !current_content_ids.contains(fp.id.as_str())
+                    && !current_line_ids.contains(fp.id.as_str())
+                    && !current_content_ids.contains(fp.line_id.as_str())
+                    && !current_line_ids.contains(fp.line_id.as_str())
+            })
             .collect();
 
         if !stale.is_empty() {
