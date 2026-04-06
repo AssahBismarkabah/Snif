@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## 3.2.0
 
-- Fix stale finding resolution marking unfixed bugs as resolved after rebases; switch from line-based fingerprints to content/fuzzy matching.
+### Stale Finding Resolution
+
+- Fix stale finding resolution marking unfixed bugs as resolved after rebases; switch from line-based fingerprints to content-based matching.
 
 ### Budget-Aware Content Degradation
 
