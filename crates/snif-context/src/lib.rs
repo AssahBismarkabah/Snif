@@ -72,7 +72,7 @@ pub fn build_context(
     config: &ContextConfig,
     metadata: ChangeMetadata,
 ) -> Result<ContextPackage> {
-    let total_budget = config.max_tokens;
+    let total_budget = config.max_tokens.saturating_sub(config.output_reserve_tokens);
     let mut remaining = total_budget;
 
     // Always include the diff

@@ -101,7 +101,7 @@ impl Default for ContextConfig {
         Self {
             max_tokens: 128_000,
             max_files: 50,
-            output_reserve_tokens: 4_096,
+            output_reserve_tokens: 32_000,
             retrieval_weights: RetrievalWeights::default(),
         }
     }

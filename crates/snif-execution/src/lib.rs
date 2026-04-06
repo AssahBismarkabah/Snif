@@ -41,7 +41,7 @@ struct Choice {
 impl LlmClient {
     pub fn new(endpoint: &str, model: &str, api_key: &str) -> Self {
         let http = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(120))
+            .timeout(std::time::Duration::from_secs(300))
             .build()
             .unwrap_or_default();
 
@@ -111,7 +111,7 @@ impl LlmClient {
             };
 
             let status = response.status();
-            if status.is_server_error() {
+            if status.is_server_error() || status.as_u16() == 429 || status.as_u16() == 408 {
                 last_error = format!("Server error {}", status);
                 continue;
             }
