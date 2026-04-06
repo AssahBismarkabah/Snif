@@ -2350,7 +2350,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "snif"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2376,7 +2376,7 @@ dependencies = [
 
 [[package]]
 name = "snif-cochange"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "snif-store",
@@ -2385,7 +2385,7 @@ dependencies = [
 
 [[package]]
 name = "snif-config"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -2395,7 +2395,7 @@ dependencies = [
 
 [[package]]
 name = "snif-context"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "snif-config",
@@ -2406,7 +2406,7 @@ dependencies = [
 
 [[package]]
 name = "snif-embeddings"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "fastembed",
@@ -2416,7 +2416,7 @@ dependencies = [
 
 [[package]]
 name = "snif-eval"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -2432,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "snif-execution"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "reqwest",
@@ -2445,7 +2445,7 @@ dependencies = [
 
 [[package]]
 name = "snif-feedback"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "rusqlite",
@@ -2459,7 +2459,7 @@ dependencies = [
 
 [[package]]
 name = "snif-graph"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "sha2",
@@ -2470,7 +2470,7 @@ dependencies = [
 
 [[package]]
 name = "snif-output"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -2483,7 +2483,7 @@ dependencies = [
 
 [[package]]
 name = "snif-parser"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "snif-types",
@@ -2499,7 +2499,7 @@ dependencies = [
 
 [[package]]
 name = "snif-platform"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "jsonwebtoken",
@@ -2513,7 +2513,7 @@ dependencies = [
 
 [[package]]
 name = "snif-prompts"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "serde_json",
  "snif-config",
@@ -2522,7 +2522,7 @@ dependencies = [
 
 [[package]]
 name = "snif-retrieval"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "snif-config",
@@ -2534,7 +2534,7 @@ dependencies = [
 
 [[package]]
 name = "snif-store"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "rusqlite",
@@ -2548,7 +2548,7 @@ dependencies = [
 
 [[package]]
 name = "snif-summarizer"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "snif-config",
@@ -2560,7 +2560,7 @@ dependencies = [
 
 [[package]]
 name = "snif-types"
-version = "3.1.8"
+version = "3.2.0"
 dependencies = [
  "serde",
  "serde_json",
