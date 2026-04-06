@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.2.1
+
+### Budget Enforcement
+
+- Fix context assembly ignoring `output_reserve_tokens` — budget now correctly
+  subtracts the output reserve before assembling context. Previously the full
+  `max_tokens` was used as the input budget, producing prompts that filled
+  99% of the context window.
+- Increase default `output_reserve_tokens` from 4,096 to 32,000 (25% of 128K).
+  Effective input budget is now 96K instead of 124K. Reduces model latency
+  and mitigates "lost in the middle" quality degradation on long prompts.
+
+### Retry and Timeout
+
+- Retry on HTTP 429 (Too Many Requests) and 408 (Request Timeout) in addition
+  to 5xx server errors. Previously 429 was treated as a permanent failure.
+- Increase request timeout from 120s to 300s for large prompts.
+
 ## 3.2.0
 
 ### Stale Finding Resolution
