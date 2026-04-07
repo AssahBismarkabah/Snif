@@ -37,7 +37,7 @@ jobs:
 
       - name: Install Snif
         env:
-          SNIF_VERSION: "3.1.4"
+          SNIF_VERSION: "3.2.1"
         run: |
           curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz" -O
           curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256" -O
@@ -51,6 +51,12 @@ jobs:
           sha256sum -c snif-x86_64-unknown-linux-gnu.tar.xz.sha256
           tar xJf snif-x86_64-unknown-linux-gnu.tar.xz
           mv snif-x86_64-unknown-linux-gnu/snif /usr/local/bin/snif
+
+      - name: Cache Snif index
+        uses: actions/cache@v4
+        with:
+          path: .snif/
+          key: snif-index-${{ github.repository }}
 
       - name: Index repository
         run: snif index --path .
@@ -109,7 +115,7 @@ snif-review:
   stage: review
   image: debian:bookworm-slim
   variables:
-    SNIF_VERSION: "3.1.4"
+    SNIF_VERSION: "3.2.1"
     SNIF_API_KEY: $SNIF_API_KEY
     GITLAB_TOKEN: $GITLAB_TOKEN
   before_script:
@@ -127,6 +133,9 @@ snif-review:
     - sha256sum -c snif-x86_64-unknown-linux-gnu.tar.xz.sha256
     - tar xJf snif-x86_64-unknown-linux-gnu.tar.xz
     - mv snif-x86_64-unknown-linux-gnu/snif /usr/local/bin/snif
+  cache:
+    paths:
+      - .snif/
   script:
     - snif index --path .
     - snif review --path .
