@@ -80,7 +80,7 @@ impl LlmClient {
             temperature: 0.0,
         };
 
-        let max_retries = 3;
+        let max_retries = 5;
         let mut last_error = String::new();
 
         for attempt in 0..=max_retries {

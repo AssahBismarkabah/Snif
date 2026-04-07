@@ -1,5 +1,10 @@
 # Changelog
 
+
+## Unreleased
+
+- increase max retry attempts from 3 to 5 in execution logic
+
 ## 3.2.1
 
 ### Budget Enforcement
