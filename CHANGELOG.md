@@ -1,7 +1,7 @@
 # Changelog
 
 
-## Unreleased
+## 3.2.2
 
 - increase max retry attempts from 3 to 5 in execution logic
 
