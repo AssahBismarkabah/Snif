@@ -1,5 +1,7 @@
 # Changelog
 
+## unreleased
+
 ## 3.2.3
 
 - Auto-detect and rebuild stale index database on schema version mismatch instead of crashing with foreign key error
