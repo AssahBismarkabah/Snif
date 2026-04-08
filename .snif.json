@@ -2,7 +2,7 @@
   "model": {
     "review_model": "gemini-3.1-pro",
     "summary_model": "deepseek-v3p2",
-    "endpoint": "https://api.ai.camer.digital/v1"
+    "endpoint": "https://services.api.ai.camer.digital/v1"
   },
   "eval_fixtures_path": "./fixtures"
 }

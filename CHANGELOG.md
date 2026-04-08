@@ -2,6 +2,8 @@
 
 ## unreleased
 
+- Auto-detect and rebuild stale index database on schema version mismatch instead of crashing with foreign key error
+
 ## 3.2.2
 
 - increase max retry attempts from 3 to 5 in execution logic

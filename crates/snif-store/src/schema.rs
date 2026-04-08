@@ -1,6 +1,10 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
+/// Increment this whenever the schema changes. On open, if the stored version
+/// doesn't match, the database is dropped and recreated automatically.
+const SCHEMA_VERSION: i64 = 2;
+
 pub fn run_migrations(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "
@@ -87,7 +91,27 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
     ",
     )?;
 
+    // Write current schema version
+    conn.execute("DELETE FROM schema_version", [])?;
+    conn.execute(
+        "INSERT INTO schema_version (version) VALUES (?1)",
+        [SCHEMA_VERSION],
+    )?;
+
     Ok(())
+}
+
+/// Check if the stored schema version matches the expected version.
+/// Returns true if the schema is compatible, false if it needs a reset.
+pub fn check_version(conn: &Connection) -> bool {
+    let version: Result<i64, _> =
+        conn.query_row("SELECT version FROM schema_version LIMIT 1", [], |row| {
+            row.get(0)
+        });
+    match version {
+        Ok(v) => v == SCHEMA_VERSION,
+        Err(_) => false,
+    }
 }
 
 pub fn drop_all(conn: &Connection) -> Result<()> {

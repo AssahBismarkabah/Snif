@@ -36,6 +36,11 @@ impl Store {
 
         let conn = Connection::open(path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
+
+        if !schema::check_version(&conn) {
+            tracing::warn!("Schema version mismatch — rebuilding index database");
+            schema::drop_all(&conn)?;
+        }
         schema::run_migrations(&conn)?;
 
         tracing::info!(path = %path.display(), "Store opened");
