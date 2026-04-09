@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-pub fn read_user_file(base_dir: &str, filename: &str) -> Result<String, String> {
-    let path = PathBuf::from(base_dir).join(filename);
-    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+pub fn open_user_file(base_dir: &str, user_supplied_path: &str) -> Result<String, String> {
+    // `user_supplied_path` comes directly from the download request.
+    let path = PathBuf::from(base_dir).join(user_supplied_path);
+    let _file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
+    Ok("opened".to_string())
 }

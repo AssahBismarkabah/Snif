@@ -11,7 +11,7 @@ impl ApiClient {
         }
     }
 
-    pub fn call(&self, path: &str) -> Result<String, String> {
-        Ok(format!("GET {}{} with key {}", self.endpoint, path, &self.api_key[..8]))
+    pub fn request_url(&self, path: &str) -> String {
+        format!("{}{}", self.endpoint, path)
     }
 }

@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
-pub fn calculate_metrics(data: &[f64]) -> HashMap<String, f64> {
+pub fn summarize_metrics(data: &[f64]) -> HashMap<String, f64> {
     let mut results = HashMap::new();
     let sum: f64 = data.iter().sum();
-    let count = data.len() as f64;
-    results.insert("mean".to_string(), sum / count);
     results.insert("sum".to_string(), sum);
-    results.insert("count".to_string(), count);
+    results.insert("count".to_string(), data.len() as f64);
     results
 }
 

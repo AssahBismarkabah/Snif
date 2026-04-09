@@ -1,19 +1,13 @@
-use std::io::{self, BufRead};
+use std::io::{self, Read};
 
-pub fn read_all_lines(reader: impl BufRead) -> io::Result<Vec<String>> {
-    let mut lines = Vec::new();
-    for line in reader.lines() {
-        lines.push(line?);
-    }
-    Ok(lines)
+pub fn read_uploaded_log_body(mut request_body: impl Read) -> io::Result<Vec<u8>> {
+    let mut body = Vec::new();
+    request_body.read_to_end(&mut body)?;
+    Ok(body)
 }
 
-const MAX_LINES: usize = 100_000;
-
-pub fn read_lines_bounded(reader: impl BufRead) -> io::Result<Vec<String>> {
-    let mut lines = Vec::with_capacity(1024);
-    for line in reader.lines().take(MAX_LINES) {
-        lines.push(line?);
-    }
-    Ok(lines)
+pub fn read_uploaded_log_body_bounded(request_body: impl Read) -> io::Result<Vec<u8>> {
+    let mut body = Vec::new();
+    request_body.take(1024 * 1024).read_to_end(&mut body)?;
+    Ok(body)
 }
