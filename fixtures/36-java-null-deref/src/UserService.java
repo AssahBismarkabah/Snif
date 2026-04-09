@@ -10,7 +10,7 @@ public class UserService {
 
     public String getGreeting(String userId) {
         String email = getUserEmail(userId);
-        return "Hello, " + email.substring(0, email.indexOf('@'));
+        return "Hello, " + email.toLowerCase();
     }
 
     public String getGreetingSafe(String userId) {
@@ -18,6 +18,6 @@ public class UserService {
         if (email == null) {
             return "Hello, unknown user";
         }
-        return "Hello, " + email.substring(0, email.indexOf('@'));
+        return "Hello, " + email.toLowerCase();
     }
 }
