@@ -1,0 +1,12 @@
+{
+  "name": "py-unhandled-keyerror",
+  "description": "Dictionary access without .get() or try/except on user data risks KeyError",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/profile.py",
+      "start_line": 7,
+      "category": "logic"
+    }
+  ]
+}

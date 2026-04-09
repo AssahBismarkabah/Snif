@@ -1,0 +1,12 @@
+{
+  "name": "convention-missing-doc",
+  "description": "Public function added without documentation comment when project conventions require all public items to be documented",
+  "conventions": "All public functions and types must have a documentation comment (/// for Rust). Undocumented public items are convention violations.",
+  "expected_findings": [
+    {
+      "file": "src/api.rs",
+      "start_line": 3,
+      "category": "convention"
+    }
+  ]
+}

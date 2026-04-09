@@ -1,0 +1,12 @@
+{
+  "name": "java-null-deref",
+  "description": "Nullable return value used without null check, causing NullPointerException when map lookup returns null",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/UserService.java",
+      "start_line": 14,
+      "category": "logic"
+    }
+  ]
+}

@@ -56,7 +56,10 @@ pub fn run_evaluation(fixtures_path: &Path, config: &SnifConfig) -> Result<EvalR
             },
         };
 
-        let system_prompt = snif_prompts::render_system_prompt(config);
+        let system_prompt = snif_prompts::render_system_prompt_with_conventions(
+            config,
+            fix.conventions.as_deref(),
+        );
         let user_prompt = snif_prompts::render_user_prompt(&context);
 
         let result = snif_execution::execute_review(&system_prompt, &user_prompt, &config.model)?;

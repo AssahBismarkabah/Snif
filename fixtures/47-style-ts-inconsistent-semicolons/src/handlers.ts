@@ -1,0 +1,18 @@
+export function handleLogin(username: string, password: string): boolean {
+  if (!username || !password) {
+    return false
+  }
+  const isValid = username.length > 0 && password.length >= 8;
+  return isValid
+}
+
+export function handleLogout(sessionId: string): void {
+  console.log(`Logging out session: ${sessionId}`);
+  // Clear session data
+  localStorage.removeItem(sessionId)
+}
+
+export function handleRefresh(token: string): string {
+  const newToken = token + "_refreshed";
+  return newToken;
+}

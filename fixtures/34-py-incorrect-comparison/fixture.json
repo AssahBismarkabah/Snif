@@ -1,0 +1,12 @@
+{
+  "name": "py-incorrect-comparison",
+  "description": "Using 'is' instead of '==' for integer value comparison fails outside cached range",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/validator.py",
+      "start_line": 4,
+      "category": "logic"
+    }
+  ]
+}

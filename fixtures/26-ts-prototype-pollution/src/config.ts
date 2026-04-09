@@ -1,0 +1,21 @@
+interface Config {
+  theme: string;
+  language: string;
+}
+
+const defaults: Config = { theme: "light", language: "en" };
+
+export function mergeConfig(userInput: Record<string, unknown>): Config {
+  const config = { ...defaults };
+  for (const key of Object.keys(userInput)) {
+    (config as any)[key] = userInput[key];
+  }
+  return config;
+}
+
+export function mergeConfigSafe(userInput: Record<string, unknown>): Config {
+  return {
+    theme: typeof userInput.theme === "string" ? userInput.theme : defaults.theme,
+    language: typeof userInput.language === "string" ? userInput.language : defaults.language,
+  };
+}

@@ -1,0 +1,12 @@
+{
+  "name": "perf-unbounded-collect",
+  "description": "Unbounded iterator collected into Vec from user-controlled input without size limit",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/ingest.rs",
+      "start_line": 6,
+      "category": "performance"
+    }
+  ]
+}

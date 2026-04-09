@@ -1,0 +1,12 @@
+{
+  "name": "ts-type-assertion-crash",
+  "description": "Unsafe type assertion masking a runtime type mismatch",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/parser.ts",
+      "start_line": 7,
+      "category": "logic"
+    }
+  ]
+}

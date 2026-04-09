@@ -1,0 +1,12 @@
+{
+  "name": "java-resource-leak",
+  "description": "JDBC connection opened but not closed in finally block or try-with-resources, causing resource leak",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/DatabaseQuery.java",
+      "start_line": 12,
+      "category": "logic"
+    }
+  ]
+}

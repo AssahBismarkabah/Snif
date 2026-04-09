@@ -1,0 +1,6 @@
+{
+  "name": "clean-java-rename",
+  "description": "Clean Java method rename from getData to fetchRecords with updated callers. No issues should be found.",
+  "conventions": null,
+  "expected_findings": []
+}

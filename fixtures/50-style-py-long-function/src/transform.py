@@ -1,0 +1,50 @@
+from typing import Any
+
+
+def transform_report(raw_data: list[dict[str, Any]]) -> dict[str, Any]:
+    """Transform raw report data into a structured summary."""
+    total_revenue = 0.0
+    total_orders = 0
+    categories: dict[str, float] = {}
+    regions: dict[str, int] = {}
+    monthly: dict[str, float] = {}
+
+    for record in raw_data:
+        amount = float(record.get("amount", 0))
+        category = str(record.get("category", "other"))
+        region = str(record.get("region", "unknown"))
+        month = str(record.get("month", "unknown"))
+
+        total_revenue += amount
+        total_orders += 1
+
+        if category in categories:
+            categories[category] += amount
+        else:
+            categories[category] = amount
+
+        if region in regions:
+            regions[region] += 1
+        else:
+            regions[region] = 1
+
+        if month in monthly:
+            monthly[month] += amount
+        else:
+            monthly[month] = amount
+
+    avg_order = total_revenue / total_orders if total_orders > 0 else 0.0
+
+    top_category = max(categories, key=categories.get) if categories else "none"
+    top_region = max(regions, key=regions.get) if regions else "none"
+
+    return {
+        "total_revenue": round(total_revenue, 2),
+        "total_orders": total_orders,
+        "average_order": round(avg_order, 2),
+        "top_category": top_category,
+        "top_region": top_region,
+        "by_category": categories,
+        "by_region": regions,
+        "by_month": monthly,
+    }

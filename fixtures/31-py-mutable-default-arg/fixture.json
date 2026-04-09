@@ -1,0 +1,12 @@
+{
+  "name": "py-mutable-default-arg",
+  "description": "Mutable default argument in function definition causes shared state across calls",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/cache.py",
+      "start_line": 2,
+      "category": "logic"
+    }
+  ]
+}

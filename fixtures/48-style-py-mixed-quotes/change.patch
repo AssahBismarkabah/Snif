@@ -1,0 +1,26 @@
+--- /dev/null
++++ b/src/messages.py
+@@ -0,0 +1,24 @@
++def get_welcome_message(name: str) -> str:
++    """Return a welcome message for the user."""
++    greeting = "Hello"
++    return f'{greeting}, {name}! Welcome back.'
++
++
++def get_error_message(code: int) -> str:
++    """Return an error message for the given code."""
++    errors = {
++        400: 'Bad Request',
++        401: "Unauthorized",
++        403: 'Forbidden',
++        404: "Not Found",
++        500: 'Internal Server Error',
++    }
++    return errors.get(code, "Unknown Error")
++
++
++def format_timestamp(ts: float) -> str:
++    """Format a Unix timestamp as a string."""
++    from datetime import datetime
++    dt = datetime.fromtimestamp(ts)
++    return f"{dt:%Y-%m-%d %H:%M:%S}"

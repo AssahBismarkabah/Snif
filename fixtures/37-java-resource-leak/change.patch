@@ -1,0 +1,31 @@
+--- a/src/DatabaseQuery.java
++++ b/src/DatabaseQuery.java
+@@ -8,4 +8,28 @@ public class DatabaseQuery {
+     private static final String DB_URL = "jdbc:sqlite:app.db";
+
+-    // TODO: implement query methods
++    public String findUser(String name) throws SQLException {
++        Connection conn = DriverManager.getConnection(DB_URL);
++        Statement stmt = conn.createStatement();
++        ResultSet rs = stmt.executeQuery(
++            "SELECT email FROM users WHERE name = '" + name + "'"
++        );
++        if (rs.next()) {
++            return rs.getString("email");
++        }
++        return null;
++    }
++
++    public String findUserSafe(String name) throws SQLException {
++        try (Connection conn = DriverManager.getConnection(DB_URL);
++             Statement stmt = conn.createStatement();
++             ResultSet rs = stmt.executeQuery(
++                 "SELECT email FROM users WHERE name = '" + name + "'"
++             )) {
++            if (rs.next()) {
++                return rs.getString("email");
++            }
++            return null;
++        }
++    }
+ }

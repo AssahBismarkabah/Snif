@@ -1,0 +1,12 @@
+{
+  "name": "perf-n-plus-one-query",
+  "description": "Database query executed inside a loop, causing N+1 query performance problem",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/reports.py",
+      "start_line": 10,
+      "category": "performance"
+    }
+  ]
+}
