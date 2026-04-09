@@ -5,7 +5,7 @@
   "expected_findings": [
     {
       "file": "src/ingest.rs",
-      "start_line": 6,
+      "start_line": 4,
       "category": "performance"
     }
   ]

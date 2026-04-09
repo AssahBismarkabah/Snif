@@ -5,7 +5,7 @@
   "expected_findings": [
     {
       "file": "src/DatabaseQuery.java",
-      "start_line": 12,
+      "start_line": 11,
       "category": "logic"
     }
   ]

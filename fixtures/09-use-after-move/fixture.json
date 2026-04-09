@@ -1,1 +1,1 @@
-{"name":"buffer-overread","description":"Reading from a buffer after resizing invalidates prior references","conventions":null,"expected_findings":[{"file":"src/buffer.rs","start_line":5,"category":"logic"}]}
+{"name":"buffer-overread","description":"Slicing the first four bytes without checking the input length can panic on short input","conventions":null,"expected_findings":[{"file":"src/buffer.rs","start_line":2,"category":"logic"}]}
