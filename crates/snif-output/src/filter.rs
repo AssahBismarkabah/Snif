@@ -29,17 +29,12 @@ pub fn apply_filters(findings: Vec<Finding>, config: &FilterConfig) -> Vec<Findi
                 return false;
             }
 
-            // Style and convention suppression
-            if config.suppress_style_only
-                && matches!(
-                    f.category,
-                    FindingCategory::Style | FindingCategory::Convention
-                )
-            {
+            // Suppress style-only noise, but keep explicit convention findings.
+            if config.suppress_style_only && matches!(f.category, FindingCategory::Style) {
                 tracing::debug!(
                     file = %f.location.file,
                     category = %f.category,
-                    "Filtered: style/convention"
+                    "Filtered: style"
                 );
                 return false;
             }

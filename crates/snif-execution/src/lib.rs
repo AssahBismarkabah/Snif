@@ -20,6 +20,13 @@ struct ChatRequest {
     model: String,
     messages: Vec<Message>,
     temperature: f64,
+    response_format: ResponseFormat,
+}
+
+#[derive(Serialize)]
+struct ResponseFormat {
+    #[serde(rename = "type")]
+    kind: &'static str,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -78,6 +85,9 @@ impl LlmClient {
                 },
             ],
             temperature: 0.0,
+            response_format: ResponseFormat {
+                kind: "json_object",
+            },
         };
 
         let max_retries = 5;
@@ -167,4 +177,20 @@ pub fn execute_review(
     );
 
     Ok(ExecutionResult { response, duration })
+}
+
+pub fn repair_review_response(raw_response: &str, config: &ModelConfig) -> Result<ExecutionResult> {
+    let repair_system_prompt = "You convert code review text into a single valid JSON object. \
+Return ONLY JSON with this exact shape: {\"summary\":\"...\",\"findings\":[...]}. \
+Preserve only findings explicitly supported by the provided review text. Do not invent new \
+issues, line numbers, or categories. If the review text does not contain a clear issue, use \
+{\"summary\":\"\",\"findings\":[]}. Your first character must be '{' and your last character \
+must be '}'.";
+
+    let repair_user_prompt = format!(
+        "Rewrite the following review into the required JSON object without adding commentary:\n\n{}",
+        raw_response
+    );
+
+    execute_review(repair_system_prompt, &repair_user_prompt, config)
 }

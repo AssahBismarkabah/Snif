@@ -1,7 +1,7 @@
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.sql.SQLException;
 
 public class DatabaseQuery {
@@ -9,10 +9,11 @@ public class DatabaseQuery {
 
     public String findUser(String name) throws SQLException {
         Connection conn = DriverManager.getConnection(DB_URL);
-        Statement stmt = conn.createStatement();
-        ResultSet rs = stmt.executeQuery(
-            "SELECT email FROM users WHERE name = '" + name + "'"
+        PreparedStatement stmt = conn.prepareStatement(
+            "SELECT email FROM users WHERE name = ?"
         );
+        stmt.setString(1, name);
+        ResultSet rs = stmt.executeQuery();
         if (rs.next()) {
             return rs.getString("email");
         }
@@ -21,14 +22,16 @@ public class DatabaseQuery {
 
     public String findUserSafe(String name) throws SQLException {
         try (Connection conn = DriverManager.getConnection(DB_URL);
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(
-                 "SELECT email FROM users WHERE name = '" + name + "'"
+             PreparedStatement stmt = conn.prepareStatement(
+                 "SELECT email FROM users WHERE name = ?"
              )) {
-            if (rs.next()) {
-                return rs.getString("email");
+            stmt.setString(1, name);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("email");
+                }
+                return null;
             }
-            return null;
         }
     }
 }

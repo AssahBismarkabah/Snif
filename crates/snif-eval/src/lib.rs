@@ -1,4 +1,5 @@
 pub mod fixture;
+pub mod history;
 pub mod metrics;
 
 use anyhow::Result;
@@ -56,15 +57,22 @@ pub fn run_evaluation(fixtures_path: &Path, config: &SnifConfig) -> Result<EvalR
             },
         };
 
-        let system_prompt = snif_prompts::render_system_prompt_with_conventions(
-            config,
-            fix.conventions.as_deref(),
-        );
+        let system_prompt =
+            snif_prompts::render_system_prompt_with_conventions(config, fix.conventions.as_deref());
         let user_prompt = snif_prompts::render_user_prompt(&context);
 
         let result = snif_execution::execute_review(&system_prompt, &user_prompt, &config.model)?;
 
-        let parsed = snif_output::parser::parse_response(&result.response)?;
+        let mut parsed = snif_output::parser::parse_response(&result.response)?;
+        let trimmed_response = result.response.trim_start();
+        if parsed.findings.is_empty()
+            && !trimmed_response.starts_with('{')
+            && !trimmed_response.starts_with('[')
+        {
+            tracing::warn!(fixture = %fix.name, "Repairing non-JSON review response");
+            let repaired = snif_execution::repair_review_response(&result.response, &config.model)?;
+            parsed = snif_output::parser::parse_response(&repaired.response)?;
+        }
         let mut findings = parsed.findings;
         findings = snif_output::filter::apply_filters(findings, &config.filter);
 
