@@ -10,7 +10,16 @@ def transform_report(raw_data: list[dict[str, Any]]) -> dict[str, Any]:
     monthly: dict[str, float] = {}
 
     for record in raw_data:
-        amount = float(record.get("amount", 0))
+        raw_amount = record.get("amount", 0)
+        if isinstance(raw_amount, (int, float)):
+            amount = float(raw_amount)
+        elif isinstance(raw_amount, str):
+            try:
+                amount = float(raw_amount)
+            except ValueError:
+                amount = 0.0
+        else:
+            amount = 0.0
         category = str(record.get("category", "other"))
         region = str(record.get("region", "unknown"))
         month = str(record.get("month", "unknown"))

@@ -13,15 +13,29 @@ pub fn render_system_prompt_with_conventions(
         "You are a strict, precision-focused code reviewer. Your job is to find real issues \
          in code changes — bugs, security vulnerabilities, logic errors, and convention \
          violations that have concrete impact.\n\n\
+         Return ONLY one valid JSON object. Do not output markdown fences, analysis, \
+         step-by-step reasoning, or any text before or after the JSON. Your first character \
+         must be '{' and your last character must be '}'.\n\n\
          Rules:\n\
          - Bias toward false negatives over false positives. If you are not confident, stay quiet.\n\
+         - Keep reasoning internal. Never expose chain-of-thought.\n\
          - Every finding MUST cite specific evidence from the provided code.\n\
          - Every finding MUST explain the user-relevant impact — what breaks, what is at risk.\n\
          - Do NOT flag speculative or hypothetical issues.\n\
          - Do NOT flag issues you cannot ground in the provided context.\n\
+         - Prefer one finding per distinct root cause. Do not split one underlying bug into \
+         multiple overlapping findings.\n\
          - Do NOT flag micro-optimizations (unnecessary allocations, format patterns, iterator \
          vs collect, clone vs borrow) unless the code is in a measured hot path or processes \
          unbounded input. Focus on bugs that break correctness or security.\n\
+         - Treat database queries inside loops as real performance bugs.\n\
+         - Treat reading or collecting unbounded user-controlled input into memory without \
+         size limits as a real performance bug.\n\
+         - Treat joining user-controlled path segments onto a base directory without validation \
+         or normalization as a security bug.\n\
+         - Treat recursive or generic merges of user-controlled objects into plain objects \
+         without blocking \"__proto__\", \"prototype\", or \"constructor\" keys as a \
+         security bug (prototype pollution).\n\
          - If full file content is not provided for a changed file, use the diff hunks to review \
          that file's changes.\n",
     );
@@ -41,16 +55,17 @@ pub fn render_system_prompt_with_conventions(
 
     prompt.push_str(
         "\nRespond with a JSON object containing two fields:\n\n\
-         1. \"summary\": A 2-3 sentence walkthrough of what this change does and why. \
+         1. \"summary\": A 1-2 sentence walkthrough of what this change does and why. \
          Describe the intent and impact on the codebase, not the individual files.\n\n\
          2. \"findings\": A JSON array of issues found. If the change is clean, \
-         use an empty array.\n\n\
+         use an empty array. If you are unsure about the format, return \
+         {\"summary\":\"\",\"findings\":[]} exactly.\n\n\
          Line numbers MUST refer to the line numbers in the file content \
          provided in the Changed Files section. If file content is omitted, \
          use the line numbers from the diff hunks.\n\n\
          Response format:\n\
          {\n\
-           \"summary\": \"<2-3 sentence walkthrough of the change>\",\n\
+           \"summary\": \"<1-2 sentence walkthrough of the change>\",\n\
            \"findings\": [\n\
              {\n\
                \"file\": \"path/to/file\",\n\
@@ -138,6 +153,11 @@ pub fn render_user_prompt(context: &ContextPackage) -> String {
         }
     }
 
-    prompt.push_str("Review the diff above. Return your findings as a JSON array.\n");
+    prompt.push_str(
+        "Review the diff above. Return only the JSON object described in the system prompt. \
+         Do not include markdown fences, analysis, or any extra text. Your first character \
+         must be '{' and your last character must be '}'. If you are unsure, return \
+         {\"summary\":\"\",\"findings\":[]} exactly.\n",
+    );
     prompt
 }
