@@ -10,7 +10,15 @@ pub fn run(path: &str, fixtures: &str, history: &str) -> Result<()> {
 
     let config = snif_config::SnifConfig::load(repo_path)?;
 
-    let result = snif_eval::run_evaluation(fixtures_path, &config)?;
+    // Load past eval history for feedback-driven guidance
+    let history = snif_eval::history::load_history(history_path)
+        .inspect_err(|e| {
+            tracing::warn!(error = %e, "Failed to load eval history — running without guidance");
+        })
+        .ok();
+    let history_refs = history.as_deref();
+
+    let result = snif_eval::run_evaluation(fixtures_path, &config, history_refs)?;
 
     // Print results
     println!("\n=== Evaluation Results ===\n");

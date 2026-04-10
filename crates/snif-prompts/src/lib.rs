@@ -2,12 +2,13 @@ use snif_config::SnifConfig;
 use snif_types::{ContentTier, ContextPackage};
 
 pub fn render_system_prompt(config: &SnifConfig) -> String {
-    render_system_prompt_with_conventions(config, None)
+    render_system_prompt_with_conventions(config, None, None)
 }
 
 pub fn render_system_prompt_with_conventions(
     config: &SnifConfig,
     conventions: Option<&str>,
+    guidance: Option<&str>,
 ) -> String {
     let mut prompt = String::from(
         "You are a strict, precision-focused code reviewer. Your job is to find real issues \
@@ -51,6 +52,12 @@ pub fn render_system_prompt_with_conventions(
         prompt.push_str("\n## Project Conventions\n\n");
         prompt.push_str(conventions);
         prompt.push_str("\n\nFlag violations of these conventions with category \"convention\".\n");
+    }
+
+    if let Some(g) = guidance {
+        prompt.push_str("\n");
+        prompt.push_str(g);
+        prompt.push_str("\n");
     }
 
     prompt.push_str(

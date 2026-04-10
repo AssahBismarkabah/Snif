@@ -8,6 +8,7 @@ on:
       - 'crates/snif-output/**'
       - 'crates/snif-execution/**'
       - 'crates/snif-config/**'
+      - 'crates/snif-eval/**'
       - 'fixtures/**'
       - '.snif.json'
 
@@ -24,10 +25,17 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Restore eval history
+        uses: actions/cache@v4
+        with:
+          path: eval-history.jsonl
+          key: eval-history-${{ github.sha }}
+          restore-keys: eval-history-
+
       - name: Build
         run: cargo build --release
 
       - name: Run evaluation
-        run: ./target/release/snif eval --fixtures ./fixtures/
+        run: ./target/release/snif eval --fixtures ./fixtures/ --history eval-history.jsonl
         env:
           SNIF_API_KEY: ${{ secrets.SNIF_API_KEY }}

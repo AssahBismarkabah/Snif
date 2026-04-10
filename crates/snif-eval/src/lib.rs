@@ -1,3 +1,4 @@
+pub mod adapter;
 pub mod fixture;
 pub mod history;
 pub mod metrics;
@@ -13,11 +14,30 @@ pub struct EvalResult {
     pub gates_passed: bool,
 }
 
-pub fn run_evaluation(fixtures_path: &Path, config: &SnifConfig) -> Result<EvalResult> {
+/// History window size for trend analysis.
+const EVAL_HISTORY_WINDOW: usize = 5;
+
+pub fn run_evaluation(
+    fixtures_path: &Path,
+    config: &SnifConfig,
+    history: Option<&[history::EvalRecord]>,
+) -> Result<EvalResult> {
     let fixtures = fixture::load_fixtures(fixtures_path)?;
 
     if fixtures.is_empty() {
         anyhow::bail!("No fixtures found in {}", fixtures_path.display());
+    }
+
+    // Generate guidance from past eval history
+    let guidance = history
+        .map(|h| adapter::analyze_history(h, EVAL_HISTORY_WINDOW))
+        .filter(|g| !g.prompt_augmentation.is_empty());
+
+    if let Some(ref g) = guidance {
+        tracing::info!(
+            guidance_len = g.prompt_augmentation.len(),
+            "Eval guidance generated from history"
+        );
     }
 
     let mut fixture_results = Vec::new();
@@ -57,8 +77,12 @@ pub fn run_evaluation(fixtures_path: &Path, config: &SnifConfig) -> Result<EvalR
             },
         };
 
-        let system_prompt =
-            snif_prompts::render_system_prompt_with_conventions(config, fix.conventions.as_deref());
+        let guidance_text = guidance.as_ref().map(|g| g.prompt_augmentation.as_str());
+        let system_prompt = snif_prompts::render_system_prompt_with_conventions(
+            config,
+            fix.conventions.as_deref(),
+            guidance_text,
+        );
         let user_prompt = snif_prompts::render_user_prompt(&context);
 
         let result = snif_execution::execute_review(&system_prompt, &user_prompt, &config.model)?;

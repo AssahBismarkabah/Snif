@@ -1,7 +1,7 @@
 {
   "model": {
-    "review_model": "gemini-3.1-pro",
-    "summary_model": "deepseek-v3p2",
+    "review_model": "qwen3p6-plus",
+    "summary_model": "qwen3p6-plus",
     "endpoint": "https://services.api.ai.camer.digital/v1"
   },
   "eval_fixtures_path": "./fixtures"
