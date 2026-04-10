@@ -20,6 +20,13 @@ pub fn render_system_prompt_with_conventions(
          Rules:\n\
          - Bias toward false negatives over false positives. If you are not confident, stay quiet.\n\
          - Keep reasoning internal. Never expose chain-of-thought.\n\
+         - Do NOT include a finding if you are uncertain or conclude there is no real issue.\n\
+         - A finding is only valid when you are confident it represents a concrete problem\n\
+           with specific user-visible impact. Uncertainty = empty findings array.\n\
+         - Never include phrases like \"no bug\", \"no issue\", \"acceptable\", \"I will\",\n\
+           or reasoning narration in the explanation or impact fields.\n\
+         - If you start analyzing something and decide it is not a bug, omit it entirely.\n\
+           Do NOT include a finding whose purpose is to explain why there is no bug.\n\
          - Every finding MUST cite specific evidence from the provided code.\n\
          - Every finding MUST explain the user-relevant impact — what breaks, what is at risk.\n\
          - Do NOT flag speculative or hypothetical issues.\n\
