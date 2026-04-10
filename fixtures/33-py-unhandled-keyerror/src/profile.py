@@ -7,10 +7,3 @@ def get_display_name(user_data: dict[str, Any]) -> str:
     first = user_data["first_name"]
     last = user_data["last_name"]
     return f"{first} {last}"
-
-
-def get_display_name_safe(user_data: dict[str, Any]) -> str:
-    """Build display name from user profile data with safe access."""
-    first = user_data.get("first_name", "Unknown")
-    last = user_data.get("last_name", "")
-    return f"{first} {last}".strip()

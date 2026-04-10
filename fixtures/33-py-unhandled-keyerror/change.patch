@@ -1,6 +1,6 @@
 --- a/src/profile.py
 +++ b/src/profile.py
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,9 @@
 +# src/profile.py
 +from typing import Any
 +
@@ -10,10 +10,3 @@
 +    first = user_data["first_name"]
 +    last = user_data["last_name"]
 +    return f"{first} {last}"
-+
-+
-+def get_display_name_safe(user_data: dict[str, Any]) -> str:
-+    """Build display name from user profile data with safe access."""
-+    first = user_data.get("first_name", "Unknown")
-+    last = user_data.get("last_name", "")
-+    return f"{first} {last}".strip()
