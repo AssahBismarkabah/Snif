@@ -45,9 +45,8 @@ pub fn run(path: &str, fixtures: &str, history: &str) -> Result<()> {
         &result.aggregate,
         result.gates_passed,
     );
-    let previous_records = snif_eval::history::load_history(history_path)?;
 
-    if let Some(previous) = previous_records.last() {
+    if let Some(previous) = history.as_ref().and_then(|h| h.last()) {
         let warnings = snif_eval::history::check_regression(&record, previous);
         if !warnings.is_empty() {
             eprintln!("\n=== Regression Warnings ===\n");
