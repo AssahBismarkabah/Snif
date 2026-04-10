@@ -1,21 +1,27 @@
 --- /dev/null
 +++ b/src/handlers.ts
-@@ -0,0 +1,19 @@
-+export function handleLogin(username: string, password: string): boolean {
-+  if (!username || !password) {
-+    return false
-+  }
-+  const isValid = username.length > 0 && password.length >= 8;
-+  return isValid
+@@ -0,0 +1,21 @@
++const VALID_USERS = ["alice", "bob", "admin"];
++
++export function authenticate(username: string): boolean {
++  return VALID_USERS.includes(username);
 +}
 +
-+export function handleLogout(sessionId: string): void {
-+  console.log(`Logging out session: ${sessionId}`);
-+  // Clear session data
-+  localStorage.removeItem(sessionId)
++export function formatGreeting(name: string): string {
++  const greeting = `Hello, ${name}!`;
++  return greeting.toUpperCase()
 +}
 +
-+export function handleRefresh(token: string): string {
-+  const newToken = token + "_refreshed";
-+  return newToken;
++export function validatePort(value: number): boolean {
++  if (value < 1 || value > 65535) return false;
++  return Number.isInteger(value);
++}
++
++export function capitalizeWords(input: string): string {
++  return input.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
++}
++
++export function truncate(str: string, maxLen: number): string {
++  if (maxLen <= 0) return "";
++  return str.length > maxLen ? str.slice(0, maxLen) + "..." : str
 +}

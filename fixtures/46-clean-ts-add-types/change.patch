@@ -1,6 +1,6 @@
 --- a/src/utils.ts
 +++ b/src/utils.ts
-@@ -1,18 +1,22 @@
+@@ -1,18 +1,23 @@
 -export function parseIntSafe(value, fallback) {
 +export function parseIntSafe(value: string, fallback: number): number {
    const parsed = parseInt(value, 10);
@@ -12,7 +12,11 @@
    if (text.length <= maxLength) {
      return text;
    }
-   return text.slice(0, maxLength - 3) + "...";
+-  return text.slice(0, maxLength - 3) + "...";
++  if (maxLength < 3) {
++    return text.slice(0, maxLength) + "...";
++  }
++  return text.slice(0, maxLength - 3) + "...";
  }
 
 -export function groupBy(items, keyFn) {
