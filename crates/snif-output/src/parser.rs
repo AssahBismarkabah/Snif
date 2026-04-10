@@ -72,7 +72,10 @@ pub fn parse_response(response: &str) -> Result<ParsedResponse> {
             if findings.is_empty() {
                 tracing::warn!("No findings could be parsed from response");
             } else {
-                tracing::info!(count = findings.len(), "Recovered findings from malformed response");
+                tracing::info!(
+                    count = findings.len(),
+                    "Recovered findings from malformed response"
+                );
             }
             Ok(ParsedResponse {
                 summary: String::new(),
@@ -131,7 +134,8 @@ fn parsed_response_from_value(value: &Value) -> Option<ParsedResponse> {
 }
 
 fn parse_findings(items: &[Value]) -> Vec<Finding> {
-    items.iter()
+    items
+        .iter()
         .filter_map(|item| serde_json::from_value::<Finding>(item.clone()).ok())
         .collect()
 }

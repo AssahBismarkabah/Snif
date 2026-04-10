@@ -57,9 +57,7 @@ pub fn analyze_history(history: &[EvalRecord], window: usize) -> EvalGuidance {
              especially around error handling, resource management, and edge cases.",
         ));
     } else if recall_trend > 0.02 {
-        lines.push(String::from(
-            "- Recall is strong and trending up.",
-        ));
+        lines.push(String::from("- Recall is strong and trending up."));
     }
 
     if noise_trend > 0.05 {
@@ -225,9 +223,7 @@ mod tests {
         ];
         let guidance = analyze_history(&history, 5);
         assert!(
-            guidance
-                .prompt_augmentation
-                .contains("more conservative"),
+            guidance.prompt_augmentation.contains("more conservative"),
             "expected conservative guidance, got: {}",
             guidance.prompt_augmentation
         );
@@ -270,9 +266,7 @@ mod tests {
             guidance
                 .prompt_augmentation
                 .contains("persistent false positive")
-                || guidance
-                    .prompt_augmentation
-                    .contains("clean or stylistic"),
+                || guidance.prompt_augmentation.contains("clean or stylistic"),
             "expected persistent-fixture guidance, got: {}",
             guidance.prompt_augmentation
         );
