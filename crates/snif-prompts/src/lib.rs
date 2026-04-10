@@ -55,9 +55,9 @@ pub fn render_system_prompt_with_conventions(
     }
 
     if let Some(g) = guidance {
-        prompt.push_str("\n");
+        prompt.push('\n');
         prompt.push_str(g);
-        prompt.push_str("\n");
+        prompt.push('\n');
     }
 
     prompt.push_str(
