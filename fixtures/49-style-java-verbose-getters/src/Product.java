@@ -1,14 +1,15 @@
 public class Product {
     private String name;
-    private double price;
+    private int priceCents;
     private int quantity;
     private boolean available;
 
-    public Product(String name, double price, int quantity) {
-        this.name = name;
-        this.price = price;
+    public Product(String name, int priceCents, int quantity) {
+        this.name = name != null ? name : "";
+        if (priceCents < 0) throw new IllegalArgumentException("Price cannot be negative");
+        if (quantity < 0) throw new IllegalArgumentException("Quantity cannot be negative");
+        this.priceCents = priceCents;
         this.quantity = quantity;
-        this.available = quantity > 0;
     }
 
     public String getName() {
@@ -16,15 +17,16 @@ public class Product {
     }
 
     public void setName(String name) {
-        this.name = name;
+        this.name = name != null ? name : "";
     }
 
-    public double getPrice() {
-        return this.price;
+    public int getPriceCents() {
+        return this.priceCents;
     }
 
-    public void setPrice(double price) {
-        this.price = price;
+    public void setPriceCents(int priceCents) {
+        if (priceCents < 0) throw new IllegalArgumentException("Price cannot be negative");
+        this.priceCents = priceCents;
     }
 
     public int getQuantity() {
@@ -32,16 +34,12 @@ public class Product {
     }
 
     public void setQuantity(int quantity) {
+        if (quantity < 0) throw new IllegalArgumentException("Quantity cannot be negative");
         this.quantity = quantity;
-        this.available = quantity > 0;
-    }
-
-    public boolean isAvailable() {
-        return this.available;
     }
 
     @Override
     public String toString() {
-        return "Product{name='" + name + "', price=" + price + ", qty=" + quantity + "}";
+        return "Product{name='" + name + "', priceCents=" + priceCents + ", qty=" + quantity + "}";
     }
 }

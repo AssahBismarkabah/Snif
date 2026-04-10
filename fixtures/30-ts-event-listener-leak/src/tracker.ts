@@ -7,7 +7,6 @@ export class ScrollTracker {
 
   private onScroll(): void {
     this.count++;
-    console.log(`Scroll count: ${this.count}`);
   }
 }
 
@@ -29,6 +28,5 @@ export class ScrollTrackerSafe {
 
   private onScroll(): void {
     this.count++;
-    console.log(`Scroll count: ${this.count}`);
   }
 }

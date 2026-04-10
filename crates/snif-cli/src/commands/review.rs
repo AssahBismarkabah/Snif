@@ -155,7 +155,16 @@ pub fn run(
     );
 
     // Parse findings from LLM response
-    let parsed = snif_output::parser::parse_response(&result.response)?;
+    let mut parsed = snif_output::parser::parse_response(&result.response)?;
+    let trimmed_response = result.response.trim_start();
+    if parsed.findings.is_empty()
+        && !trimmed_response.starts_with('{')
+        && !trimmed_response.starts_with('[')
+    {
+        tracing::warn!("Repairing non-JSON review response");
+        let repaired = snif_execution::repair_review_response(&result.response, &config.model)?;
+        parsed = snif_output::parser::parse_response(&repaired.response)?;
+    }
     let change_summary = parsed.summary;
     let mut findings = parsed.findings;
 
