@@ -76,6 +76,10 @@ enum Commands {
         /// Path to the repository root (for config loading)
         #[arg(long, default_value = ".")]
         path: String,
+
+        /// Path to JSONL history file for tracking results over time
+        #[arg(long, default_value = "eval-history.jsonl")]
+        history: String,
     },
 }
 
@@ -114,8 +118,12 @@ fn main() -> anyhow::Result<()> {
         Commands::Clean { path } => {
             commands::clean::run(&path)?;
         }
-        Commands::Eval { fixtures, path } => {
-            commands::eval::run(&path, &fixtures)?;
+        Commands::Eval {
+            fixtures,
+            path,
+            history,
+        } => {
+            commands::eval::run(&path, &fixtures, &history)?;
         }
     }
 

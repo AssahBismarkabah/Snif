@@ -1,0 +1,12 @@
+{
+  "name": "ts-event-listener-leak",
+  "description": "Event listener added but never removed, causing a memory/resource leak",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/tracker.ts",
+      "start_line": 5,
+      "category": "logic"
+    }
+  ]
+}

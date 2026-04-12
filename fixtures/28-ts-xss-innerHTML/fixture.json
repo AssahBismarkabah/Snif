@@ -1,0 +1,12 @@
+{
+  "name": "ts-xss-innerHTML",
+  "description": "User input assigned directly to innerHTML without sanitization",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/render.ts",
+      "start_line": 4,
+      "category": "security"
+    }
+  ]
+}

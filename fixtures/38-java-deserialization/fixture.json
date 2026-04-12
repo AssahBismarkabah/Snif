@@ -1,0 +1,12 @@
+{
+  "name": "java-deserialization",
+  "description": "Unsafe deserialization of untrusted data using ObjectInputStream, enabling remote code execution",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/MessageHandler.java",
+      "start_line": 10,
+      "category": "security"
+    }
+  ]
+}

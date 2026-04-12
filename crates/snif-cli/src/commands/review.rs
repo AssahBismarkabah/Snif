@@ -155,7 +155,16 @@ pub fn run(
     );
 
     // Parse findings from LLM response
-    let parsed = snif_output::parser::parse_response(&result.response)?;
+    let mut parsed = snif_output::parser::parse_response(&result.response)?;
+    let trimmed_response = result.response.trim_start();
+    if parsed.findings.is_empty()
+        && !trimmed_response.starts_with('{')
+        && !trimmed_response.starts_with('[')
+    {
+        tracing::warn!("Repairing non-JSON review response");
+        let repaired = snif_execution::repair_review_response(&result.response, &config.model)?;
+        parsed = snif_output::parser::parse_response(&repaired.response)?;
+    }
     let change_summary = parsed.summary;
     let mut findings = parsed.findings;
 
@@ -206,32 +215,42 @@ pub fn run(
 
         tracing::info!(posted = findings.len(), "Findings posted");
 
-        // Collect both content-based and line-based IDs from current findings
-        let current_content_ids: std::collections::HashSet<&str> = findings
-            .iter()
-            .filter_map(|f| f.fingerprint.as_ref().map(|fp| fp.id.as_str()))
-            .collect();
-        let current_line_ids: std::collections::HashSet<&str> = findings
-            .iter()
-            .filter_map(|f| f.fingerprint.as_ref().map(|fp| fp.line_id.as_str()))
-            .collect();
+        // Only resolve stale findings when the current review produced findings.
+        // If current review is completely clean (zero findings), don't auto-resolve
+        // prior ones — the LLM likely just missed them this time. Conservative —
+        // biases toward keeping findings visible rather than incorrectly clearing them.
+        if findings.is_empty() {
+            tracing::info!(
+                "Current review is clean — skipping stale resolution to avoid clearing prior findings"
+            );
+        } else {
+            // Collect both content-based and line-based IDs from current findings
+            let current_content_ids: std::collections::HashSet<&str> = findings
+                .iter()
+                .filter_map(|f| f.fingerprint.as_ref().map(|fp| fp.id.as_str()))
+                .collect();
+            let current_line_ids: std::collections::HashSet<&str> = findings
+                .iter()
+                .filter_map(|f| f.fingerprint.as_ref().map(|fp| fp.line_id.as_str()))
+                .collect();
 
-        // A prior finding is stale only if NEITHER its content hash NOR its
-        // line hash matches any current finding. Conservative — biases toward
-        // keeping findings rather than incorrectly resolving them.
-        let stale: Vec<_> = prior
-            .into_iter()
-            .filter(|fp| {
-                !current_content_ids.contains(fp.id.as_str())
-                    && !current_line_ids.contains(fp.id.as_str())
-                    && !current_content_ids.contains(fp.line_id.as_str())
-                    && !current_line_ids.contains(fp.line_id.as_str())
-            })
-            .collect();
+            // A prior finding is stale only if NEITHER its content hash NOR its
+            // line hash matches any current finding. Conservative — biases toward
+            // keeping findings rather than incorrectly resolving them.
+            let stale: Vec<_> = prior
+                .into_iter()
+                .filter(|fp| {
+                    !current_content_ids.contains(fp.id.as_str())
+                        && !current_line_ids.contains(fp.id.as_str())
+                        && !current_content_ids.contains(fp.line_id.as_str())
+                        && !current_line_ids.contains(fp.line_id.as_str())
+                })
+                .collect();
 
-        if !stale.is_empty() {
-            tracing::info!(count = stale.len(), "Resolving stale findings");
-            adapter.resolve_stale(&stale)?;
+            if !stale.is_empty() {
+                tracing::info!(count = stale.len(), "Resolving stale findings");
+                adapter.resolve_stale(&stale)?;
+            }
         }
     }
 

@@ -5,7 +5,7 @@
   "expected_findings": [
     {
       "file": "src/io.rs",
-      "start_line": 7,
+      "start_line": 8,
       "category": "logic"
     }
   ]

@@ -1,0 +1,9 @@
+# src/profile.py
+from typing import Any
+
+
+def get_display_name(user_data: dict[str, Any]) -> str:
+    """Build display name from user profile data."""
+    first = user_data["first_name"]
+    last = user_data["last_name"]
+    return f"{first} {last}"

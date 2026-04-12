@@ -1,0 +1,12 @@
+{
+  "name": "py-open-without-with",
+  "description": "File opened without context manager risks resource leak on exception",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/loader.py",
+      "start_line": 8,
+      "category": "logic"
+    }
+  ]
+}

@@ -3,7 +3,7 @@ use rusqlite::Connection;
 
 /// Increment this whenever the schema changes. On open, if the stored version
 /// doesn't match, the database is dropped and recreated automatically.
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 
 pub fn run_migrations(conn: &Connection) -> Result<()> {
     conn.execute_batch(
@@ -48,8 +48,8 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         );
 
         CREATE TABLE IF NOT EXISTS cochange (
-            file_id_a INTEGER NOT NULL REFERENCES files(id),
-            file_id_b INTEGER NOT NULL REFERENCES files(id),
+            file_id_a INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+            file_id_b INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
             correlation REAL NOT NULL,
             commit_count INTEGER NOT NULL,
             PRIMARY KEY (file_id_a, file_id_b)
@@ -57,8 +57,8 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 
         CREATE TABLE IF NOT EXISTS summaries (
             id INTEGER PRIMARY KEY,
-            symbol_id INTEGER REFERENCES symbols(id),
-            file_id INTEGER REFERENCES files(id),
+            symbol_id INTEGER REFERENCES symbols(id) ON DELETE CASCADE,
+            file_id INTEGER REFERENCES files(id) ON DELETE CASCADE,
             level TEXT NOT NULL,
             summary TEXT NOT NULL,
             token_count INTEGER,

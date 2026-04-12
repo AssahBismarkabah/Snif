@@ -1,0 +1,6 @@
+{
+  "name": "style-ts-inconsistent-semicolons",
+  "description": "TypeScript code with inconsistent semicolon usage. Functionally correct, no bugs.",
+  "conventions": null,
+  "expected_findings": []
+}

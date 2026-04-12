@@ -1,0 +1,10 @@
+--- a/src/Repository.java
++++ b/src/Repository.java
+@@ -5,7 +5,7 @@ public class Repository {
+     private final List<String> records = new ArrayList<>();
+
+-    public List<String> getData() {
++    public List<String> fetchRecords() {
+         return List.copyOf(records);
+     }
+

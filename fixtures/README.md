@@ -27,15 +27,47 @@ The benchmark set is composed of three categories.
 
 Bug fixtures contain deliberate, verifiable issues that the reviewer should
 catch. Each has one or more entries in `expected_findings` pointing to the file
-and line where the bug exists. Categories include logic errors, security
-vulnerabilities, and convention violations.
+and line where the bug exists. Finding categories include logic, security,
+convention, and performance. Bug fixtures span multiple languages: Rust,
+TypeScript, Python, and Java.
 
 Clean fixtures contain well-written code with no issues. The reviewer should
 return an empty array. These verify that the tool stays quiet on clean changes.
+Clean fixtures cover all four supported languages.
 
 Style fixtures contain code with formatting or style inconsistencies but no
 logic bugs or security issues. The reviewer should return an empty array.
-These verify that style-only noise is suppressed.
+These verify that style-only noise is suppressed. Style fixtures cover
+TypeScript, Python, and Java in addition to Rust.
+
+
+# Language Coverage
+
+The fixture set covers all four languages supported by the Snif parser:
+
+Rust (fixtures 01-25, 39-40, 42): logic errors, security vulnerabilities,
+convention violations, performance issues, clean changes, and style noise.
+
+TypeScript (fixtures 26-30, 43, 46-47): prototype pollution, missing await,
+XSS via innerHTML, unsafe type assertions, event listener leaks, clean
+refactors, type annotation additions, and style inconsistencies.
+
+Python (fixtures 31-35, 41, 44, 48, 50): mutable default arguments, SQL
+injection, unhandled KeyError, incorrect identity comparison, file handle
+leaks, N+1 queries, test additions, mixed quotes, and long functions.
+
+Java (fixtures 36-38, 45, 49): null dereference, resource leaks, unsafe
+deserialization, method renames, and verbose getter/setter style.
+
+
+# Convention Fixtures
+
+Fixtures 39 and 40 test convention enforcement. They use the `conventions`
+field in `fixture.json` to inject project-specific rules into the system
+prompt. This field is an optional string that describes the conventions the
+reviewer should enforce. When present, the system prompt includes a
+"Project Conventions" section instructing the model to flag violations with
+category "convention".
 
 
 # Running
@@ -71,6 +103,14 @@ Create a new directory under `fixtures/` with:
   ]
 }
 ```
+
+The `conventions` field is optional. Set it to a string describing project
+conventions when testing convention enforcement (category "convention"). Set
+it to `null` for all other fixture types.
+
+Source files can be in any language. The eval harness reads all files in the
+fixture directory (excluding `fixture.json` and `change.patch`) regardless
+of extension.
 
 For clean and style fixtures, set `expected_findings` to an empty array.
 

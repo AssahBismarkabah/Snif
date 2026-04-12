@@ -104,35 +104,11 @@ when the codebase changes significantly or when you want to update summaries.
 # Evaluation
 
 The evaluation harness runs benchmark fixtures through the full review pipeline
-and measures precision, recall, and noise rate.
+and measures precision, recall, and noise rate. The fixture set covers Rust,
+TypeScript, Python, and Java across bug, clean, and style categories.
 
-## Fixture Format
-
-Each fixture is a JSON file in the fixtures directory:
-
-```json
-{
-  "name": "missing-null-check",
-  "description": "Function dereferences nullable pointer without check",
-  "diff": "--- a/src/handler.rs\n+++ b/src/handler.rs\n@@ -40,6 +40,8 @@\n ...",
-  "files": {
-    "src/handler.rs": "full file content here"
-  },
-  "conventions": "",
-  "expected_findings": [
-    {
-      "file": "src/handler.rs",
-      "start_line": 42,
-      "category": "logic",
-      "description": "Null pointer dereference"
-    }
-  ]
-}
-```
-
-For clean changes that should produce no findings, set `expected_findings` to
-an empty array. For style-noise changes that must not be flagged, also set it
-to an empty array.
+See `fixtures/README.md` for the fixture format, directory structure, language
+coverage, and instructions for adding new fixtures.
 
 ## Running the Harness
 
@@ -157,17 +133,3 @@ The aspirational targets for Phase 1 are:
 - Precision >= 80%
 - Recall >= 60%
 - Noise rate <= 10%
-
-## Creating Fixtures
-
-Start with a small set of 3-5 fixtures:
-
-1. A change with a known bug (e.g., off-by-one error, missing error handling)
-2. A clean change with no issues
-3. A change with style noise that should not be flagged
-
-Extract diffs and file contents from real repository history. Expected findings
-should be concrete and verifiable — not hypothetical issues.
-
-Expand the fixture set over time as the reviewer's behavior is observed in
-production.

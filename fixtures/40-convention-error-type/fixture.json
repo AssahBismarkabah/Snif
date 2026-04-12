@@ -1,0 +1,12 @@
+{
+  "name": "convention-error-type",
+  "description": "Custom error type does not implement std::error::Error trait when project conventions require it",
+  "conventions": "All custom error types must implement std::fmt::Display and std::error::Error. Using bare enums for errors without these trait implementations is a convention violation.",
+  "expected_findings": [
+    {
+      "file": "src/errors.rs",
+      "start_line": 1,
+      "category": "convention"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# src/loader.py
+import json
+from typing import Any
+
+
+def load_config(path: str) -> dict[str, Any]:
+    """Load JSON configuration from file."""
+    f = open(path, "r")
+    data = json.load(f)
+    f.close()
+    return data
+
+
+def load_config_safe(path: str) -> dict[str, Any]:
+    """Load JSON configuration using context manager."""
+    with open(path, "r") as f:
+        return json.load(f)

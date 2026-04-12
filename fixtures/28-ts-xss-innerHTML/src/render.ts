@@ -1,0 +1,13 @@
+export function renderComment(container: HTMLElement, userComment: string): void {
+  const div = document.createElement("div");
+  div.className = "comment";
+  div.innerHTML = userComment;
+  container.appendChild(div);
+}
+
+export function renderCommentSafe(container: HTMLElement, userComment: string): void {
+  const div = document.createElement("div");
+  div.className = "comment";
+  div.textContent = userComment;
+  container.appendChild(div);
+}

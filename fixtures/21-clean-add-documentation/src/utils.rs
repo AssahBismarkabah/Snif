@@ -1,0 +1,14 @@
+use std::collections::HashMap;
+
+/// Builds a stable default header map for outgoing requests.
+pub fn default_headers(content_type: &str) -> HashMap<String, String> {
+    let mut headers = HashMap::new();
+    headers.insert("Content-Type".to_string(), content_type.to_string());
+    headers.insert("X-Client".to_string(), "snif".to_string());
+    headers
+}
+
+/// Builds a cache key for a namespaced identifier.
+pub fn cache_key(namespace: &str, id: u64) -> String {
+    format!("{namespace}:{id}")
+}

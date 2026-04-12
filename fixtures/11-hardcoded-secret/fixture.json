@@ -1,1 +1,17 @@
-{"name":"hardcoded-secret","description":"API key hardcoded in source instead of loaded from environment","conventions":null,"expected_findings":[{"file":"src/client.rs","start_line":10,"category":"security"}]}
+{
+  "name": "hardcoded-secret",
+  "description": "API key hardcoded in source instead of loaded from environment",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/client.rs",
+      "start_line": 10,
+      "category": "security"
+    },
+    {
+      "file": "src/client.rs",
+      "start_line": 14,
+      "category": "security"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "py-sql-injection",
+  "description": "f-string interpolation in SQL query allows SQL injection",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/queries.py",
+      "start_line": 7,
+      "category": "security"
+    }
+  ]
+}

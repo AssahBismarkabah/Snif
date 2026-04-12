@@ -1,0 +1,6 @@
+{
+  "name": "clean-py-add-tests",
+  "description": "Clean addition of Python unit tests for an existing module. No issues should be found.",
+  "conventions": null,
+  "expected_findings": []
+}

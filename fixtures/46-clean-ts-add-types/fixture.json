@@ -1,0 +1,6 @@
+{
+  "name": "clean-ts-add-types",
+  "description": "Clean addition of TypeScript type annotations to previously untyped functions. No issues should be found.",
+  "conventions": null,
+  "expected_findings": []
+}

@@ -1,0 +1,6 @@
+{
+  "name": "style-java-verbose-getters",
+  "description": "Java class with verbose but correct getter/setter boilerplate. No bugs, just style.",
+  "conventions": null,
+  "expected_findings": []
+}

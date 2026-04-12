@@ -1,0 +1,13 @@
+use std::io::{self, Read};
+
+pub fn read_uploaded_log_body(mut request_body: impl Read) -> io::Result<Vec<u8>> {
+    let mut body = Vec::new();
+    request_body.read_to_end(&mut body)?;
+    Ok(body)
+}
+
+pub fn read_uploaded_log_body_bounded(request_body: impl Read) -> io::Result<Vec<u8>> {
+    let mut body = Vec::new();
+    request_body.take(1024 * 1024).read_to_end(&mut body)?;
+    Ok(body)
+}

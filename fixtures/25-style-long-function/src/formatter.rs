@@ -18,7 +18,7 @@ pub fn format_report(title: &str, sections: &[(String, Vec<String>)]) -> String 
             output.push_str("  (no items)\n");
         } else {
             for (j, item) in items.iter().enumerate() {
-                let prefix = if j == items.len() - 1 { "└" } else { "├" };
+                let prefix = if j == items.len() - 1 { "`-" } else { "|-" };
                 output.push_str(&format!("  {} {}\n", prefix, item));
             }
         }

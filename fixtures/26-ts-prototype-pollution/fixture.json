@@ -1,0 +1,12 @@
+{
+  "name": "ts-prototype-pollution",
+  "description": "Unvalidated object merge that allows prototype pollution",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/config.ts",
+      "start_line": 10,
+      "category": "security"
+    }
+  ]
+}

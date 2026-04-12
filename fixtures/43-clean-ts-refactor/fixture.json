@@ -1,0 +1,6 @@
+{
+  "name": "clean-ts-refactor",
+  "description": "Clean TypeScript refactoring that extracts a validation helper. No issues should be found.",
+  "conventions": null,
+  "expected_findings": []
+}

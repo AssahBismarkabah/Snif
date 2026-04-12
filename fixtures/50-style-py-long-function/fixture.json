@@ -1,0 +1,6 @@
+{
+  "name": "style-py-long-function",
+  "description": "Python code with a long but functionally correct data transformation function. No bugs.",
+  "conventions": null,
+  "expected_findings": []
+}

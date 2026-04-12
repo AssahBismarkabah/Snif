@@ -5,18 +5,20 @@
 -    if s.chars().count() <= max_chars {
 -        s.to_string()
 -    } else {
--        let truncated: String = s.chars().take(max_chars).collect();
+-        let truncated: String = s.chars().take(max_chars.saturating_sub(3)).collect();
 -        format!("{}...", truncated)
 -    }
 -}
 --- /dev/null
 +++ b/src/helpers.rs
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,18 @@
 +pub fn truncate(s: &str, max_chars: usize) -> String {
 +    if s.chars().count() <= max_chars {
 +        s.to_string()
++    } else if max_chars <= 3 {
++        s.chars().take(max_chars).collect()
 +    } else {
-+        let truncated: String = s.chars().take(max_chars).collect();
++        let truncated: String = s.chars().take(max_chars - 3).collect();
 +        format!("{}...", truncated)
 +    }
 +}

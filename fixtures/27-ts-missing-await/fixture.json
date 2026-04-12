@@ -1,0 +1,12 @@
+{
+  "name": "ts-missing-await",
+  "description": "Async function called without await, causing a promise to be used as a value",
+  "conventions": null,
+  "expected_findings": [
+    {
+      "file": "src/service.ts",
+      "start_line": 13,
+      "category": "logic"
+    }
+  ]
+}
