@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn filter_chain_removes_self_dismissed() {
         let findings = vec![
-            make_finding("no bug here", "None", 0.9),   // should be filtered
+            make_finding("no bug here", "None", 0.9), // should be filtered
             make_finding(
                 "Concurrent writes corrupt JSONL",
                 "Data corruption risk",
