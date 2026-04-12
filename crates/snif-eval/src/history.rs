@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, Write};
 use std::path::Path;
@@ -81,7 +82,11 @@ pub fn save_record(path: &Path, record: &EvalRecord) -> Result<()> {
         .open(path)
         .with_context(|| format!("Failed to open history file: {}", path.display()))?;
 
+    file.lock_exclusive()
+        .with_context(|| format!("Failed to lock history file: {}", path.display()))?;
     writeln!(file, "{}", line).context("Failed to write eval record")?;
+    file.unlock()
+        .with_context(|| "Failed to unlock history file")?;
 
     tracing::info!(path = %path.display(), "Eval record saved to history");
     Ok(())
