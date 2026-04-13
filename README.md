@@ -121,6 +121,9 @@ snif clean
 This does not touch your source code or configuration — only Snif's generated
 data.
 
+## Examples
+![github-stale-bug](./docs/examples/github-stale-bug.png)
+![gitlab-unused-translation](./docs/examples/gitlab-unused-translation.png)
 
 # Documentation
 
