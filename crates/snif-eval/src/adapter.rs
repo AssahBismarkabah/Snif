@@ -1,5 +1,26 @@
 use crate::history::EvalRecord;
 
+/// Precision trend threshold: if precision drops more than this, generate conservative guidance.
+const PRECISION_DECLINE_THRESHOLD: f64 = -0.05;
+
+/// Precision improvement threshold: if precision rises more than this, generate positive guidance.
+const PRECISION_IMPROVEMENT_THRESHOLD: f64 = 0.02;
+
+/// Recall decline threshold.
+const RECALL_DECLINE_THRESHOLD: f64 = -0.05;
+
+/// Recall improvement threshold.
+const RECALL_IMPROVEMENT_THRESHOLD: f64 = 0.02;
+
+/// Noise increase threshold: if false positive rate rises above this, generate suppression guidance.
+const NOISE_INCREASE_THRESHOLD: f64 = 0.05;
+
+/// Minimum number of runs before considering a fixture pattern persistent.
+const MIN_RUNS_FOR_PATTERN: usize = 2;
+
+/// Ratio threshold: if a fixture's FP or FN count exceeds this fraction of runs, flag it as persistent.
+const PERSISTENT_PATTERN_RATIO: f64 = 0.5;
+
 /// Guidance text generated from analysis of past eval runs.
 /// Appended to the system prompt to steer the model based on
 /// observed precision, recall, and noise trends.
@@ -39,28 +60,28 @@ pub fn analyze_history(history: &[EvalRecord], window: usize) -> EvalGuidance {
          Based on analysis of recent evaluation runs, adjust your review approach:",
     ));
 
-    if precision_trend < -0.05 {
+    if precision_trend < PRECISION_DECLINE_THRESHOLD {
         lines.push(String::from(
             "- Precision has declined recently. Be more conservative — only report \
              findings with clear, concrete evidence and user-visible impact. \
              When in doubt, stay quiet.",
         ));
-    } else if precision_trend > 0.02 {
+    } else if precision_trend > PRECISION_IMPROVEMENT_THRESHOLD {
         lines.push(String::from(
             "- Precision is strong and trending up. Maintain this level of rigor.",
         ));
     }
 
-    if recall_trend < -0.05 {
+    if recall_trend < RECALL_DECLINE_THRESHOLD {
         lines.push(String::from(
             "- Recall has declined — findings are being missed. Be more thorough, \
              especially around error handling, resource management, and edge cases.",
         ));
-    } else if recall_trend > 0.02 {
+    } else if recall_trend > RECALL_IMPROVEMENT_THRESHOLD {
         lines.push(String::from("- Recall is strong and trending up."));
     }
 
-    if noise_trend > 0.05 {
+    if noise_trend > NOISE_INCREASE_THRESHOLD {
         lines.push(String::from(
             "- Noise rate (false positives) is rising. Avoid flagging speculative issues, \
              code style, or patterns that don't have a clear behavioral impact.",
@@ -117,7 +138,8 @@ fn analyze_fixture_patterns(recent: &[&EvalRecord]) -> EvalGuidance {
         .iter()
         .filter(|(name, fp_count)| {
             let runs = fixture_runs.get(name.as_str()).copied().unwrap_or(1);
-            runs >= 2 && **fp_count as f64 / runs as f64 > 0.5
+            runs >= MIN_RUNS_FOR_PATTERN
+                && **fp_count as f64 / runs as f64 > PERSISTENT_PATTERN_RATIO
         })
         .collect();
 
@@ -136,7 +158,8 @@ fn analyze_fixture_patterns(recent: &[&EvalRecord]) -> EvalGuidance {
         .iter()
         .filter(|(name, fn_count)| {
             let runs = fixture_runs.get(name.as_str()).copied().unwrap_or(1);
-            runs >= 2 && **fn_count as f64 / runs as f64 > 0.5
+            runs >= MIN_RUNS_FOR_PATTERN
+                && **fn_count as f64 / runs as f64 > PERSISTENT_PATTERN_RATIO
         })
         .collect();
 
@@ -163,7 +186,11 @@ fn compute_trend(records: &[&EvalRecord], metric: fn(&EvalRecord) -> f64) -> f64
     // `records` comes from `history.iter().rev().take(window)`,
     // so records[0] is the most recent, records[last] is the oldest.
     let newest = metric(records[0]);
-    let oldest = metric(records.last().unwrap());
+    let oldest = metric(
+        records
+            .last()
+            .expect("records.len() >= 2 guard ensures this exists"),
+    );
     newest - oldest
 }
 

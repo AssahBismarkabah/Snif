@@ -98,7 +98,10 @@ async fn summarize_all_async(
         let sym_name = sym.name.clone();
 
         tasks.push(tokio::spawn(async move {
-            let _permit = sem.acquire().await.unwrap();
+            let _permit = sem
+                .acquire()
+                .await
+                .expect("semaphore should not be closed during summarization");
             let result = client
                 .chat_completion(prompt::SYSTEM_PROMPT, &user_prompt)
                 .await;
@@ -182,7 +185,10 @@ async fn summarize_all_async(
         let fid = *file_id;
 
         file_tasks.push(tokio::spawn(async move {
-            let _permit = sem.acquire().await.unwrap();
+            let _permit = sem
+                .acquire()
+                .await
+                .expect("semaphore should not be closed during file summarization");
             let result = client
                 .chat_completion(prompt::SYSTEM_PROMPT, &user_prompt)
                 .await;

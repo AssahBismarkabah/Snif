@@ -16,7 +16,7 @@ pub fn compute_fingerprints(findings: &mut [Finding]) {
         } else {
             format!("{}:{}", content_hash, count)
         };
-        *content_counts.get_mut(&content_hash).unwrap() += 1;
+        *count += 1;
 
         finding.fingerprint = Some(Fingerprint {
             id,

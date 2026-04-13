@@ -6,6 +6,15 @@ use std::path::Path;
 
 use crate::metrics::{AggregateMetrics, FixtureResult};
 
+/// Precision drop threshold: flag regression if precision falls more than this.
+const PRECISION_REGRESSION_THRESHOLD: f64 = 0.05;
+
+/// Recall drop threshold: flag regression if recall falls more than this.
+const RECALL_REGRESSION_THRESHOLD: f64 = 0.10;
+
+/// Noise increase threshold: flag regression if noise rate rises more than this.
+const NOISE_REGRESSION_THRESHOLD: f64 = 0.05;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EvalRecord {
     pub timestamp: String,
@@ -122,7 +131,7 @@ pub fn check_regression(current: &EvalRecord, previous: &EvalRecord) -> Vec<Regr
 
     // Aggregate metric regressions
     let precision_drop = previous.precision - current.precision;
-    if precision_drop > 0.05 {
+    if precision_drop > PRECISION_REGRESSION_THRESHOLD {
         warnings.push(RegressionWarning {
             message: format!(
                 "Precision dropped {:.1}pp ({:.1}% -> {:.1}%)",
@@ -134,7 +143,7 @@ pub fn check_regression(current: &EvalRecord, previous: &EvalRecord) -> Vec<Regr
     }
 
     let recall_drop = previous.recall - current.recall;
-    if recall_drop > 0.10 {
+    if recall_drop > RECALL_REGRESSION_THRESHOLD {
         warnings.push(RegressionWarning {
             message: format!(
                 "Recall dropped {:.1}pp ({:.1}% -> {:.1}%)",
@@ -146,7 +155,7 @@ pub fn check_regression(current: &EvalRecord, previous: &EvalRecord) -> Vec<Regr
     }
 
     let noise_increase = current.noise_rate - previous.noise_rate;
-    if noise_increase > 0.05 {
+    if noise_increase > NOISE_REGRESSION_THRESHOLD {
         warnings.push(RegressionWarning {
             message: format!(
                 "Noise rate increased {:.1}pp ({:.1}% -> {:.1}%)",

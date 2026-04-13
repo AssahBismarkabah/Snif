@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 snif-types = { path = "../snif-types" }
+snif-store = { path = "../snif-store" }
 snif-embeddings = { path = "../snif-embeddings" }
 snif-config = { path = "../snif-config" }
 rusqlite = { workspace = true }

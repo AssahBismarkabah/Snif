@@ -1,16 +1,6 @@
 use crate::Store;
 use anyhow::Result;
-use snif_types::Symbol;
-
-pub struct SymbolForSummary {
-    pub id: i64,
-    pub name: String,
-    pub kind: String,
-    pub start_line: i64,
-    pub end_line: i64,
-    pub file_id: i64,
-    pub file_path: String,
-}
+use snif_types::{Symbol, SymbolForSummary};
 
 impl Store {
     pub fn insert_symbols(&self, file_id: i64, symbols: &[Symbol]) -> Result<()> {

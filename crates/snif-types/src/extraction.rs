@@ -92,3 +92,15 @@ pub struct ParseError {
     pub column: usize,
     pub message: String,
 }
+
+/// Lightweight symbol representation used when building summaries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolForSummary {
+    pub id: i64,
+    pub name: String,
+    pub kind: String,
+    pub start_line: i64,
+    pub end_line: i64,
+    pub file_id: i64,
+    pub file_path: String,
+}

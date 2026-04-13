@@ -2,20 +2,10 @@ pub mod collector;
 pub mod filter;
 
 use anyhow::Result;
-use rusqlite::{ffi::sqlite3_auto_extension, Connection};
-use sqlite_vec::sqlite3_vec_init;
+use rusqlite::Connection;
+use snif_store::init_sqlite_vec;
 use std::path::Path;
-use std::sync::Once;
 use zerocopy::AsBytes;
-
-static INIT_VEC: Once = Once::new();
-
-fn init_sqlite_vec() {
-    INIT_VEC.call_once(|| unsafe {
-        #[allow(clippy::missing_transmute_annotations)]
-        sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
-    });
-}
 
 pub struct FeedbackStore {
     conn: Connection,

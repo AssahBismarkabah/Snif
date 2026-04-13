@@ -15,7 +15,11 @@ use std::sync::Once;
 
 static INIT_VEC: Once = Once::new();
 
-fn init_sqlite_vec() {
+/// Initialise the sqlite-vec extension for the current process.
+///
+/// Safe to call from multiple threads — the underlying `Once` guarantees
+/// the extension is registered exactly once.
+pub fn init_sqlite_vec() {
     INIT_VEC.call_once(|| unsafe {
         #[allow(clippy::missing_transmute_annotations)]
         sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));

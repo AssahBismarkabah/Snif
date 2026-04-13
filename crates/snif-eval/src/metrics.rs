@@ -2,6 +2,12 @@ use snif_types::Finding;
 
 use crate::fixture::ExpectedFinding;
 
+/// Minimum acceptable precision for the quality gate.
+const MIN_PRECISION: f64 = 0.70;
+
+/// Maximum acceptable noise rate (false positive ratio) for the quality gate.
+const MAX_NOISE_RATE: f64 = 0.20;
+
 pub struct FixtureResult {
     pub fixture_name: String,
     pub expected: usize,
@@ -106,20 +112,22 @@ pub fn aggregate(results: &[FixtureResult]) -> AggregateMetrics {
 }
 
 pub fn check_quality_gates(metrics: &AggregateMetrics) -> bool {
-    let precision_ok = metrics.precision >= 0.70;
-    let noise_ok = metrics.noise_rate <= 0.20;
+    let precision_ok = metrics.precision >= MIN_PRECISION;
+    let noise_ok = metrics.noise_rate <= MAX_NOISE_RATE;
 
     if !precision_ok {
         tracing::error!(
             precision = format!("{:.1}%", metrics.precision * 100.0),
-            "Quality gate FAILED: precision below 70%"
+            "Quality gate FAILED: precision below {:.0}%",
+            MIN_PRECISION * 100.0
         );
     }
 
     if !noise_ok {
         tracing::error!(
             noise_rate = format!("{:.1}%", metrics.noise_rate * 100.0),
-            "Quality gate FAILED: noise rate above 20%"
+            "Quality gate FAILED: noise rate above {:.0}%",
+            MAX_NOISE_RATE * 100.0
         );
     }
 

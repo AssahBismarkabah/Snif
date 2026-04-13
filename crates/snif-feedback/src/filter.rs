@@ -3,7 +3,20 @@ use snif_config::FilterConfig;
 use snif_embeddings::Embedder;
 use snif_types::Finding;
 
+use crate::collector::SignalType;
 use crate::FeedbackStore;
+
+/// Maximum cosine distance for a signal to be considered similar.
+const MAX_SIMILAR_DISTANCE: f64 = 0.3;
+
+/// Minimum number of dismissed signals to suppress a finding.
+const DISMISSED_SUPPRESSION_THRESHOLD: usize = 3;
+
+/// Minimum number of accepted signals to boost finding confidence.
+const ACCEPTED_BOOST_THRESHOLD: usize = 3;
+
+/// Confidence boost applied when a finding matches accepted signals.
+const ACCEPTED_CONFIDENCE_BOOST: f64 = 0.1;
 
 pub fn apply_feedback_filter(
     findings: Vec<Finding>,
@@ -46,17 +59,17 @@ pub fn apply_feedback_filter(
         let mut accepted_count = 0;
 
         for (signal_type, distance) in &similar {
-            if *distance > 0.3 {
+            if *distance > MAX_SIMILAR_DISTANCE {
                 continue;
             }
             match signal_type.as_str() {
-                "dismissed" => dismissed_count += 1,
-                "accepted" => accepted_count += 1,
+                s if s == SignalType::Dismissed.as_str() => dismissed_count += 1,
+                s if s == SignalType::Accepted.as_str() => accepted_count += 1,
                 _ => {}
             }
         }
 
-        if dismissed_count >= 3 {
+        if dismissed_count >= DISMISSED_SUPPRESSION_THRESHOLD {
             tracing::debug!(
                 file = %finding.location.file,
                 dismissed = dismissed_count,
@@ -65,8 +78,8 @@ pub fn apply_feedback_filter(
             continue;
         }
 
-        if accepted_count >= 3 {
-            finding.confidence = (finding.confidence + 0.1).min(1.0);
+        if accepted_count >= ACCEPTED_BOOST_THRESHOLD {
+            finding.confidence = (finding.confidence + ACCEPTED_CONFIDENCE_BOOST).min(1.0);
         }
 
         if finding.confidence >= config.min_confidence {

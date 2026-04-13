@@ -149,7 +149,7 @@ fn generate_jwt(app_id: &str, private_key: &str) -> Result<String> {
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .expect("system clock should be after UNIX_EPOCH")
         .as_secs();
 
     let claims = Claims {

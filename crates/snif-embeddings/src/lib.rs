@@ -26,7 +26,10 @@ impl Embedder {
 
     pub fn embed_single(&self, text: &str) -> Result<Vec<f32>> {
         let embeddings = self.model.embed(vec![text], None)?;
-        Ok(embeddings.into_iter().next().unwrap())
+        embeddings
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Embedding model returned empty result for text"))
     }
 
     pub fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
