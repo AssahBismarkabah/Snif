@@ -2,6 +2,7 @@ pub mod adapter;
 pub mod fixture;
 pub mod history;
 pub mod metrics;
+pub mod reporter;
 
 use anyhow::Result;
 use snif_config::SnifConfig;
