@@ -36,7 +36,7 @@ const GATES_FAILED_TAG: &str = "gates-failed";
 /// Format: snif-eval-{git_sha_short}-{YYYYMMDD-HHMMSS}
 /// Each run creates a separate immutable snapshot for trend comparison.
 fn generate_experiment_name(git_sha: &str, timestamp: &str) -> String {
-    let sha_short = &git_sha[..git_sha.len().min(7)];
+    let sha_short = git_sha.get(..7).unwrap_or(git_sha);
 
     // Robustly parse and format the timestamp using chrono
     let formatted_time = chrono::DateTime::parse_from_rfc3339(timestamp)
@@ -262,7 +262,7 @@ fn create_experiment<S: Fn(std::time::Duration)>(
             EVAL_TAG,
             if record.gates_passed { GATES_PASSED_TAG } else { GATES_FAILED_TAG },
             format!("model-{}", model_name),
-            format!("sha-{}", &record.git_sha[..record.git_sha.len().min(7)]),
+            format!("sha-{}", record.git_sha.get(..7).unwrap_or(&record.git_sha)),
         ],
     });
 
