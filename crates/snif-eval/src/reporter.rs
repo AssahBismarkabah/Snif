@@ -21,12 +21,7 @@ const RETRY_BASE_DELAY_SECS: u64 = 1;
 /// Override with the `SNIF_BRAINTRUST_PROJECT_ID` environment variable in CI/CD.
 pub const BRAINTRUST_DEFAULT_PROJECT_ID: &str = "7c476f2d-a083-4eb2-bd93-430266782cd0";
 
-/// Stable experiment name. All eval runs insert into the same experiment,
-/// allowing trend tracking over time. Individual runs are distinguished by
-/// metadata (git_sha, timestamp) on each event.
-const EXPERIMENT_NAME: &str = "snif-eval";
-
-/// Human-readable description for the experiment in the Braintrust dashboard.
+/// Human-readable description for experiments in the Braintrust dashboard.
 const EXPERIMENT_DESCRIPTION: &str = "Snif eval harness results";
 
 /// Tag applied to all experiments from this eval harness.
@@ -35,6 +30,42 @@ const EVAL_TAG: &str = "snif-eval";
 /// Tag applied when quality gates pass; inverted-gates tag used otherwise.
 const GATES_PASSED_TAG: &str = "gates-passed";
 const GATES_FAILED_TAG: &str = "gates-failed";
+
+/// Generate a unique experiment name per eval run.
+/// Format: snif-eval-{git_sha_short}-{YYYYMMDD-HHMMSS}
+/// Each run creates a separate immutable snapshot for trend comparison.
+fn generate_experiment_name(git_sha: &str, timestamp: &str) -> String {
+    let sha_short = &git_sha[..git_sha.len().min(7)];
+    // Parse ISO timestamp to YYYYMMDD-HHMMSS format
+    let formatted = timestamp
+        .get(0..10)
+        .map(|d| d.replace('-', ""))
+        .unwrap_or_default();
+    let time_part = timestamp
+        .get(11..19)
+        .map(|t| t.replace(':', ""))
+        .unwrap_or_default();
+    format!("snif-eval-{sha_short}-{formatted}-{time_part}")
+}
+
+/// Determine if running in CI based on environment variables.
+fn detect_runner() -> &'static str {
+    if std::env::var("CI").is_ok()
+        || std::env::var("GITHUB_ACTIONS").is_ok()
+        || std::env::var("GITLAB_CI").is_ok()
+    {
+        "ci"
+    } else {
+        "local"
+    }
+}
+
+/// Get the current git branch from environment or default to current branch.
+fn detect_git_branch() -> String {
+    std::env::var("GITHUB_REF_NAME")
+        .or_else(|_| std::env::var("CI_COMMIT_REF_NAME"))
+        .unwrap_or_else(|_| "unknown".to_string())
+}
 
 /// F1 score coefficient (2.0 for harmonic mean of precision and recall).
 const F1_COEFFICIENT: f64 = 2.0;
@@ -87,9 +118,8 @@ where
 
 /// Report evaluation results to Braintrust monitoring dashboard.
 ///
-/// Inserts events for each fixture and one aggregate row into a persistent
-/// experiment named "snif-eval". Runs accumulate as data points within a
-/// single experiment, enabling trend tracking without dashboard clutter.
+/// Creates a new experiment per run (named snif-eval-{git_sha}-{timestamp}),
+/// enabling side-by-side comparison and trend tracking in the Braintrust UI.
 ///
 /// Fails gracefully: returns an error but does not panic. The caller should
 /// log the error and continue — local JSONL history is unaffected.
@@ -105,13 +135,15 @@ pub fn report_to_braintrust(
         .build()
         .context("Failed to create HTTP client")?;
 
+    let experiment_name = generate_experiment_name(&record.git_sha, &record.timestamp);
+
     report_to_braintrust_inner(
         &client,
         BRAINTRUST_API_BASE,
         api_key,
         project_id,
         model_name,
-        EXPERIMENT_NAME,
+        &experiment_name,
         record,
         fixture_results,
     )
@@ -168,7 +200,7 @@ fn report_to_braintrust_inner_with_sleep<S: Fn(std::time::Duration)>(
 
     tracing::info!(
         experiment_id = %exp_id,
-        name = EXPERIMENT_NAME,
+        name = experiment_name,
         "Braintrust experiment created"
     );
 
@@ -210,15 +242,20 @@ fn create_experiment<S: Fn(std::time::Duration)>(
         "description": EXPERIMENT_DESCRIPTION,
         "repo_info": {
             "commit": record.git_sha,
+            "branch": detect_git_branch(),
         },
         "metadata": {
             "model": model_name,
             "timestamp": record.timestamp,
+            "runner": detect_runner(),
+            "fixture_count": record.fixture_count,
         },
-        "ensure_new": false,
+        "ensure_new": true,
         "tags": [
             EVAL_TAG,
             if record.gates_passed { GATES_PASSED_TAG } else { GATES_FAILED_TAG },
+            format!("model-{}", model_name),
+            format!("sha-{}", &record.git_sha[..record.git_sha.len().min(7)]),
         ],
     });
 
@@ -434,6 +471,7 @@ mod tests {
 
     const TEST_API_KEY: &str = "test-api-key";
     const TEST_MODEL: &str = "test-model";
+    const TEST_EXPERIMENT_NAME: &str = "snif-eval-abc1234-20240101-000000";
 
     fn test_record() -> EvalRecord {
         EvalRecord {
@@ -520,7 +558,7 @@ mod tests {
             TEST_API_KEY,
             BRAINTRUST_DEFAULT_PROJECT_ID,
             TEST_MODEL,
-            EXPERIMENT_NAME,
+            TEST_EXPERIMENT_NAME,
             &record,
             &fixture_results,
             &|_| {}, // No-op sleep for fast tests
@@ -565,7 +603,7 @@ mod tests {
             TEST_API_KEY,
             BRAINTRUST_DEFAULT_PROJECT_ID,
             TEST_MODEL,
-            EXPERIMENT_NAME,
+            TEST_EXPERIMENT_NAME,
             &record,
             &fixture_results,
             &|_| {}, // No-op sleep for fast tests
@@ -641,7 +679,7 @@ mod tests {
             TEST_API_KEY,
             BRAINTRUST_DEFAULT_PROJECT_ID,
             TEST_MODEL,
-            EXPERIMENT_NAME,
+            TEST_EXPERIMENT_NAME,
             &record,
             &|_| {}, // No-op sleep for fast tests
         );
@@ -691,5 +729,35 @@ mod tests {
 
         assert!(result.is_ok());
         server.reset();
+    }
+
+    #[test]
+    fn generate_experiment_name_produces_correct_format() {
+        let name = generate_experiment_name(
+            "abc1234def5678abc1234def5678abc1234def56",
+            "2026-04-14T10:30:00Z",
+        );
+        assert_eq!(name, "snif-eval-abc1234-20260414-103000");
+    }
+
+    #[test]
+    fn generate_experiment_name_uses_unique_sha_per_run() {
+        let name1 = generate_experiment_name(
+            "sha1111111111111111111111111111111111",
+            "2026-04-14T10:30:00Z",
+        );
+        let name2 = generate_experiment_name(
+            "sha2222222222222222222222222222222222",
+            "2026-04-14T10:30:00Z",
+        );
+        assert_ne!(name1, name2);
+        assert!(name1.starts_with("snif-eval-sha1111-"));
+        assert!(name2.starts_with("snif-eval-sha2222-"));
+    }
+
+    #[test]
+    fn generate_experiment_name_handles_short_sha() {
+        let name = generate_experiment_name("abc1234", "2026-04-14T10:30:00Z");
+        assert_eq!(name, "snif-eval-abc1234-20260414-103000");
     }
 }
