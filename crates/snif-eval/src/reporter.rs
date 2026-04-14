@@ -118,6 +118,7 @@ pub fn report_to_braintrust(
 }
 
 /// Internal implementation, testable with a mock base URL and custom sleep function.
+#[allow(clippy::too_many_arguments)]
 fn report_to_braintrust_inner(
     client: &Client,
     api_base: &str,
@@ -141,6 +142,7 @@ fn report_to_braintrust_inner(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn report_to_braintrust_inner_with_sleep<S: Fn(std::time::Duration)>(
     client: &Client,
     api_base: &str,
@@ -171,14 +173,25 @@ fn report_to_braintrust_inner_with_sleep<S: Fn(std::time::Duration)>(
     );
 
     // Step 2: Insert per-fixture events
-    insert_fixture_events(&client, api_base, api_key, &exp_id, model_name, fixture_results, sleep_fn)?;
+    insert_fixture_events(
+        client,
+        api_base,
+        api_key,
+        &exp_id,
+        model_name,
+        fixture_results,
+        sleep_fn,
+    )?;
 
     // Step 3: Insert aggregate summary event
-    insert_aggregate_event(&client, api_base, api_key, &exp_id, model_name, record, sleep_fn)?;
+    insert_aggregate_event(
+        client, api_base, api_key, &exp_id, model_name, record, sleep_fn,
+    )?;
 
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_experiment<S: Fn(std::time::Duration)>(
     client: &Client,
     api_base: &str,
@@ -209,31 +222,35 @@ fn create_experiment<S: Fn(std::time::Duration)>(
         ],
     });
 
-    retry_with_backoff_custom("create_experiment", || {
-        let response = client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()
-            .context("Failed to send experiment creation request")?;
+    retry_with_backoff_custom(
+        "create_experiment",
+        || {
+            let response = client
+                .post(&url)
+                .header("Authorization", format!("Bearer {}", api_key))
+                .header("Content-Type", "application/json")
+                .json(&body)
+                .send()
+                .context("Failed to send experiment creation request")?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body_text = response.text().unwrap_or_default();
-            anyhow::bail!("Braintrust API returned {}: {}", status, body_text);
-        }
+            if !response.status().is_success() {
+                let status = response.status();
+                let body_text = response.text().unwrap_or_default();
+                anyhow::bail!("Braintrust API returned {}: {}", status, body_text);
+            }
 
-        let result: serde_json::Value = response
-            .json()
-            .context("Failed to parse experiment creation response")?;
+            let result: serde_json::Value = response
+                .json()
+                .context("Failed to parse experiment creation response")?;
 
-        result
-            .get("id")
-            .and_then(|v| v.as_str())
-            .map(String::from)
-            .context("Experiment creation response missing 'id' field")
-    }, sleep_fn)
+            result
+                .get("id")
+                .and_then(|v| v.as_str())
+                .map(String::from)
+                .context("Experiment creation response missing 'id' field")
+        },
+        sleep_fn,
+    )
 }
 
 fn insert_fixture_events<S: Fn(std::time::Duration)>(
@@ -249,10 +266,7 @@ fn insert_fixture_events<S: Fn(std::time::Duration)>(
         return Ok(());
     }
 
-    let url = format!(
-        "{}/v1/experiment/{}/insert",
-        api_base, experiment_id
-    );
+    let url = format!("{}/v1/experiment/{}/insert", api_base, experiment_id);
 
     let events: Vec<serde_json::Value> = fixture_results
         .iter()
@@ -269,7 +283,8 @@ fn insert_fixture_events<S: Fn(std::time::Duration)>(
                 DEFAULT_SCORE_WHEN_NO_DATA
             };
             let fixture_f1 = if fixture_precision + fixture_recall > 0.0 {
-                F1_COEFFICIENT * fixture_precision * fixture_recall / (fixture_precision + fixture_recall)
+                F1_COEFFICIENT * fixture_precision * fixture_recall
+                    / (fixture_precision + fixture_recall)
             } else {
                 DEFAULT_F1_WHEN_NO_DATA
             };
@@ -306,23 +321,27 @@ fn insert_fixture_events<S: Fn(std::time::Duration)>(
 
     let body = json!({ "events": events });
 
-    let result = retry_with_backoff_custom("insert_fixture_events", || {
-        let response = client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()
-            .context("Failed to send fixture events request")?;
+    let result = retry_with_backoff_custom(
+        "insert_fixture_events",
+        || {
+            let response = client
+                .post(&url)
+                .header("Authorization", format!("Bearer {}", api_key))
+                .header("Content-Type", "application/json")
+                .json(&body)
+                .send()
+                .context("Failed to send fixture events request")?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body_text = response.text().unwrap_or_default();
-            anyhow::bail!("Braintrust insert returned {}: {}", status, body_text);
-        }
+            if !response.status().is_success() {
+                let status = response.status();
+                let body_text = response.text().unwrap_or_default();
+                anyhow::bail!("Braintrust insert returned {}: {}", status, body_text);
+            }
 
-        Ok(())
-    }, sleep_fn);
+            Ok(())
+        },
+        sleep_fn,
+    );
 
     if let Err(e) = result {
         tracing::warn!(error = %e, "Failed to insert fixture events after retries");
@@ -341,10 +360,7 @@ fn insert_aggregate_event<S: Fn(std::time::Duration)>(
     record: &EvalRecord,
     sleep_fn: &S,
 ) -> Result<()> {
-    let url = format!(
-        "{}/v1/experiment/{}/insert",
-        api_base, experiment_id
-    );
+    let url = format!("{}/v1/experiment/{}/insert", api_base, experiment_id);
 
     let noise_score = 1.0 - record.noise_rate;
 
@@ -377,23 +393,31 @@ fn insert_aggregate_event<S: Fn(std::time::Duration)>(
         }],
     });
 
-    let result = retry_with_backoff_custom("insert_aggregate_event", || {
-        let response = client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()
-            .context("Failed to send aggregate event request")?;
+    let result = retry_with_backoff_custom(
+        "insert_aggregate_event",
+        || {
+            let response = client
+                .post(&url)
+                .header("Authorization", format!("Bearer {}", api_key))
+                .header("Content-Type", "application/json")
+                .json(&body)
+                .send()
+                .context("Failed to send aggregate event request")?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body_text = response.text().unwrap_or_default();
-            anyhow::bail!("Braintrust aggregate insert returned {}: {}", status, body_text);
-        }
+            if !response.status().is_success() {
+                let status = response.status();
+                let body_text = response.text().unwrap_or_default();
+                anyhow::bail!(
+                    "Braintrust aggregate insert returned {}: {}",
+                    status,
+                    body_text
+                );
+            }
 
-        Ok(())
-    }, sleep_fn);
+            Ok(())
+        },
+        sleep_fn,
+    );
 
     if let Err(e) = result {
         tracing::warn!(error = %e, "Failed to insert aggregate event after retries");
@@ -473,7 +497,10 @@ mod tests {
             .create();
 
         server
-            .mock("POST", mockito::Matcher::Regex(r"^/v1/experiment/.+/insert$".to_string()))
+            .mock(
+                "POST",
+                mockito::Matcher::Regex(r"^/v1/experiment/.+/insert$".to_string()),
+            )
             .with_status(200)
             .with_body(r#"{"row_ids": ["r1"]}"#)
             .expect_at_least(1)
@@ -515,7 +542,10 @@ mod tests {
             .create();
 
         server
-            .mock("POST", mockito::Matcher::Regex(r"^/v1/experiment/.+/insert$".to_string()))
+            .mock(
+                "POST",
+                mockito::Matcher::Regex(r"^/v1/experiment/.+/insert$".to_string()),
+            )
             .with_status(200)
             .with_body(r#"{"row_ids": ["r1"]}"#)
             .expect_at_least(1)
@@ -550,13 +580,17 @@ mod tests {
 
         let call_count = AtomicU32::new(0);
 
-        let result = retry_with_backoff_custom("test_operation", || {
-            let count = call_count.fetch_add(1, Ordering::SeqCst);
-            if count == 0 {
-                anyhow::bail!("Transient network error")
-            }
-            Ok("success")
-        }, &|_| {}); // No-op sleep for fast tests
+        let result = retry_with_backoff_custom(
+            "test_operation",
+            || {
+                let count = call_count.fetch_add(1, Ordering::SeqCst);
+                if count == 0 {
+                    anyhow::bail!("Transient network error")
+                }
+                Ok("success")
+            },
+            &|_| {},
+        ); // No-op sleep for fast tests
 
         assert!(result.is_ok());
         assert_eq!(call_count.load(Ordering::SeqCst), 2);
@@ -627,7 +661,10 @@ mod tests {
             .create();
 
         server
-            .mock("POST", mockito::Matcher::Regex(r"^/v1/experiment/.+/insert$".to_string()))
+            .mock(
+                "POST",
+                mockito::Matcher::Regex(r"^/v1/experiment/.+/insert$".to_string()),
+            )
             .with_status(500)
             .with_body(r#"{"error": "internal server error"}"#)
             .expect_at_least(1)
