@@ -5,8 +5,8 @@
   "expected_findings": [
     {
       "file": "src/parser.ts",
-      "start_line": 7,
-      "category": "logic"
+      "start_line": 6,
+      "category": "security"
     }
   ]
 }

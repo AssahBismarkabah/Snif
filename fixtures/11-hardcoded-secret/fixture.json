@@ -10,8 +10,8 @@
     },
     {
       "file": "src/client.rs",
-      "start_line": 14,
-      "category": "security"
+      "start_line": 15,
+      "category": "logic"
     }
   ]
 }
