@@ -59,6 +59,25 @@ pub fn run(path: &str, fixtures: &str, history: &str) -> Result<()> {
 
     snif_eval::history::save_record(history_path, &record)?;
 
+    // Report to Braintrust monitoring if configured
+    let braintrust_project_id = std::env::var("SNIF_BRAINTRUST_PROJECT_ID")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| snif_eval::reporter::BRAINTRUST_DEFAULT_PROJECT_ID.to_string());
+    if let Ok(api_key) = std::env::var("BRAINTRUST_API_KEY") {
+        let model_name = &config.model.review_model;
+        match snif_eval::reporter::report_to_braintrust(
+            &api_key,
+            &braintrust_project_id,
+            model_name,
+            &record,
+            &result.fixture_results,
+        ) {
+            Ok(_) => tracing::info!("Results reported to Braintrust"),
+            Err(e) => tracing::warn!(error = %e, "Failed to report to Braintrust"),
+        }
+    }
+
     if result.gates_passed {
         println!("  Quality gates: PASSED");
     } else {

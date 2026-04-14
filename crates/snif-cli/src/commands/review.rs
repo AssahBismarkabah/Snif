@@ -156,15 +156,17 @@ pub fn run(
 
     // Parse findings from LLM response
     let mut parsed = snif_output::parser::parse_response(&result.response)?;
-    let trimmed_response = result.response.trim_start();
-    if parsed.findings.is_empty()
-        && !trimmed_response.starts_with('{')
-        && !trimmed_response.starts_with('[')
-    {
-        tracing::warn!("Repairing non-JSON review response");
+
+    // Run repair if findings are empty OR if chain-of-thought leakage is detected
+    let needs_repair =
+        parsed.findings.is_empty() || snif_output::parser::has_chain_of_thought(&result.response);
+
+    if needs_repair {
+        tracing::warn!("Repairing review response");
         let repaired = snif_execution::repair_review_response(&result.response, &config.model)?;
         parsed = snif_output::parser::parse_response(&repaired.response)?;
     }
+
     let change_summary = parsed.summary;
     let mut findings = parsed.findings;
 

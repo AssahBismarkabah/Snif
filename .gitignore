@@ -21,3 +21,7 @@ spikes/target/
 
 # Snif runtime data
 .snif/
+
+# Generated eval artifacts
+eval-history.jsonl
+eval-output.log

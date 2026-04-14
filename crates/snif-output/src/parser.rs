@@ -14,52 +14,208 @@ pub struct ParsedResponse {
     pub findings: Vec<Finding>,
 }
 
-pub fn parse_response(response: &str) -> Result<ParsedResponse> {
-    let trimmed = response.trim();
+/// Chain-of-thought patterns that indicate leaked reasoning.
+const COT_PATTERNS: &[&str] = &[
+    "let me think",
+    "let's look",
+    "let me analyze",
+    "actually,",
+    "wait,",
+    "however, there is",
+    "however, the",
+    "i need to",
+    "i should",
+    "i will",
+    "the code slices",
+    "the real issue",
+    "more critically",
+    "more significantly",
+    "let's look closer",
+    "looking at",
+    "examining",
+    "checking",
+    "the most concrete",
+    "the most significant",
+    "a more significant",
+    "a potential panic",
+    "potential panic",
+    "this is likely",
+    "this is technically",
+    "while this is",
+    "if this is",
+    "if the",
+    "if git_sha",
+    "if record",
+    "but the",
+    "but if",
+    "so the",
+    "so no",
+    "so it",
+    "wait,",
+    "actually",
+];
 
-    // Try to parse as the new object format: { "summary": "...", "findings": [...] }
-    if let Some(start) = trimmed.find('{') {
-        if let Some(end) = trimmed.rfind('}') {
-            let json_str = &trimmed[start..=end];
-            if let Ok(review) = serde_json::from_str::<ReviewResponse>(json_str) {
-                let summary = review.summary.unwrap_or_default();
-                tracing::info!(
-                    count = review.findings.len(),
-                    has_summary = !summary.is_empty(),
-                    "Parsed review response"
-                );
-                return Ok(ParsedResponse {
-                    summary,
-                    findings: review.findings,
-                });
+/// Extract the outermost balanced JSON object from a response that may contain
+/// chain-of-thought preamble text.
+fn extract_json_object(input: &str) -> Option<&str> {
+    let start = input.find('{')?;
+    let after_open = &input[start..];
+
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escape = false;
+    let mut end_pos = None;
+
+    for (i, ch) in after_open.char_indices() {
+        if in_string {
+            if escape {
+                escape = false;
+            } else if ch == '\\' {
+                escape = true;
+            } else if ch == '"' {
+                in_string = false;
             }
+            continue;
+        }
 
-            if let Ok(value) = serde_json::from_str::<Value>(json_str) {
-                if let Some(parsed) = parsed_response_from_value(&value) {
-                    tracing::info!(
-                        count = parsed.findings.len(),
-                        has_summary = !parsed.summary.is_empty(),
-                        "Parsed review response with flexible object extraction"
-                    );
-                    return Ok(parsed);
+        match ch {
+            '"' => in_string = true,
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    end_pos = Some(i);
+                    break;
                 }
             }
+            _ => {}
         }
     }
 
-    // Fall back to parsing as a plain JSON array (backwards compatibility)
-    let json_str = if let Some(start) = trimmed.find('[') {
-        if let Some(end) = trimmed.rfind(']') {
-            &trimmed[start..=end]
-        } else {
-            trimmed
+    end_pos.map(|end| &after_open[..=end])
+}
+
+/// Check if the response contains chain-of-thought leakage patterns.
+fn contains_cot_patterns(response: &str) -> bool {
+    let lower = response.to_lowercase();
+    COT_PATTERNS.iter().any(|pattern| lower.contains(pattern))
+}
+
+/// Sanitize a finding's text fields by removing chain-of-thought preamble.
+/// Strips common reasoning patterns from the beginning of the text and keeps
+/// only the concrete issue description.
+fn sanitize_text(text: &str) -> String {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    let lower = trimmed.to_lowercase();
+
+    // If the text starts with a COT pattern, try to find where the concrete
+    // statement begins by looking for sentence boundaries after COT markers.
+    if COT_PATTERNS
+        .iter()
+        .any(|p| lower.starts_with(p) || lower.contains(p))
+    {
+        // Try to find the first sentence that doesn't start with COT patterns
+        let sentences: Vec<&str> = trimmed.split(&['.', '!', '?', '\n']).collect();
+        for sentence in &sentences {
+            let s = sentence.trim();
+            if s.is_empty() {
+                continue;
+            }
+            let s_lower = s.to_lowercase();
+            if !COT_PATTERNS.iter().any(|p| s_lower.contains(p)) {
+                return format!(
+                    "{}.",
+                    s.trim_start_matches(|c: char| !c.is_alphabetic()).trim()
+                );
+            }
         }
+        // If all sentences contain COT patterns, return the last part after the
+        // last COT marker
+        for pattern in COT_PATTERNS {
+            if let Some(pos) = lower.find(pattern) {
+                let after = &trimmed[pos + pattern.len()..];
+                // Skip past any punctuation/spaces after the pattern
+                let clean = after
+                    .trim_start_matches(|c: char| !c.is_alphabetic())
+                    .trim();
+                if !clean.is_empty() && clean.len() > 5 {
+                    // Only return if there's substantial content
+                    return clean.to_string();
+                }
+            }
+        }
+        // Fall back to returning the original text if nothing clean was found
+        trimmed.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// Sanitize all text fields in findings to remove chain-of-thought leakage.
+fn sanitize_findings(findings: &mut [Finding]) {
+    for finding in findings {
+        finding.explanation = sanitize_text(&finding.explanation);
+        finding.impact = sanitize_text(&finding.impact);
+        finding.evidence = sanitize_text(&finding.evidence);
+        if let Some(ref mut suggestion) = finding.suggestion {
+            *suggestion = sanitize_text(suggestion);
+        }
+    }
+}
+
+pub fn parse_response(response: &str) -> Result<ParsedResponse> {
+    let trimmed = response.trim();
+
+    // Extract clean JSON object, stripping any chain-of-thought preamble
+    let json_str = if let Some(extracted) = extract_json_object(trimmed) {
+        extracted
     } else {
         trimmed
     };
 
+    // Try to parse as the new object format: { "summary": "...", "findings": [...] }
+    if let Ok(review) = serde_json::from_str::<ReviewResponse>(json_str) {
+        let summary = review.summary.unwrap_or_default();
+        let mut findings = review.findings;
+        sanitize_findings(&mut findings);
+        tracing::info!(
+            count = findings.len(),
+            has_summary = !summary.is_empty(),
+            "Parsed review response"
+        );
+        return Ok(ParsedResponse { summary, findings });
+    }
+
+    if let Ok(value) = serde_json::from_str::<Value>(json_str) {
+        if let Some(mut parsed) = parsed_response_from_value(&value) {
+            sanitize_findings(&mut parsed.findings);
+            tracing::info!(
+                count = parsed.findings.len(),
+                has_summary = !parsed.summary.is_empty(),
+                "Parsed review response with flexible object extraction"
+            );
+            return Ok(parsed);
+        }
+    }
+
+    // Fall back to parsing as a plain JSON array (backwards compatibility)
+    let json_str = if let Some(start) = json_str.find('[') {
+        if let Some(end) = json_str.rfind(']') {
+            &json_str[start..=end]
+        } else {
+            json_str
+        }
+    } else {
+        json_str
+    };
+
     match serde_json::from_str::<Vec<Finding>>(json_str) {
-        Ok(findings) => {
+        Ok(mut findings) => {
+            sanitize_findings(&mut findings);
             tracing::info!(count = findings.len(), "Parsed findings (array format)");
             Ok(ParsedResponse {
                 summary: String::new(),
@@ -68,7 +224,8 @@ pub fn parse_response(response: &str) -> Result<ParsedResponse> {
         }
         Err(e) => {
             tracing::warn!(error = %e, "Failed to parse response, attempting line-by-line");
-            let findings = salvage_findings(trimmed);
+            let mut findings = salvage_findings(trimmed);
+            sanitize_findings(&mut findings);
             if findings.is_empty() {
                 tracing::warn!("No findings could be parsed from response");
             } else {
@@ -83,6 +240,11 @@ pub fn parse_response(response: &str) -> Result<ParsedResponse> {
             })
         }
     }
+}
+
+/// Check if the raw response contains chain-of-thought patterns that warrant repair.
+pub fn has_chain_of_thought(response: &str) -> bool {
+    contains_cot_patterns(response)
 }
 
 fn parsed_response_from_value(value: &Value) -> Option<ParsedResponse> {
@@ -205,7 +367,7 @@ fn extract_balanced_objects(input: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_response;
+    use super::{has_chain_of_thought, parse_response};
 
     #[test]
     fn parses_object_with_issues_field() {
@@ -258,5 +420,45 @@ mod tests {
         let parsed = parse_response(response).unwrap();
         assert_eq!(parsed.findings.len(), 1);
         assert_eq!(parsed.findings[0].location.file, "src/lib.rs");
+    }
+
+    #[test]
+    fn detects_chain_of_thought_in_response() {
+        let response = "Let me think about this code. {\"summary\":\"test\",\"findings\":[]}";
+        assert!(has_chain_of_thought(response));
+    }
+
+    #[test]
+    fn does_not_detect_clean_response_as_cot() {
+        let response = r#"{"summary":"Clean change","findings":[]}"#;
+        assert!(!has_chain_of_thought(response));
+    }
+
+    #[test]
+    fn sanitizes_cot_from_finding_explanation() {
+        let response = r#"Let me think about this.
+        {
+          "summary": "Found issue",
+          "findings": [
+            {
+              "file": "src/lib.rs",
+              "start_line": 7,
+              "end_line": 8,
+              "category": "logic",
+              "confidence": 0.9,
+              "evidence": "panic!()",
+              "explanation": "Let me analyze this. Actually, the code panics here.",
+              "impact": "The process crashes.",
+              "suggestion": null
+            }
+          ]
+        }"#;
+
+        let parsed = parse_response(response).unwrap();
+        assert_eq!(parsed.findings.len(), 1);
+        // The explanation should be sanitized - "Let me analyze" and "Actually" should be stripped
+        let explanation = &parsed.findings[0].explanation;
+        assert!(!explanation.to_lowercase().contains("let me analyze"));
+        assert!(!explanation.to_lowercase().starts_with("actually"));
     }
 }

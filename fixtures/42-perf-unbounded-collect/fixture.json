@@ -5,8 +5,8 @@
   "expected_findings": [
     {
       "file": "src/ingest.rs",
-      "start_line": 4,
-      "category": "performance"
+      "start_line": 3,
+      "category": "security"
     }
   ]
 }

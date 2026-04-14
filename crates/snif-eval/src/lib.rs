@@ -2,6 +2,7 @@ pub mod adapter;
 pub mod fixture;
 pub mod history;
 pub mod metrics;
+pub mod reporter;
 
 use anyhow::Result;
 use snif_config::SnifConfig;
@@ -88,12 +89,13 @@ pub fn run_evaluation(
         let result = snif_execution::execute_review(&system_prompt, &user_prompt, &config.model)?;
 
         let mut parsed = snif_output::parser::parse_response(&result.response)?;
-        let trimmed_response = result.response.trim_start();
-        if parsed.findings.is_empty()
-            && !trimmed_response.starts_with('{')
-            && !trimmed_response.starts_with('[')
-        {
-            tracing::warn!(fixture = %fix.name, "Repairing non-JSON review response");
+
+        // Run repair if findings are empty OR if chain-of-thought leakage is detected
+        let needs_repair = parsed.findings.is_empty()
+            || snif_output::parser::has_chain_of_thought(&result.response);
+
+        if needs_repair {
+            tracing::warn!(fixture = %fix.name, "Repairing review response");
             let repaired = snif_execution::repair_review_response(&result.response, &config.model)?;
             parsed = snif_output::parser::parse_response(&repaired.response)?;
         }
