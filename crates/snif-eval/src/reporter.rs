@@ -37,7 +37,7 @@ const GATES_FAILED_TAG: &str = "gates-failed";
 /// Each run creates a separate immutable snapshot for trend comparison.
 fn generate_experiment_name(git_sha: &str, timestamp: &str) -> String {
     let sha_short = &git_sha[..git_sha.len().min(7)];
-    
+
     // Robustly parse and format the timestamp using chrono
     let formatted_time = chrono::DateTime::parse_from_rfc3339(timestamp)
         .or_else(|_| chrono::DateTime::parse_from_str(timestamp, "%Y-%m-%dT%H:%M:%S%.f%z"))
@@ -45,7 +45,10 @@ fn generate_experiment_name(git_sha: &str, timestamp: &str) -> String {
         .map(|dt| dt.format("%Y%m%d-%H%M%S").to_string())
         .unwrap_or_else(|_| {
             // Fallback: use current time if parsing fails, to ensure uniqueness
-            tracing::warn!(timestamp = timestamp, "Failed to parse timestamp, using current time");
+            tracing::warn!(
+                timestamp = timestamp,
+                "Failed to parse timestamp, using current time"
+            );
             Utc::now().format("%Y%m%d-%H%M%S").to_string()
         });
 
@@ -775,7 +778,7 @@ mod tests {
         // Format: snif-eval-abc1234-YYYYMMDD-HHMMSS
         // Split by '-': ["snif", "eval", "abc1234", "YYYYMMDD", "HHMMSS"] -> 5 parts
         let parts: Vec<&str> = name.split('-').collect();
-        assert_eq!(parts.len(), 5); 
+        assert_eq!(parts.len(), 5);
         assert_eq!(parts[3].len(), 8); // YYYYMMDD
         assert_eq!(parts[4].len(), 6); // HHMMSS
     }
