@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use chrono::Utc;
 use reqwest::blocking::Client;
 use serde_json::json;
 
@@ -36,16 +37,19 @@ const GATES_FAILED_TAG: &str = "gates-failed";
 /// Each run creates a separate immutable snapshot for trend comparison.
 fn generate_experiment_name(git_sha: &str, timestamp: &str) -> String {
     let sha_short = &git_sha[..git_sha.len().min(7)];
-    // Parse ISO timestamp to YYYYMMDD-HHMMSS format
-    let formatted = timestamp
-        .get(0..10)
-        .map(|d| d.replace('-', ""))
-        .unwrap_or_default();
-    let time_part = timestamp
-        .get(11..19)
-        .map(|t| t.replace(':', ""))
-        .unwrap_or_default();
-    format!("snif-eval-{sha_short}-{formatted}-{time_part}")
+    
+    // Robustly parse and format the timestamp using chrono
+    let formatted_time = chrono::DateTime::parse_from_rfc3339(timestamp)
+        .or_else(|_| chrono::DateTime::parse_from_str(timestamp, "%Y-%m-%dT%H:%M:%S%.f%z"))
+        .or_else(|_| chrono::DateTime::parse_from_str(timestamp, "%Y-%m-%d %H:%M:%S%.f%z"))
+        .map(|dt| dt.format("%Y%m%d-%H%M%S").to_string())
+        .unwrap_or_else(|_| {
+            // Fallback: use current time if parsing fails, to ensure uniqueness
+            tracing::warn!(timestamp = timestamp, "Failed to parse timestamp, using current time");
+            Utc::now().format("%Y%m%d-%H%M%S").to_string()
+        });
+
+    format!("snif-eval-{sha_short}-{formatted_time}")
 }
 
 /// Determine if running in CI based on environment variables.
@@ -738,6 +742,42 @@ mod tests {
             "2026-04-14T10:30:00Z",
         );
         assert_eq!(name, "snif-eval-abc1234-20260414-103000");
+    }
+
+    #[test]
+    fn generate_experiment_name_handles_milliseconds() {
+        let name = generate_experiment_name(
+            "abc1234def5678abc1234def5678abc1234def56",
+            "2026-04-14T10:30:00.123Z",
+        );
+        assert_eq!(name, "snif-eval-abc1234-20260414-103000");
+    }
+
+    #[test]
+    fn generate_experiment_name_handles_offset_timezone() {
+        let name = generate_experiment_name(
+            "abc1234def5678abc1234def5678abc1234def56",
+            "2026-04-14T10:30:00+02:00",
+        );
+        // Chrono preserves the offset when formatting, so 10:30:00 stays as-is
+        assert_eq!(name, "snif-eval-abc1234-20260414-103000");
+    }
+
+    #[test]
+    fn generate_experiment_name_fallback_for_malformed_timestamp() {
+        let name = generate_experiment_name(
+            "abc1234def5678abc1234def5678abc1234def56",
+            "not-a-timestamp",
+        );
+        // Should not panic, and should use current time
+        assert!(name.starts_with("snif-eval-abc1234-"));
+        // Verify it has a date-like part (15 chars for YYYYMMDD-HHMMSS)
+        // Format: snif-eval-abc1234-YYYYMMDD-HHMMSS
+        // Split by '-': ["snif", "eval", "abc1234", "YYYYMMDD", "HHMMSS"] -> 5 parts
+        let parts: Vec<&str> = name.split('-').collect();
+        assert_eq!(parts.len(), 5); 
+        assert_eq!(parts[3].len(), 8); // YYYYMMDD
+        assert_eq!(parts[4].len(), 6); // HHMMSS
     }
 
     #[test]
