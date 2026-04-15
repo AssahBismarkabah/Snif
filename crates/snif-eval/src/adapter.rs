@@ -1,25 +1,28 @@
 use crate::history::EvalRecord;
 
 /// Precision trend threshold: if precision drops more than this, generate conservative guidance.
-const PRECISION_DECLINE_THRESHOLD: f64 = -0.05;
+const PRECISION_DECLINE_THRESHOLD: f64 = -0.10;
 
 /// Precision improvement threshold: if precision rises more than this, generate positive guidance.
-const PRECISION_IMPROVEMENT_THRESHOLD: f64 = 0.02;
+const PRECISION_IMPROVEMENT_THRESHOLD: f64 = 0.05;
 
 /// Recall decline threshold.
-const RECALL_DECLINE_THRESHOLD: f64 = -0.05;
+const RECALL_DECLINE_THRESHOLD: f64 = -0.10;
 
 /// Recall improvement threshold.
-const RECALL_IMPROVEMENT_THRESHOLD: f64 = 0.02;
+const RECALL_IMPROVEMENT_THRESHOLD: f64 = 0.05;
 
 /// Noise increase threshold: if false positive rate rises above this, generate suppression guidance.
-const NOISE_INCREASE_THRESHOLD: f64 = 0.05;
+const NOISE_INCREASE_THRESHOLD: f64 = 0.10;
 
 /// Minimum number of runs before considering a fixture pattern persistent.
-const MIN_RUNS_FOR_PATTERN: usize = 2;
+const MIN_RUNS_FOR_PATTERN: usize = 3;
 
 /// Ratio threshold: if a fixture's FP or FN count exceeds this fraction of runs, flag it as persistent.
-const PERSISTENT_PATTERN_RATIO: f64 = 0.5;
+const PERSISTENT_PATTERN_RATIO: f64 = 0.6;
+
+/// Maximum number of fixture names to include in guidance to avoid prompt bloat.
+const MAX_FIXTURE_NAMES_IN_GUIDANCE: usize = 3;
 
 /// Guidance text generated from analysis of past eval runs.
 /// Appended to the system prompt to steer the model based on
@@ -144,16 +147,29 @@ fn analyze_fixture_patterns(recent: &[&EvalRecord]) -> EvalGuidance {
         .collect();
 
     if !persistent_fp.is_empty() {
-        let names: Vec<&str> = persistent_fp.iter().map(|(n, _)| n.as_str()).collect();
+        let names: Vec<&str> = persistent_fp
+            .iter()
+            .map(|(n, _)| n.as_str())
+            .take(MAX_FIXTURE_NAMES_IN_GUIDANCE)
+            .collect();
+        let suffix = if persistent_fp.len() > MAX_FIXTURE_NAMES_IN_GUIDANCE {
+            format!(
+                " and {} more",
+                persistent_fp.len() - MAX_FIXTURE_NAMES_IN_GUIDANCE
+            )
+        } else {
+            String::new()
+        };
         lines.push(format!(
-            "- The following fixtures have produced persistent false positives: {}. \
+            "- The following fixtures have produced persistent false positives: {}{}. \
              These are likely clean or stylistic changes. Only report findings if you \
              identify a clear bug with concrete evidence.",
-            names.join(", ")
+            names.join(", "),
+            suffix,
         ));
     }
 
-    // Find fixtures with persistent FN issues (missed in > 50% of runs)
+    // Find fixtures with persistent FN issues (missed in > 60% of runs)
     let persistent_fn: Vec<(&String, &usize)> = fixture_fn_counts
         .iter()
         .filter(|(name, fn_count)| {
@@ -164,11 +180,24 @@ fn analyze_fixture_patterns(recent: &[&EvalRecord]) -> EvalGuidance {
         .collect();
 
     if !persistent_fn.is_empty() {
-        let names: Vec<&str> = persistent_fn.iter().map(|(n, _)| n.as_str()).collect();
+        let names: Vec<&str> = persistent_fn
+            .iter()
+            .map(|(n, _)| n.as_str())
+            .take(MAX_FIXTURE_NAMES_IN_GUIDANCE)
+            .collect();
+        let suffix = if persistent_fn.len() > MAX_FIXTURE_NAMES_IN_GUIDANCE {
+            format!(
+                " and {} more",
+                persistent_fn.len() - MAX_FIXTURE_NAMES_IN_GUIDANCE
+            )
+        } else {
+            String::new()
+        };
         lines.push(format!(
-            "- The following fixtures have had findings missed in recent runs: {}. \
+            "- The following fixtures have had findings missed in recent runs: {}{}. \
              Pay close attention to these patterns — they contain real bugs.",
-            names.join(", ")
+            names.join(", "),
+            suffix,
         ));
     }
 
@@ -274,6 +303,7 @@ mod tests {
 
     #[test]
     fn persistent_fp_fixtures_generates_targeted_guidance() {
+        // Need 3+ runs (MIN_RUNS_FOR_PATTERN) and >60% FP rate
         let history = vec![
             make_record(
                 0.90,
@@ -286,6 +316,12 @@ mod tests {
                 0.90,
                 0.15,
                 vec![("style-ts", 5, 8, 5, 3)], // FP again
+            ),
+            make_record(
+                0.82,
+                0.90,
+                0.18,
+                vec![("style-ts", 5, 9, 5, 4)], // FP again
             ),
         ];
         let guidance = analyze_history(&history, 5);

@@ -6,7 +6,8 @@
     {
       "file": "src/profile.py",
       "start_line": 7,
-      "category": "logic"
+      "category": "logic",
+      "acceptable_categories": ["security", "other"]
     }
   ]
 }

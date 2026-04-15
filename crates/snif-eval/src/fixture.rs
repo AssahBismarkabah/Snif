@@ -19,6 +19,12 @@ pub struct ExpectedFinding {
     pub file: String,
     pub start_line: usize,
     pub category: String,
+    /// Alternative categories that should also be accepted as a match.
+    /// Useful when the bug is genuinely ambiguous (e.g., resource leak
+    /// could be "logic" or "performance"; unsafe type assertion could
+    /// be "security" or "logic").
+    #[serde(default)]
+    pub acceptable_categories: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

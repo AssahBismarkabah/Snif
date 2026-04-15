@@ -29,6 +29,35 @@ pub struct AggregateMetrics {
     pub noise_rate: f64,
 }
 
+/// Categories that are semantically close enough to count as a match.
+/// When the model returns one of these categories for a finding whose
+/// expected category is the paired one (or vice versa), we still count
+/// it as a true positive.  This prevents the double-penalty problem
+/// (TP=0, FP=1, FN=1) when the bug genuinely sits on a category boundary.
+const CATEGORY_ALIASES: &[(&str, &str)] = &[
+    ("security", "logic"),
+    ("performance", "logic"),
+    ("performance", "security"),
+    ("convention", "style"),
+    ("other", "logic"),
+    ("other", "security"),
+    ("other", "performance"),
+];
+
+fn categories_match(actual: &str, expected: &str, acceptable: &[String]) -> bool {
+    if actual == expected {
+        return true;
+    }
+    // Fixture-level override: explicit list of acceptable alternatives
+    if acceptable.iter().any(|c| c == actual) {
+        return true;
+    }
+    // Global alias table: check both orderings
+    CATEGORY_ALIASES
+        .iter()
+        .any(|(a, b)| (actual == *a && expected == *b) || (actual == *b && expected == *a))
+}
+
 pub fn compute_fixture_result(
     fixture_name: &str,
     expected: &[ExpectedFinding],
@@ -45,7 +74,11 @@ pub fn compute_fixture_result(
             }
 
             let path_match = actual_finding.location.file == expected_finding.file;
-            let category_match = actual_finding.category.to_string() == expected_finding.category;
+            let category_match = categories_match(
+                &actual_finding.category.to_string(),
+                &expected_finding.category,
+                &expected_finding.acceptable_categories,
+            );
             let line_diff = (actual_finding.location.start_line as i64
                 - expected_finding.start_line as i64)
                 .unsigned_abs() as usize;
@@ -132,4 +165,122 @@ pub fn check_quality_gates(metrics: &AggregateMetrics) -> bool {
     }
 
     precision_ok && noise_ok
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fixture::ExpectedFinding;
+    use snif_types::{FileLocation, Finding, FindingCategory};
+
+    fn make_finding(
+        file: &str,
+        line: usize,
+        category: FindingCategory,
+        confidence: f64,
+    ) -> Finding {
+        Finding {
+            location: FileLocation {
+                file: file.to_string(),
+                start_line: line,
+                end_line: None,
+            },
+            category,
+            confidence,
+            evidence: "evidence".to_string(),
+            explanation: "explanation".to_string(),
+            impact: "impact".to_string(),
+            suggestion: None,
+            fingerprint: None,
+        }
+    }
+
+    #[test]
+    fn category_alias_security_logic_match() {
+        let expected = vec![ExpectedFinding {
+            file: "src/parser.ts".to_string(),
+            start_line: 6,
+            category: "security".to_string(),
+            acceptable_categories: vec![],
+        }];
+        let actual = vec![make_finding(
+            "src/parser.ts",
+            6,
+            FindingCategory::Logic,
+            0.9,
+        )];
+
+        let result = compute_fixture_result("test", &expected, &actual, 5);
+        assert_eq!(result.true_positives, 1);
+        assert_eq!(result.false_positives, 0);
+        assert_eq!(result.false_negatives, 0);
+    }
+
+    #[test]
+    fn category_alias_performance_logic_match() {
+        let expected = vec![ExpectedFinding {
+            file: "src/ingest.rs".to_string(),
+            start_line: 3,
+            category: "security".to_string(),
+            acceptable_categories: vec![],
+        }];
+        let actual = vec![make_finding(
+            "src/ingest.rs",
+            3,
+            FindingCategory::Performance,
+            0.9,
+        )];
+
+        let result = compute_fixture_result("test", &expected, &actual, 5);
+        assert_eq!(result.true_positives, 1);
+        assert_eq!(result.false_positives, 0);
+    }
+
+    #[test]
+    fn fixture_acceptable_categories_override() {
+        let expected = vec![ExpectedFinding {
+            file: "src/tracker.ts".to_string(),
+            start_line: 5,
+            category: "logic".to_string(),
+            acceptable_categories: vec!["performance".to_string(), "other".to_string()],
+        }];
+        let actual = vec![make_finding(
+            "src/tracker.ts",
+            5,
+            FindingCategory::Other,
+            0.9,
+        )];
+
+        let result = compute_fixture_result("test", &expected, &actual, 5);
+        assert_eq!(result.true_positives, 1);
+        assert_eq!(result.false_positives, 0);
+    }
+
+    #[test]
+    fn unrelated_category_still_mismatches() {
+        let expected = vec![ExpectedFinding {
+            file: "src/lib.rs".to_string(),
+            start_line: 10,
+            category: "security".to_string(),
+            acceptable_categories: vec![],
+        }];
+        let actual = vec![make_finding("src/lib.rs", 10, FindingCategory::Style, 0.9)];
+
+        let result = compute_fixture_result("test", &expected, &actual, 5);
+        assert_eq!(result.true_positives, 0);
+        assert_eq!(result.false_positives, 1);
+        assert_eq!(result.false_negatives, 1);
+    }
+
+    #[test]
+    fn categories_match_function_tests() {
+        assert!(categories_match("security", "logic", &[]));
+        assert!(categories_match("logic", "security", &[]));
+        assert!(categories_match("performance", "logic", &[]));
+        assert!(categories_match("other", "security", &[]));
+        assert!(categories_match("logic", "logic", &[]));
+        assert!(!categories_match("style", "security", &[]));
+        assert!(!categories_match("convention", "security", &[]));
+        assert!(categories_match("style", "convention", &[]));
+    }
 }

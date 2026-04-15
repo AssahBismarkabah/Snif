@@ -15,44 +15,33 @@ pub struct ParsedResponse {
 }
 
 /// Chain-of-thought patterns that indicate leaked reasoning.
+///
+/// Only patterns that are clearly reasoning/meta-commentary — not common
+/// English phrases that could appear in legitimate finding text.
+/// Over-broad patterns (e.g. "actually", "but the", "so the") were
+/// removed because they caused false COT detection, triggering
+/// unnecessary repair calls that changed finding categories.
 const COT_PATTERNS: &[&str] = &[
     "let me think",
     "let's look",
     "let me analyze",
-    "actually,",
-    "wait,",
-    "however, there is",
-    "however, the",
     "i need to",
     "i should",
-    "i will",
+    "i will look for",
+    "i will remove this finding",
+    "i will lower the confidence",
     "the code slices",
-    "the real issue",
-    "more critically",
-    "more significantly",
+    "the real issue is not",
     "let's look closer",
-    "looking at",
-    "examining",
-    "checking",
-    "the most concrete",
-    "the most significant",
-    "a more significant",
-    "a potential panic",
-    "potential panic",
-    "this is likely",
-    "this is technically",
-    "while this is",
-    "if this is",
-    "if the",
-    "if git_sha",
-    "if record",
-    "but the",
-    "but if",
-    "so the",
-    "so no",
-    "so it",
-    "wait,",
-    "actually",
+    "looking at the code, i",
+    "examining this, i",
+    "the most concrete issue i can",
+    "the most significant issue i can",
+    "i will now",
+    "let me check",
+    "first, let me",
+    "step 1:",
+    "step 2:",
 ];
 
 /// Extract the outermost balanced JSON object from a response that may contain
@@ -102,8 +91,10 @@ fn contains_cot_patterns(response: &str) -> bool {
 }
 
 /// Sanitize a finding's text fields by removing chain-of-thought preamble.
-/// Strips common reasoning patterns from the beginning of the text and keeps
-/// only the concrete issue description.
+/// Strips reasoning patterns that appear at the START of the text only.
+/// Only sanitizes when the text begins with a COT pattern — avoids
+/// mangling legitimate finding text that merely contains common English
+/// words like "actually" or "however" mid-sentence.
 fn sanitize_text(text: &str) -> String {
     let trimmed = text.trim();
     if trimmed.is_empty() {
@@ -112,47 +103,44 @@ fn sanitize_text(text: &str) -> String {
 
     let lower = trimmed.to_lowercase();
 
-    // If the text starts with a COT pattern, try to find where the concrete
-    // statement begins by looking for sentence boundaries after COT markers.
-    if COT_PATTERNS
-        .iter()
-        .any(|p| lower.starts_with(p) || lower.contains(p))
-    {
-        // Try to find the first sentence that doesn't start with COT patterns
-        let sentences: Vec<&str> = trimmed.split(&['.', '!', '?', '\n']).collect();
-        for sentence in &sentences {
-            let s = sentence.trim();
-            if s.is_empty() {
-                continue;
-            }
-            let s_lower = s.to_lowercase();
-            if !COT_PATTERNS.iter().any(|p| s_lower.contains(p)) {
-                return format!(
-                    "{}.",
-                    s.trim_start_matches(|c: char| !c.is_alphabetic()).trim()
-                );
-            }
-        }
-        // If all sentences contain COT patterns, return the last part after the
-        // last COT marker
-        for pattern in COT_PATTERNS {
-            if let Some(pos) = lower.find(pattern) {
-                let after = &trimmed[pos + pattern.len()..];
-                // Skip past any punctuation/spaces after the pattern
-                let clean = after
-                    .trim_start_matches(|c: char| !c.is_alphabetic())
-                    .trim();
-                if !clean.is_empty() && clean.len() > 5 {
-                    // Only return if there's substantial content
-                    return clean.to_string();
-                }
-            }
-        }
-        // Fall back to returning the original text if nothing clean was found
-        trimmed.to_string()
-    } else {
-        trimmed.to_string()
+    // Only sanitize if the text STARTS with a COT pattern — this is the
+    // hallmark of leaked reasoning. Mid-text occurrences are legitimate.
+    let starts_with_cot = COT_PATTERNS.iter().any(|p| lower.starts_with(p));
+
+    if !starts_with_cot {
+        return trimmed.to_string();
     }
+
+    // Text starts with reasoning — find the first concrete sentence
+    let sentences: Vec<&str> = trimmed.split(&['.', '!', '?', '\n']).collect();
+    for sentence in &sentences {
+        let s = sentence.trim();
+        if s.is_empty() {
+            continue;
+        }
+        let s_lower = s.to_lowercase();
+        if !COT_PATTERNS.iter().any(|p| s_lower.starts_with(p)) {
+            return format!(
+                "{}.",
+                s.trim_start_matches(|c: char| !c.is_alphabetic()).trim()
+            );
+        }
+    }
+    // If all sentences start with COT patterns, return the last part after the
+    // last COT marker
+    for pattern in COT_PATTERNS {
+        if let Some(pos) = lower.find(pattern) {
+            let after = &trimmed[pos + pattern.len()..];
+            let clean = after
+                .trim_start_matches(|c: char| !c.is_alphabetic())
+                .trim();
+            if !clean.is_empty() && clean.len() > 5 {
+                return clean.to_string();
+            }
+        }
+    }
+    // Fall back to returning the original text if nothing clean was found
+    trimmed.to_string()
 }
 
 /// Sanitize all text fields in findings to remove chain-of-thought leakage.
@@ -447,7 +435,7 @@ mod tests {
               "category": "logic",
               "confidence": 0.9,
               "evidence": "panic!()",
-              "explanation": "Let me analyze this. Actually, the code panics here.",
+              "explanation": "Let me analyze this. The code panics here.",
               "impact": "The process crashes.",
               "suggestion": null
             }
@@ -456,9 +444,8 @@ mod tests {
 
         let parsed = parse_response(response).unwrap();
         assert_eq!(parsed.findings.len(), 1);
-        // The explanation should be sanitized - "Let me analyze" and "Actually" should be stripped
+        // The explanation should be sanitized - "Let me analyze" should be stripped
         let explanation = &parsed.findings[0].explanation;
         assert!(!explanation.to_lowercase().contains("let me analyze"));
-        assert!(!explanation.to_lowercase().starts_with("actually"));
     }
 }

@@ -7,8 +7,7 @@ export function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) {
     return text;
   }
-  const truncated = Math.max(0, maxLength - 3);
-  return text.slice(0, truncated) + "...";
+  return text.slice(0, maxLength - 3) + "...";
 }
 
 export function groupBy<T>(items: T[], keyFn: (item: T) => string): Record<string, T[]> {

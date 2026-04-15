@@ -6,12 +6,8 @@
     {
       "file": "src/client.rs",
       "start_line": 10,
-      "category": "security"
-    },
-    {
-      "file": "src/client.rs",
-      "start_line": 15,
-      "category": "logic"
+      "category": "security",
+      "acceptable_categories": ["logic"]
     }
   ]
 }

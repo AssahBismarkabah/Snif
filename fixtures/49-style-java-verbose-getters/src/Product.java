@@ -2,7 +2,6 @@ public class Product {
     private String name;
     private int priceCents;
     private int quantity;
-    private boolean available;
 
     public Product(String name, int priceCents, int quantity) {
         this.name = name != null ? name : "";

@@ -6,7 +6,8 @@
     {
       "file": "src/ingest.rs",
       "start_line": 3,
-      "category": "security"
+      "category": "security",
+      "acceptable_categories": ["performance", "logic"]
     }
   ]
 }
