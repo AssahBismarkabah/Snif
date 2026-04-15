@@ -1,6 +1,6 @@
 # Changelog
 
-## unreleased
+3.2.4
 
 - Connect eval harness to Braintrust monitoring dashboard  experiment results reported automatically with unique per-run experiment names
 - Generate unique experiment names for eval runs using commit hash and timestamp, detect CI context for run labeling
