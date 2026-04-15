@@ -20,7 +20,9 @@ impl FeedbackStore {
         }
 
         let conn = Connection::open(path)?;
-        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=OFF;",
+        )?;
 
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS feedback_signals (

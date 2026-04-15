@@ -39,7 +39,13 @@ impl Store {
         }
 
         let conn = Connection::open(path)?;
-        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
+        // foreign_keys must be OFF: the bundled SQLite is compiled with
+        // SQLITE_DEFAULT_FOREIGN_KEYS=1, which enables FK enforcement by
+        // default. The schema and delete logic assume standard SQLite
+        // behaviour (FK constraints OFF).
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=OFF;",
+        )?;
 
         if !schema::check_version(&conn) {
             tracing::warn!("Schema version mismatch — rebuilding index database");

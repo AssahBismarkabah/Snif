@@ -16,6 +16,7 @@
 - Fix `perf-unbounded-collect` fixture — add `acceptable_categories: ["performance", "logic"]` since unbounded collection is genuinely a performance/security boundary issue
 - Fix `style-java-verbose-getters` fixture — remove uninitialized `available` field from source that was a real bug the model correctly caught
 - Add unit tests for category alias matching, acceptable_categories override, and unrelated category mismatch
+- Fix foreign key constraint error (code 787) in GitLab CI — the bundled SQLite is compiled with `SQLITE_DEFAULT_FOREIGN_KEYS=1`, enabling FK enforcement by default. Add `PRAGMA foreign_keys=OFF` to both `snif-store` and `snif-feedback` connection setup so the codebase's standard SQLite assumptions hold
 
 ## 3.2.3
 
