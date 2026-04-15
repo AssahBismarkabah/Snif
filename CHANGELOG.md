@@ -2,6 +2,21 @@
 
 ## unreleased
 
+- Connect eval harness to Braintrust monitoring dashboard  experiment results reported automatically with unique per-run experiment names
+- Generate unique experiment names for eval runs using commit hash and timestamp, detect CI context for run labeling
+- Implement exponential backoff and retry logic for Braintrust API calls in eval reporter
+- Enhance response parsing and sanitization to handle chain-of-thought leakage — tighten COT detection patterns to avoid false positives on legitimate finding text
+- Add category alias table in metrics — semantically close categories (security/logic, performance/logic, convention/style, other/*) now count as matches instead of producing double penalties (TP=0, FP=1, FN=1)
+- Add `acceptable_categories` field to fixture expected findings — per-finding override for ambiguous category boundaries
+- Raise guidance feedback thresholds — precision/recall decline from 5pp to 10pp, improvement from 2pp to 5pp, noise increase from 5pp to 10pp, minimum runs from 2 to 3, persistent pattern ratio from 50% to 60%
+- Cap fixture names in guidance text to 3 to prevent prompt bloat
+- Fix `clean-ts-add-types` fixture — remove behavioral change (maxLength guard) from patch and source so fixture is truly clean
+- Fix `hardcoded-secret` fixture — remove questionable second expected finding (URL concatenation on line 15), add `acceptable_categories: ["logic"]` to primary finding
+- Fix `py-unhandled-keyerror` fixture — add `acceptable_categories: ["security", "other"]` for category-ambiguous user-data access
+- Fix `perf-unbounded-collect` fixture — add `acceptable_categories: ["performance", "logic"]` since unbounded collection is genuinely a performance/security boundary issue
+- Fix `style-java-verbose-getters` fixture — remove uninitialized `available` field from source that was a real bug the model correctly caught
+- Add unit tests for category alias matching, acceptable_categories override, and unrelated category mismatch
+
 ## 3.2.3
 
 - Auto-detect and rebuild stale index database on schema version mismatch instead of crashing with foreign key error
