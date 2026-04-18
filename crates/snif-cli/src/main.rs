@@ -1,6 +1,7 @@
 mod commands;
 
 use clap::{Parser, Subcommand};
+use snif_config::constants::cli;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -17,7 +18,7 @@ enum Commands {
     /// Build the repository index
     Index {
         /// Path to the repository root
-        #[arg(long, default_value = ".")]
+        #[arg(long, default_value = cli::DEFAULT_PATH)]
         path: String,
 
         /// Force a full rebuild instead of incremental update
@@ -28,7 +29,7 @@ enum Commands {
     /// Review a code change
     Review {
         /// Path to the repository root
-        #[arg(long, default_value = ".")]
+        #[arg(long, default_value = cli::DEFAULT_PATH)]
         path: String,
 
         /// Platform: github or gitlab (auto-detected from CI env)
@@ -56,14 +57,14 @@ enum Commands {
         diff_file: Option<String>,
 
         /// Output format: json (default) or sarif
-        #[arg(long, default_value = "json")]
+        #[arg(long, default_value = cli::DEFAULT_OUTPUT_FORMAT)]
         format: String,
     },
 
     /// Remove all local runtime data (index, cache, feedback)
     Clean {
         /// Path to the repository root
-        #[arg(long, default_value = ".")]
+        #[arg(long, default_value = cli::DEFAULT_PATH)]
         path: String,
     },
 
@@ -74,11 +75,11 @@ enum Commands {
         fixtures: String,
 
         /// Path to the repository root (for config loading)
-        #[arg(long, default_value = ".")]
+        #[arg(long, default_value = cli::DEFAULT_PATH)]
         path: String,
 
         /// Path to JSONL history file for tracking results over time
-        #[arg(long, default_value = "eval-history.jsonl")]
+        #[arg(long, default_value = cli::DEFAULT_EVAL_HISTORY)]
         history: String,
     },
 }

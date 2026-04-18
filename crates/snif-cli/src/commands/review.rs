@@ -1,4 +1,6 @@
 use anyhow::{Context, Result};
+use snif_config::constants::cli;
+use snif_config::env::{app, ci};
 use snif_platform::PlatformAdapter;
 use snif_types::ContentTier;
 use std::path::Path;
@@ -123,7 +125,7 @@ pub fn run(
                 content_bytes = file.content.len(),
                 "Degrading changed file to diff-only to fit budget"
             );
-            file.content = "[See diff for changes to this file.]".to_string();
+            file.content = cli::CONTENT_DIFF_ONLY_PLACEHOLDER.to_string();
             file.content_tier = ContentTier::DiffOnly;
             file.summary = None;
             continue;
@@ -184,7 +186,7 @@ pub fn run(
     }
 
     match format {
-        "sarif" => {
+        cli::OUTPUT_FORMAT_SARIF => {
             let sarif = snif_output::sarif::to_sarif(&findings);
             let sarif_json = serde_json::to_string_pretty(&sarif)?;
             std::fs::write("findings.sarif", &sarif_json)?;
@@ -263,14 +265,14 @@ fn detect_platform(explicit: Option<&str>, config_default: &str) -> String {
     if let Some(p) = explicit {
         return p.to_string();
     }
-    if let Ok(p) = std::env::var("SNIF_PLATFORM") {
+    if let Ok(p) = std::env::var(app::SNIF_PLATFORM) {
         return p;
     }
-    if std::env::var("CI_PROJECT_PATH").is_ok() {
-        return "gitlab".to_string();
+    if std::env::var(ci::CI_PROJECT_PATH).is_ok() {
+        return cli::PLATFORM_GITLAB.to_string();
     }
-    if std::env::var("GITHUB_REPOSITORY").is_ok() {
-        return "github".to_string();
+    if std::env::var(ci::GITHUB_REPOSITORY).is_ok() {
+        return cli::PLATFORM_GITHUB.to_string();
     }
     config_default.to_string()
 }
@@ -283,29 +285,22 @@ fn create_adapter(
     config_api_base: Option<&str>,
 ) -> Result<Box<dyn PlatformAdapter>> {
     match platform {
-        "gitlab" => {
+        cli::PLATFORM_GITLAB => {
             let project_path = project
                 .or(repo)
                 .map(String::from)
-                .or_else(|| std::env::var("CI_PROJECT_PATH").ok())
-                .context(
-                    "--project or CI_PROJECT_PATH required for GitLab. \
-                     Make sure the pipeline runs with: rules: - if: $CI_PIPELINE_SOURCE == \"merge_request_event\"",
-                )?;
+                .or_else(|| std::env::var(ci::CI_PROJECT_PATH).ok())
+                .context(cli::GITLAB_PROJECT_PATH_REQUIRED)?;
             let mr_iid = pr
                 .or_else(|| {
-                    std::env::var("CI_MERGE_REQUEST_IID")
+                    std::env::var(ci::CI_MERGE_REQUEST_IID)
                         .ok()
                         .and_then(|s| s.parse().ok())
                 })
-                .context(
-                    "--pr/--mr or CI_MERGE_REQUEST_IID required for GitLab. \
-                     CI_MERGE_REQUEST_IID is only available in merge request pipelines. \
-                     Add this rule to your .gitlab-ci.yml: rules: - if: $CI_PIPELINE_SOURCE == \"merge_request_event\"",
-                )?;
+                .context(cli::GITLAB_MR_IID_REQUIRED)?;
             let api_base = config_api_base
                 .map(String::from)
-                .or_else(|| std::env::var("CI_API_V4_URL").ok());
+                .or_else(|| std::env::var(ci::CI_API_V4_URL).ok());
             Ok(Box::new(snif_platform::gitlab::GitLabAdapter::new(
                 &project_path,
                 mr_iid,
@@ -315,18 +310,18 @@ fn create_adapter(
         _ => {
             let repo_str = repo
                 .map(String::from)
-                .or_else(|| std::env::var("GITHUB_REPOSITORY").ok())
-                .context("--repo or GITHUB_REPOSITORY required for GitHub")?;
+                .or_else(|| std::env::var(ci::GITHUB_REPOSITORY).ok())
+                .context(cli::GITHUB_REPOSITORY_REQUIRED)?;
             let pr_num = pr
                 .or_else(|| {
-                    std::env::var("SNIF_PR_NUMBER")
+                    std::env::var(app::SNIF_PR_NUMBER)
                         .ok()
                         .and_then(|s| s.parse().ok())
                 })
-                .context("--pr or SNIF_PR_NUMBER required for GitHub")?;
+                .context(cli::SNIF_PR_NUMBER_REQUIRED)?;
             let parts: Vec<&str> = repo_str.splitn(2, '/').collect();
             if parts.len() != 2 {
-                anyhow::bail!("--repo must be in owner/repo format");
+                anyhow::bail!(cli::REPO_FORMAT_ERROR);
             }
             Ok(Box::new(snif_platform::github::GitHubAdapter::new(
                 parts[0], parts[1], pr_num,

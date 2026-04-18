@@ -23,6 +23,9 @@ const NON_REVIEWABLE_FILES: &[&str] = &[
     "flake.lock",
 ];
 
+const CONTENT_EXCLUDED_PLACEHOLDER: &str =
+    "[File content excluded — large or generated file. See diff for changes.]";
+
 fn is_non_reviewable(path: &str) -> bool {
     let filename = path.rsplit('/').next().unwrap_or(path);
     NON_REVIEWABLE_FILES.contains(&filename)
@@ -154,8 +157,7 @@ pub fn build_context(
     for candidate in candidates {
         // Non-reviewable/large files always go to DiffOnly
         if candidate.forced_exclude {
-            let content =
-                "[File content excluded — large or generated file. See diff for changes.]";
+            let content = CONTENT_EXCLUDED_PLACEHOLDER;
             let tokens = budget::estimate_tokens(content);
             changed_files_tokens += tokens;
             remaining = remaining.saturating_sub(tokens);

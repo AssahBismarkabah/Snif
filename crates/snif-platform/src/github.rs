@@ -4,6 +4,10 @@ use snif_config::constants::timeouts;
 use snif_config::env::{app, ci, keys};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
+const GITHUB_API_BASE: &str = "https://api.github.com";
+const GITHUB_API_VERSION_HEADER: &str = "application/vnd.github.v3+json";
+const GITHUB_USER_AGENT: &str = "snif-review-agent";
+
 pub struct GitHubAdapter {
     token: String,
     owner: String,
@@ -50,8 +54,8 @@ impl GitHubAdapter {
 
     fn api_url(&self, path: &str) -> String {
         format!(
-            "https://api.github.com/repos/{}/{}/{}",
-            self.owner, self.repo, path
+            "{}/repos/{}/{}/{}",
+            GITHUB_API_BASE, self.owner, self.repo, path
         )
     }
 
@@ -65,8 +69,8 @@ impl GitHubAdapter {
             .http
             .get(&url)
             .header("Authorization", self.auth_header())
-            .header("Accept", "application/vnd.github.v3+json")
-            .header("User-Agent", "snif-review-agent")
+            .header("Accept", GITHUB_API_VERSION_HEADER)
+            .header("User-Agent", GITHUB_USER_AGENT)
             .send()
             .context("Failed to call GitHub API")?;
 
@@ -84,8 +88,8 @@ impl GitHubAdapter {
         self.http
             .post(&url)
             .header("Authorization", self.auth_header())
-            .header("Accept", "application/vnd.github.v3+json")
-            .header("User-Agent", "snif-review-agent")
+            .header("Accept", GITHUB_API_VERSION_HEADER)
+            .header("User-Agent", GITHUB_USER_AGENT)
             .json(body)
             .send()
             .context("Failed to call GitHub API")

@@ -4,6 +4,9 @@ use snif_config::constants::timeouts;
 use snif_config::env::{ci, keys};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
+const GITLAB_DEFAULT_API_BASE: &str = "https://gitlab.com/api/v4";
+const GITLAB_USER_AGENT: &str = "snif-review-agent";
+
 pub struct GitLabAdapter {
     token: String,
     project_path: String,
@@ -23,7 +26,7 @@ impl GitLabAdapter {
             ))?;
 
         let encoded_path = project_path.replace('/', "%2F");
-        let base = api_base.unwrap_or("https://gitlab.com/api/v4").to_string();
+        let base = api_base.unwrap_or(GITLAB_DEFAULT_API_BASE).to_string();
 
         Ok(Self {
             token,
@@ -61,7 +64,7 @@ impl GitLabAdapter {
             .http
             .get(&url)
             .header("PRIVATE-TOKEN", &self.token)
-            .header("User-Agent", "snif-review-agent")
+            .header("User-Agent", GITLAB_USER_AGENT)
             .send()
             .context("Failed to call GitLab API")?;
 
@@ -79,7 +82,7 @@ impl GitLabAdapter {
         self.http
             .post(&url)
             .header("PRIVATE-TOKEN", &self.token)
-            .header("User-Agent", "snif-review-agent")
+            .header("User-Agent", GITLAB_USER_AGENT)
             .json(body)
             .send()
             .context("Failed to call GitLab API")
@@ -90,7 +93,7 @@ impl GitLabAdapter {
         self.http
             .put(&url)
             .header("PRIVATE-TOKEN", &self.token)
-            .header("User-Agent", "snif-review-agent")
+            .header("User-Agent", GITLAB_USER_AGENT)
             .json(body)
             .send()
             .context("Failed to call GitLab API")

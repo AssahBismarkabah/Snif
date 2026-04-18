@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use chrono::Utc;
 use reqwest::blocking::Client;
 use serde_json::json;
+use snif_config::env::ci;
 
 use crate::history::EvalRecord;
 use crate::metrics::FixtureResult;
@@ -57,9 +58,9 @@ fn generate_experiment_name(git_sha: &str, timestamp: &str) -> String {
 
 /// Determine if running in CI based on environment variables.
 fn detect_runner() -> &'static str {
-    if std::env::var("CI").is_ok()
-        || std::env::var("GITHUB_ACTIONS").is_ok()
-        || std::env::var("GITLAB_CI").is_ok()
+    if std::env::var(ci::CI).is_ok()
+        || std::env::var(ci::GITHUB_ACTIONS).is_ok()
+        || std::env::var(ci::GITLAB_CI).is_ok()
     {
         "ci"
     } else {
@@ -69,8 +70,8 @@ fn detect_runner() -> &'static str {
 
 /// Get the current git branch from environment or default to current branch.
 fn detect_git_branch() -> String {
-    std::env::var("GITHUB_REF_NAME")
-        .or_else(|_| std::env::var("CI_COMMIT_REF_NAME"))
+    std::env::var(ci::GITHUB_REF_NAME)
+        .or_else(|_| std::env::var(ci::CI_COMMIT_REF_NAME))
         .unwrap_or_else(|_| "unknown".to_string())
 }
 
