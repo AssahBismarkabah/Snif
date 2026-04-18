@@ -4,10 +4,10 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-snif-types = { path = "../snif-types" }
 snif-config = { path = "../snif-config" }
+snif-types = { path = "../snif-types" }
 anyhow = { workspace = true }
-tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+tracing = { workspace = true }

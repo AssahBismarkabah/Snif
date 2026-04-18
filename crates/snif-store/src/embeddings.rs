@@ -66,28 +66,29 @@ impl Store {
         query_embedding: &[f32],
         k: usize,
     ) -> Result<Vec<SimilarSummary>> {
-        // Two-step: KNN first, then join in application code
-        let knn_results = self.query_similar_summaries(query_embedding, k)?;
-
-        let mut results = Vec::with_capacity(knn_results.len());
-        let mut detail_stmt = self
-            .conn
-            .prepare("SELECT id, file_id, symbol_id, summary FROM summaries WHERE id = ?1")?;
-
-        for (summary_id, distance) in knn_results {
-            if let Ok(row) = detail_stmt.query_row([summary_id], |row| {
-                Ok(SimilarSummary {
-                    summary_id: row.get(0)?,
-                    file_id: row.get(1)?,
-                    symbol_id: row.get(2)?,
-                    summary_text: row.get(3)?,
-                    distance,
-                })
-            }) {
-                results.push(row);
-            }
-        }
-
-        Ok(results)
+        // Single query with JOIN instead of N+1 pattern
+        let mut stmt = self.conn.prepare(
+            "SELECT s.id, s.file_id, s.symbol_id, s.summary, se.distance
+             FROM summary_embeddings se
+             JOIN summaries s ON se.summary_id = s.id
+             WHERE se.embedding MATCH ?1
+               AND se.k = ?2
+             ORDER BY se.distance",
+        )?;
+        let rows = stmt
+            .query_map(
+                rusqlite::params![query_embedding.as_bytes(), k as i64],
+                |row| {
+                    Ok(SimilarSummary {
+                        summary_id: row.get(0)?,
+                        file_id: row.get(1)?,
+                        symbol_id: row.get(2)?,
+                        summary_text: row.get(3)?,
+                        distance: row.get(4)?,
+                    })
+                },
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 }

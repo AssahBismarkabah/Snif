@@ -1,5 +1,6 @@
 use anyhow::Result;
 use rusqlite::Connection;
+use snif_config::constants::model;
 
 /// Increment this whenever the schema changes. On open, if the stored version
 /// doesn't match, the database is dropped and recreated automatically.
@@ -77,19 +78,21 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
     )?;
 
     // Vec tables created separately — sqlite-vec virtual tables use different syntax
-    conn.execute_batch(
+    conn.execute_batch(&format!(
         "
         CREATE VIRTUAL TABLE IF NOT EXISTS summary_embeddings USING vec0(
             summary_id INTEGER PRIMARY KEY,
-            embedding float[384]
+            embedding float[{}]
         );
 
         CREATE VIRTUAL TABLE IF NOT EXISTS finding_embeddings USING vec0(
             finding_id INTEGER PRIMARY KEY,
-            embedding float[384]
+            embedding float[{}]
         );
     ",
-    )?;
+        model::DEFAULT_EMBEDDING_DIMENSION,
+        model::DEFAULT_EMBEDDING_DIMENSION
+    ))?;
 
     // Write current schema version
     conn.execute("DELETE FROM schema_version", [])?;

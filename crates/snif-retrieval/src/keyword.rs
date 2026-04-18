@@ -1,7 +1,7 @@
 use anyhow::Result;
 use snif_store::Store;
 use snif_types::RetrievalMethod;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub fn keyword_retrieval(
     store: &Store,
@@ -14,9 +14,11 @@ pub fn keyword_retrieval(
         return Ok(results);
     }
 
+    let exclude_set: HashSet<i64> = exclude_file_ids.iter().copied().collect();
+
     let symbol_matches = store.get_files_defining_symbols(identifiers)?;
     for (file_id, name) in &symbol_matches {
-        if !exclude_file_ids.contains(file_id) {
+        if !exclude_set.contains(file_id) {
             results
                 .entry(*file_id)
                 .or_default()
@@ -28,7 +30,7 @@ pub fn keyword_retrieval(
 
     let ref_matches = store.get_files_referencing_symbols(identifiers)?;
     for (file_id, name) in &ref_matches {
-        if !exclude_file_ids.contains(file_id) {
+        if !exclude_set.contains(file_id) {
             results
                 .entry(*file_id)
                 .or_default()

@@ -1,4 +1,5 @@
 use serde_json::json;
+use snif_config::constants::thresholds;
 use snif_types::Finding;
 
 pub fn to_sarif(findings: &[Finding]) -> serde_json::Value {
@@ -38,9 +39,9 @@ pub fn to_sarif(findings: &[Finding]) -> serde_json::Value {
     let results: Vec<serde_json::Value> = findings
         .iter()
         .map(|f| {
-            let level = if f.confidence >= 0.9 {
+            let level = if f.confidence >= thresholds::SARIF_ERROR_CONFIDENCE {
                 "error"
-            } else if f.confidence >= 0.7 {
+            } else if f.confidence >= thresholds::SARIF_WARNING_CONFIDENCE {
                 "warning"
             } else {
                 "note"

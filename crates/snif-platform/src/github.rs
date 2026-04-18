@@ -1,5 +1,7 @@
 use crate::{extract_fingerprints, PlatformAdapter, BOT_MARKER};
 use anyhow::{bail, Context, Result};
+use snif_config::constants::timeouts;
+use snif_config::env::{app, ci, keys};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
 pub struct GitHubAdapter {
@@ -24,16 +26,22 @@ impl GitHubAdapter {
     }
 
     pub fn from_env() -> Result<Self> {
-        let repo_full = std::env::var("GITHUB_REPOSITORY")
-            .context("GITHUB_REPOSITORY not set (expected owner/repo)")?;
+        let repo_full = std::env::var(ci::GITHUB_REPOSITORY).context(format!(
+            "{} not set (expected owner/repo)",
+            ci::GITHUB_REPOSITORY
+        ))?;
         let parts: Vec<&str> = repo_full.splitn(2, '/').collect();
         if parts.len() != 2 {
             bail!("GITHUB_REPOSITORY must be in owner/repo format");
         }
 
-        let pr_number: u64 = std::env::var("SNIF_PR_NUMBER")
-            .or_else(|_| std::env::var("GITHUB_PR_NUMBER"))
-            .context("SNIF_PR_NUMBER or GITHUB_PR_NUMBER must be set")?
+        let pr_number: u64 = std::env::var(app::SNIF_PR_NUMBER)
+            .or_else(|_| std::env::var(ci::GITHUB_PR_NUMBER))
+            .context(format!(
+                "{} or {} must be set",
+                app::SNIF_PR_NUMBER,
+                ci::GITHUB_PR_NUMBER
+            ))?
             .parse()
             .context("PR number must be a valid integer")?;
 
@@ -88,18 +96,22 @@ impl GitHubAdapter {
 fn resolve_token() -> Result<String> {
     // Try GitHub App authentication
     if let (Ok(app_id), Ok(private_key), Ok(installation_id)) = (
-        std::env::var("SNIF_APP_ID"),
-        std::env::var("SNIF_APP_PRIVATE_KEY"),
-        std::env::var("SNIF_APP_INSTALLATION_ID"),
+        std::env::var(app::SNIF_APP_ID),
+        std::env::var(app::SNIF_APP_PRIVATE_KEY),
+        std::env::var(app::SNIF_APP_INSTALLATION_ID),
     ) {
         tracing::info!("Authenticating as GitHub App");
         return get_installation_token(&app_id, &private_key, &installation_id);
     }
 
     // Fall back to GITHUB_TOKEN
-    std::env::var("GITHUB_TOKEN").context(
-        "No GitHub credentials found. Set GITHUB_TOKEN or SNIF_APP_ID + SNIF_APP_PRIVATE_KEY + SNIF_APP_INSTALLATION_ID",
-    )
+    std::env::var(keys::GITHUB_TOKEN).context(format!(
+        "No GitHub credentials found. Set {} or {} + {} + {}",
+        keys::GITHUB_TOKEN,
+        app::SNIF_APP_ID,
+        app::SNIF_APP_PRIVATE_KEY,
+        app::SNIF_APP_INSTALLATION_ID
+    ))
 }
 
 fn get_installation_token(
@@ -153,8 +165,8 @@ fn generate_jwt(app_id: &str, private_key: &str) -> Result<String> {
         .as_secs();
 
     let claims = Claims {
-        iat: now - 60,        // 60 seconds in the past to account for clock drift
-        exp: now + (10 * 60), // 10 minutes
+        iat: now - timeouts::JWT_CLOCK_DRIFT_SECS,
+        exp: now + timeouts::JWT_EXPIRY_SECS,
         iss: app_id.to_string(),
     };
 

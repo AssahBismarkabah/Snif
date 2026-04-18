@@ -2511,7 +2511,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
-name = "snif"
+name = "snif-cli"
 version = "3.2.4"
 dependencies = [
  "anyhow",
@@ -2541,6 +2541,7 @@ name = "snif-cochange"
 version = "3.2.4"
 dependencies = [
  "anyhow",
+ "snif-config",
  "snif-store",
  "tracing",
 ]
@@ -2572,6 +2573,7 @@ version = "3.2.4"
 dependencies = [
  "anyhow",
  "fastembed",
+ "snif-config",
  "snif-store",
  "tracing",
 ]
@@ -2653,6 +2655,8 @@ name = "snif-parser"
 version = "3.2.4"
 dependencies = [
  "anyhow",
+ "rayon",
+ "snif-config",
  "snif-types",
  "streaming-iterator",
  "tracing",
@@ -2673,6 +2677,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "snif-config",
  "snif-types",
  "tokio",
  "tracing",
@@ -2706,6 +2711,7 @@ dependencies = [
  "anyhow",
  "rusqlite",
  "serde_json",
+ "snif-config",
  "snif-types",
  "sqlite-vec",
  "thiserror",

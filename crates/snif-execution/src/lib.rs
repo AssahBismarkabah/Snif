@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
-use snif_config::ModelConfig;
+use snif_config::{constants::timeouts, env::keys, ModelConfig};
 use std::time::Instant;
 
 pub struct LlmClient {
@@ -48,7 +48,9 @@ struct Choice {
 impl LlmClient {
     pub fn new(endpoint: &str, model: &str, api_key: &str) -> Self {
         let http = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(300))
+            .timeout(std::time::Duration::from_secs(
+                timeouts::LLM_REQUEST_TIMEOUT_SECS,
+            ))
             .build()
             .unwrap_or_default();
 
@@ -90,12 +92,14 @@ impl LlmClient {
             },
         };
 
-        let max_retries = 5;
+        let max_retries = timeouts::LLM_MAX_RETRIES;
         let mut last_error = String::new();
 
         for attempt in 0..=max_retries {
             if attempt > 0 {
-                let delay = std::time::Duration::from_secs(2u64.pow(attempt as u32));
+                let delay = std::time::Duration::from_secs(
+                    timeouts::LLM_RETRY_BASE_DELAY_SECS.pow(attempt),
+                );
                 tracing::warn!(
                     attempt,
                     delay_secs = delay.as_secs(),
@@ -157,9 +161,13 @@ pub fn execute_review(
     user_prompt: &str,
     config: &ModelConfig,
 ) -> Result<ExecutionResult> {
-    let api_key = std::env::var("SNIF_API_KEY")
-        .or_else(|_| std::env::var("OPENAI_API_KEY"))
-        .context("SNIF_API_KEY or OPENAI_API_KEY must be set")?;
+    let api_key = std::env::var(keys::SNIF_API_KEY)
+        .or_else(|_| std::env::var(keys::OPENAI_API_KEY))
+        .context(format!(
+            "{} or {} must be set",
+            keys::SNIF_API_KEY,
+            keys::OPENAI_API_KEY
+        ))?;
 
     let client = LlmClient::from_config(config, &api_key, true);
 

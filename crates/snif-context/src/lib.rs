@@ -1,6 +1,7 @@
 pub mod budget;
 
 use anyhow::Result;
+use snif_config::constants::limits;
 use snif_config::ContextConfig;
 use snif_store::Store;
 use snif_types::{
@@ -9,8 +10,6 @@ use snif_types::{
 };
 use std::collections::HashMap;
 use std::path::Path;
-
-const MAX_CHANGED_FILE_BYTES: usize = 50_000;
 
 const NON_REVIEWABLE_FILES: &[&str] = &[
     "pnpm-lock.yaml",
@@ -34,20 +33,20 @@ fn is_non_reviewable(path: &str) -> bool {
 }
 
 /// Count diff hunks per file path from a unified diff.
-fn count_hunks_per_file(diff: &str) -> HashMap<String, usize> {
-    let mut counts: HashMap<String, usize> = HashMap::new();
-    let mut current_file: Option<String> = None;
+fn count_hunks_per_file(diff: &str) -> HashMap<&str, usize> {
+    let mut counts: HashMap<&str, usize> = HashMap::new();
+    let mut current_file: Option<&str> = None;
 
     for line in diff.lines() {
         if let Some(path) = line.strip_prefix("+++ b/") {
             if path != "/dev/null" {
-                current_file = Some(path.to_string());
+                current_file = Some(path);
             }
         } else if line.starts_with("+++ /dev/null") {
             current_file = None;
         } else if line.starts_with("@@") {
-            if let Some(ref file) = current_file {
-                *counts.entry(file.clone()).or_insert(0) += 1;
+            if let Some(file) = current_file {
+                *counts.entry(file).or_insert(0) += 1;
             }
         }
     }
@@ -103,7 +102,7 @@ pub fn build_context(
             .unwrap_or(0);
 
         let (full_content, forced_exclude) =
-            if is_non_reviewable(path) || file_size > MAX_CHANGED_FILE_BYTES {
+            if is_non_reviewable(path) || file_size > limits::MAX_CHANGED_FILE_BYTES {
                 tracing::info!(
                     path = %path,
                     size = file_size,
@@ -129,7 +128,7 @@ pub fn build_context(
                 .unwrap_or(0);
         let hunk_count = hunk_counts.get(path.as_str()).copied().unwrap_or(0);
         candidates.push(FileCandidate {
-            path: path.clone(),
+            path: path.to_string(),
             full_content,
             summary,
             full_tokens,

@@ -3,18 +3,13 @@ use anyhow::Result;
 
 impl Store {
     pub fn upsert_file(&self, path: &str, hash: &str, language: &str) -> Result<i64> {
-        self.conn.execute(
+        let id: i64 = self.conn.query_row(
             "INSERT INTO files (path, hash, language) VALUES (?1, ?2, ?3)
-             ON CONFLICT(path) DO UPDATE SET hash = ?2, language = ?3, indexed_at = datetime('now')",
+             ON CONFLICT(path) DO UPDATE SET hash = ?2, language = ?3, indexed_at = datetime('now')
+             RETURNING id",
             rusqlite::params![path, hash, language],
+            |row| row.get(0),
         )?;
-
-        let id: i64 =
-            self.conn
-                .query_row("SELECT id FROM files WHERE path = ?1", [path], |row| {
-                    row.get(0)
-                })?;
-
         Ok(id)
     }
 
@@ -40,6 +35,27 @@ impl Store {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
+    }
+
+    pub fn get_file_ids_batch(&self, paths: &[String]) -> Result<Vec<(i64, String)>> {
+        if paths.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let placeholders: String = paths.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT id, path FROM files WHERE path IN ({})",
+            placeholders
+        );
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let params: Vec<&dyn rusqlite::ToSql> =
+            paths.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+
+        let rows = stmt
+            .query_map(params.as_slice(), |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 
     pub fn get_all_file_paths(&self) -> Result<Vec<(i64, String)>> {

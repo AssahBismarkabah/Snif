@@ -4,9 +4,9 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-snif-types = { path = "../snif-types" }
+snif-config = { path = "../snif-config" }
 snif-store = { path = "../snif-store" }
 snif-embeddings = { path = "../snif-embeddings" }
-snif-config = { path = "../snif-config" }
+snif-types = { path = "../snif-types" }
 anyhow = { workspace = true }
 tracing = { workspace = true }

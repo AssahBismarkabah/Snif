@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+snif-config = { path = "../snif-config" }
 snif-types = { path = "../snif-types" }
 tree-sitter = { workspace = true }
 tree-sitter-rust = { workspace = true }
@@ -14,3 +15,4 @@ streaming-iterator = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 walkdir = { workspace = true }
+rayon = { workspace = true }

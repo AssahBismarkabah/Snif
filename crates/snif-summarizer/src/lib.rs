@@ -1,7 +1,7 @@
 mod prompt;
 
 use anyhow::{bail, Result};
-use snif_config::ModelConfig;
+use snif_config::{constants::model, env::keys, ModelConfig};
 use snif_execution::LlmClient;
 use snif_store::Store;
 use std::collections::HashMap;
@@ -22,13 +22,15 @@ pub fn summarize_all(
     repo_root: &Path,
     config: &ModelConfig,
 ) -> Result<SummarizeStats> {
-    let api_key = std::env::var("SNIF_API_KEY")
-        .or_else(|_| std::env::var("OPENAI_API_KEY"))
+    let api_key = std::env::var(keys::SNIF_API_KEY)
+        .or_else(|_| std::env::var(keys::OPENAI_API_KEY))
         .unwrap_or_default();
 
     if api_key.is_empty() {
         tracing::warn!(
-            "No API key found (SNIF_API_KEY or OPENAI_API_KEY). Skipping summarization."
+            "No API key found ({} or {}). Skipping summarization.",
+            keys::SNIF_API_KEY,
+            keys::OPENAI_API_KEY
         );
         return Ok(SummarizeStats {
             symbols_summarized: 0,
@@ -48,7 +50,9 @@ pub fn summarize_all(
         });
     }
 
-    let rt = tokio::runtime::Runtime::new()?;
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
     rt.block_on(summarize_all_async(store, repo_root, config, &api_key))
 }
 
@@ -60,7 +64,7 @@ async fn summarize_all_async(
 ) -> Result<SummarizeStats> {
     let start = Instant::now();
     let client = Arc::new(LlmClient::from_config(config, api_key, false));
-    let semaphore = Arc::new(Semaphore::new(3));
+    let semaphore = Arc::new(Semaphore::new(model::MAX_CONCURRENT_SUMMARIZATION));
 
     let symbols = store.get_symbols_for_summarization()?;
     tracing::info!(symbols = symbols.len(), "Starting summarization");

@@ -3,6 +3,7 @@ mod semantic;
 mod structural;
 
 use anyhow::Result;
+use snif_config::constants::retrieval;
 use snif_config::RetrievalWeights;
 use snif_embeddings::Embedder;
 use snif_store::Store;
@@ -16,17 +17,13 @@ pub fn retrieve(
     embedder: &Embedder,
     weights: &RetrievalWeights,
 ) -> Result<RetrievalResults> {
-    let mut changed_file_ids: Vec<(i64, String)> = Vec::new();
-    for path in changed_paths {
-        if let Some(id) = store.get_file_id(path)? {
-            changed_file_ids.push((id, path.clone()));
-        }
-    }
-
+    // Batch query for file IDs instead of individual lookups
+    let changed_file_ids = store.get_file_ids_batch(changed_paths)?;
     let changed_ids: Vec<i64> = changed_file_ids.iter().map(|(id, _)| *id).collect();
 
     let struct_results = structural::structural_retrieval(store, &changed_file_ids)?;
-    let sem_results = semantic::semantic_retrieval(store, &changed_ids, embedder, 20)?;
+    let sem_results =
+        semantic::semantic_retrieval(store, &changed_ids, embedder, retrieval::SEMANTIC_KNN_K)?;
     let kw_results = keyword::keyword_retrieval(store, diff_identifiers, &changed_ids)?;
 
     let structural_count = struct_results.len();
@@ -83,19 +80,21 @@ fn compute_score(sources: &[RetrievalMethod], weights: &RetrievalWeights) -> f64
         match source {
             RetrievalMethod::Structural(reason) => {
                 let method_score = match reason {
-                    StructuralReason::DirectImport => 1.0,
-                    StructuralReason::ReverseImport => 0.8,
+                    StructuralReason::DirectImport => retrieval::DIRECT_IMPORT_SCORE,
+                    StructuralReason::ReverseImport => retrieval::REVERSE_IMPORT_SCORE,
                     StructuralReason::CoChange { correlation } => *correlation,
-                    StructuralReason::SymbolReference { .. } => 0.6,
+                    StructuralReason::SymbolReference { .. } => retrieval::SYMBOL_REFERENCE_SCORE,
                 };
                 score += weights.structural * method_score;
             }
             RetrievalMethod::Semantic { distance } => {
-                let similarity = (1.0 - distance).max(0.0);
+                let similarity = (1.0 - distance).max(retrieval::SEMANTIC_SIMILARITY_FLOOR);
                 score += weights.semantic * similarity;
             }
             RetrievalMethod::Keyword { matched_terms } => {
-                let term_score = (matched_terms.len() as f64).min(3.0) / 3.0;
+                let term_score = (matched_terms.len() as f64)
+                    .min(retrieval::MAX_KEYWORD_TERMS as f64)
+                    / retrieval::MAX_KEYWORD_TERMS as f64;
                 score += weights.keyword * term_score;
             }
         }

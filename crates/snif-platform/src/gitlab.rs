@@ -1,5 +1,7 @@
 use crate::{extract_fingerprints, PlatformAdapter, BOT_MARKER};
 use anyhow::{bail, Context, Result};
+use snif_config::constants::timeouts;
+use snif_config::env::{ci, keys};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
 pub struct GitLabAdapter {
@@ -12,9 +14,13 @@ pub struct GitLabAdapter {
 
 impl GitLabAdapter {
     pub fn new(project_path: &str, mr_iid: u64, api_base: Option<&str>) -> Result<Self> {
-        let token = std::env::var("GITLAB_TOKEN")
-            .or_else(|_| std::env::var("CI_JOB_TOKEN"))
-            .context("GITLAB_TOKEN or CI_JOB_TOKEN must be set")?;
+        let token = std::env::var(keys::GITLAB_TOKEN)
+            .or_else(|_| std::env::var(keys::CI_JOB_TOKEN))
+            .context(format!(
+                "{} or {} must be set",
+                keys::GITLAB_TOKEN,
+                keys::CI_JOB_TOKEN
+            ))?;
 
         let encoded_path = project_path.replace('/', "%2F");
         let base = api_base.unwrap_or("https://gitlab.com/api/v4").to_string();
@@ -29,15 +35,18 @@ impl GitLabAdapter {
     }
 
     pub fn from_env() -> Result<Self> {
-        let project_path =
-            std::env::var("CI_PROJECT_PATH").context("CI_PROJECT_PATH must be set")?;
+        let project_path = std::env::var(ci::CI_PROJECT_PATH)
+            .context(format!("{} must be set", ci::CI_PROJECT_PATH))?;
 
-        let mr_iid: u64 = std::env::var("CI_MERGE_REQUEST_IID")
-            .context("CI_MERGE_REQUEST_IID must be set")?
+        let mr_iid: u64 = std::env::var(ci::CI_MERGE_REQUEST_IID)
+            .context(format!("{} must be set", ci::CI_MERGE_REQUEST_IID))?
             .parse()
-            .context("CI_MERGE_REQUEST_IID must be a valid integer")?;
+            .context(format!(
+                "{} must be a valid integer",
+                ci::CI_MERGE_REQUEST_IID
+            ))?;
 
-        let api_base = std::env::var("CI_API_V4_URL").ok();
+        let api_base = std::env::var(ci::CI_API_V4_URL).ok();
 
         Self::new(&project_path, mr_iid, api_base.as_deref())
     }
@@ -89,18 +98,20 @@ impl GitLabAdapter {
 
     fn get_all_notes(&self) -> Result<Vec<serde_json::Value>> {
         let mut all_notes = Vec::new();
-        let mut page = 1u32;
-        let max_pages = 100;
+        let mut page = 1usize;
+        let max_pages = timeouts::GITLAB_MAX_PAGES;
 
         loop {
             if page > max_pages {
-                tracing::warn!("Pagination exceeded max pages, stopping");
+                tracing::warn!("Pagination exceeded max pages ({max_pages}), stopping");
                 break;
             }
 
             let path = format!(
-                "merge_requests/{}/notes?sort=asc&per_page=100&page={}",
-                self.mr_iid, page
+                "merge_requests/{}/notes?sort=asc&per_page={}&page={}",
+                self.mr_iid,
+                timeouts::GITLAB_PER_PAGE,
+                page
             );
             let response = self.get(&path)?;
 
@@ -108,7 +119,7 @@ impl GitLabAdapter {
                 .headers()
                 .get("x-next-page")
                 .and_then(|v| v.to_str().ok())
-                .and_then(|s| s.parse::<u32>().ok());
+                .and_then(|s| s.parse::<usize>().ok());
 
             let notes: Vec<serde_json::Value> = response.json()?;
             all_notes.extend(notes);

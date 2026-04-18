@@ -1,6 +1,8 @@
 use anyhow::Result;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+use snif_config::constants::model;
 use snif_store::Store;
+use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
 pub struct Embedder {
@@ -45,13 +47,13 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
     if summaries.is_empty() {
         return Ok(EmbedStats {
             summaries_embedded: 0,
-            dimension: 384,
+            dimension: model::DEFAULT_EMBEDDING_DIMENSION,
             duration: start.elapsed(),
         });
     }
 
     // Filter out summaries that already have embeddings
-    let existing_ids = store.get_embedded_summary_ids()?;
+    let existing_ids: HashSet<i64> = store.get_embedded_summary_ids()?.into_iter().collect();
     let summaries: Vec<_> = summaries
         .into_iter()
         .filter(|(id, _)| !existing_ids.contains(id))

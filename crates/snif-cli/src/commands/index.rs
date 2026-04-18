@@ -1,5 +1,7 @@
-use anyhow::Result;
 use std::path::Path;
+
+use anyhow::Result;
+use snif_config::constants::retrieval;
 
 pub fn run(path: &str, full: bool) -> Result<()> {
     let repo_path = Path::new(path);
@@ -28,7 +30,8 @@ pub fn run(path: &str, full: bool) -> Result<()> {
     );
 
     // Step 4: Co-change analysis from git history
-    let cochange_stats = snif_cochange::analyze_cochange(&store, repo_path, 0.1, 3)?;
+    let cochange_stats =
+        snif_cochange::analyze_cochange(&store, repo_path, retrieval::MIN_COCHANGE_CORRELATION, 3)?;
 
     tracing::info!(
         commits = cochange_stats.commits_analyzed,

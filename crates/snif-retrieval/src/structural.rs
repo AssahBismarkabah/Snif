@@ -1,14 +1,14 @@
 use anyhow::Result;
 use snif_store::Store;
 use snif_types::{RetrievalMethod, StructuralReason};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub fn structural_retrieval(
     store: &Store,
     changed_file_ids: &[(i64, String)],
 ) -> Result<HashMap<i64, Vec<RetrievalMethod>>> {
     let mut results: HashMap<i64, Vec<RetrievalMethod>> = HashMap::new();
-    let changed_ids: Vec<i64> = changed_file_ids.iter().map(|(id, _)| *id).collect();
+    let changed_ids: HashSet<i64> = changed_file_ids.iter().map(|(id, _)| *id).collect();
 
     for (file_id, file_path) in changed_file_ids {
         if let Ok(imports) = store.get_imports_for_file(*file_id) {
@@ -33,7 +33,10 @@ pub fn structural_retrieval(
             }
         }
 
-        if let Ok(cochanges) = store.get_cochange_for_file(*file_id, 0.2) {
+        if let Ok(cochanges) = store.get_cochange_for_file(
+            *file_id,
+            snif_config::constants::retrieval::MIN_COCHANGE_RETRIEVAL_CORRELATION,
+        ) {
             for (other_id, correlation, _) in cochanges {
                 if !changed_ids.contains(&other_id) {
                     results
