@@ -112,28 +112,36 @@ impl FeedbackStore {
         let signal_ids: Vec<i64> = knn_results.iter().map(|(id, _)| *id).collect();
         let distance_map: HashMap<i64, f64> = knn_results.into_iter().collect();
 
-        let placeholders: String = signal_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let sql = format!(
-            "SELECT id, signal_type FROM feedback_signals 
-             WHERE id IN ({}) AND team_id = ?",
-            placeholders
-        );
+        // SQLite has a default limit of 999 variables per query.
+        // Chunk to stay well under that limit.
+        const SQLITE_MAX_VARIABLE_NUMBER: usize = 900;
 
-        let mut stmt = self.conn.prepare(&sql)?;
-        let mut params: Vec<&dyn rusqlite::ToSql> = signal_ids
-            .iter()
-            .map(|id| id as &dyn rusqlite::ToSql)
-            .collect();
-        params.push(&team_id);
+        let mut results = Vec::new();
+        for chunk in signal_ids.chunks(SQLITE_MAX_VARIABLE_NUMBER) {
+            let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+            let sql = format!(
+                "SELECT id, signal_type FROM feedback_signals 
+                 WHERE id IN ({}) AND team_id = ?",
+                placeholders
+            );
 
-        let results = stmt
-            .query_map(params.as_slice(), |row| {
-                let id: i64 = row.get(0)?;
-                let signal_type: String = row.get(1)?;
-                let distance = *distance_map.get(&id).unwrap_or(&0.0);
-                Ok((signal_type, distance))
-            })?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+            let mut stmt = self.conn.prepare(&sql)?;
+            let mut params: Vec<&dyn rusqlite::ToSql> = chunk
+                .iter()
+                .map(|id| id as &dyn rusqlite::ToSql)
+                .collect();
+            params.push(&team_id);
+
+            let chunk_results = stmt
+                .query_map(params.as_slice(), |row| {
+                    let id: i64 = row.get(0)?;
+                    let signal_type: String = row.get(1)?;
+                    let distance = *distance_map.get(&id).unwrap_or(&0.0);
+                    Ok((signal_type, distance))
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            results.extend(chunk_results);
+        }
 
         Ok(results)
     }

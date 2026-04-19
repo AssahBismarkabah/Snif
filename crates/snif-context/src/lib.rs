@@ -20,20 +20,24 @@ fn is_non_reviewable(path: &str) -> bool {
 }
 
 /// Count diff hunks per file path from a unified diff.
-fn count_hunks_per_file(diff: &str) -> HashMap<&str, usize> {
-    let mut counts: HashMap<&str, usize> = HashMap::new();
-    let mut current_file: Option<&str> = None;
+/// Handles multiple diff formats: +++ b/, +++ a/, +++ , and no-prefix.
+fn count_hunks_per_file(diff: &str) -> HashMap<String, usize> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    let mut current_file: Option<String> = None;
 
     for line in diff.lines() {
-        if let Some(path) = line.strip_prefix("+++ b/") {
-            if path != "/dev/null" {
-                current_file = Some(path);
+        // Handle various diff prefix formats: +++ b/path, +++ a/path, +++ path
+        let path = line.strip_prefix("+++ b/").or_else(|| line.strip_prefix("+++ a/")).or_else(|| line.strip_prefix("+++ "));
+
+        if let Some(p) = path {
+            if p != "/dev/null" {
+                current_file = Some(p.to_string());
             }
         } else if line.starts_with("+++ /dev/null") {
             current_file = None;
         } else if line.starts_with("@@") {
-            if let Some(file) = current_file {
-                *counts.entry(file).or_insert(0) += 1;
+            if let Some(ref file) = current_file {
+                *counts.entry(file.clone()).or_insert(0) += 1;
             }
         }
     }
