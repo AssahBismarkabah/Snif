@@ -27,7 +27,10 @@ fn count_hunks_per_file(diff: &str) -> HashMap<String, usize> {
 
     for line in diff.lines() {
         // Handle various diff prefix formats: +++ b/path, +++ a/path, +++ path
-        let path = line.strip_prefix("+++ b/").or_else(|| line.strip_prefix("+++ a/")).or_else(|| line.strip_prefix("+++ "));
+        let path = line
+            .strip_prefix("+++ b/")
+            .or_else(|| line.strip_prefix("+++ a/"))
+            .or_else(|| line.strip_prefix("+++ "));
 
         if let Some(p) = path {
             if p != "/dev/null" {

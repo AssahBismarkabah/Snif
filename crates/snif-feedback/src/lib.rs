@@ -126,10 +126,8 @@ impl FeedbackStore {
             );
 
             let mut stmt = self.conn.prepare(&sql)?;
-            let mut params: Vec<&dyn rusqlite::ToSql> = chunk
-                .iter()
-                .map(|id| id as &dyn rusqlite::ToSql)
-                .collect();
+            let mut params: Vec<&dyn rusqlite::ToSql> =
+                chunk.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
             params.push(&team_id);
 
             let chunk_results = stmt
