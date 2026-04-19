@@ -651,7 +651,10 @@ mod tests {
 
         assert!(result.is_err());
         // Initial attempt + 5 retries = 6 total attempts
-        assert_eq!(call_count.load(Ordering::SeqCst), timeouts::LLM_MAX_RETRIES + 1);
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            timeouts::LLM_MAX_RETRIES + 1
+        );
         assert!(result.unwrap_err().to_string().contains("Persistent error"));
     }
 

@@ -112,8 +112,12 @@ pub fn run_evaluation(
             );
         }
 
-        let fixture_result =
-            metrics::compute_fixture_result(&fix.name, &fix.expected_findings, &findings, thresholds::EVAL_LINE_TOLERANCE);
+        let fixture_result = metrics::compute_fixture_result(
+            &fix.name,
+            &fix.expected_findings,
+            &findings,
+            thresholds::EVAL_LINE_TOLERANCE,
+        );
 
         tracing::info!(
             name = %fix.name,

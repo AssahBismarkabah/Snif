@@ -43,11 +43,31 @@ pub fn analyze_history(history: &[EvalRecord], window: usize) -> EvalGuidance {
     let noise_trend = compute_trend(&recent, |r| r.noise_rate);
 
     lines.push(String::from(eval::GUIDANCE_HEADER));
-    push_guidance_if(&mut lines, precision_trend < eval_thresholds::PRECISION_DECLINE_THRESHOLD, eval::GUIDANCE_PRECISION_DECLINED);
-    push_guidance_if(&mut lines, precision_trend > eval_thresholds::PRECISION_IMPROVEMENT_THRESHOLD, eval::GUIDANCE_PRECISION_STRONG);
-    push_guidance_if(&mut lines, recall_trend < eval_thresholds::RECALL_DECLINE_THRESHOLD, eval::GUIDANCE_RECALL_DECLINED);
-    push_guidance_if(&mut lines, recall_trend > eval_thresholds::RECALL_IMPROVEMENT_THRESHOLD, eval::GUIDANCE_RECALL_STRONG);
-    push_guidance_if(&mut lines, noise_trend > eval_thresholds::NOISE_INCREASE_THRESHOLD, eval::GUIDANCE_NOISE_RISING);
+    push_guidance_if(
+        &mut lines,
+        precision_trend < eval_thresholds::PRECISION_DECLINE_THRESHOLD,
+        eval::GUIDANCE_PRECISION_DECLINED,
+    );
+    push_guidance_if(
+        &mut lines,
+        precision_trend > eval_thresholds::PRECISION_IMPROVEMENT_THRESHOLD,
+        eval::GUIDANCE_PRECISION_STRONG,
+    );
+    push_guidance_if(
+        &mut lines,
+        recall_trend < eval_thresholds::RECALL_DECLINE_THRESHOLD,
+        eval::GUIDANCE_RECALL_DECLINED,
+    );
+    push_guidance_if(
+        &mut lines,
+        recall_trend > eval_thresholds::RECALL_IMPROVEMENT_THRESHOLD,
+        eval::GUIDANCE_RECALL_STRONG,
+    );
+    push_guidance_if(
+        &mut lines,
+        noise_trend > eval_thresholds::NOISE_INCREASE_THRESHOLD,
+        eval::GUIDANCE_NOISE_RISING,
+    );
 
     // Fixture-level pattern analysis
     let fixture_guidance = analyze_fixture_patterns(&recent);
@@ -265,7 +285,12 @@ mod tests {
 
     #[test]
     fn single_record_returns_no_trend_guidance() {
-        let history = vec![make_record(SINGLE_RECORD_PRECISION, SINGLE_RECORD_RECALL, SINGLE_RECORD_NOISE, vec![])];
+        let history = vec![make_record(
+            SINGLE_RECORD_PRECISION,
+            SINGLE_RECORD_RECALL,
+            SINGLE_RECORD_NOISE,
+            vec![],
+        )];
         let guidance = analyze_history(&history, TEST_WINDOW);
         // Single record, no trend possible; fixture patterns need 2+ runs
         assert!(guidance.prompt_augmentation.is_empty());
@@ -310,19 +335,37 @@ mod tests {
                 FP_RUN_1_PRECISION,
                 BASE_RECALL,
                 FP_RUN_1_NOISE,
-                vec![(FIXTURE_NAME, FIXTURE_EXPECTED, FP_RUN_1_ACTUAL, FIXTURE_TP, FP_RUN_1_FP)],
+                vec![(
+                    FIXTURE_NAME,
+                    FIXTURE_EXPECTED,
+                    FP_RUN_1_ACTUAL,
+                    FIXTURE_TP,
+                    FP_RUN_1_FP,
+                )],
             ),
             make_record(
                 FP_RUN_2_PRECISION,
                 BASE_RECALL,
                 FP_RUN_2_NOISE,
-                vec![(FIXTURE_NAME, FIXTURE_EXPECTED, FP_RUN_2_ACTUAL, FIXTURE_TP, FP_RUN_2_FP)],
+                vec![(
+                    FIXTURE_NAME,
+                    FIXTURE_EXPECTED,
+                    FP_RUN_2_ACTUAL,
+                    FIXTURE_TP,
+                    FP_RUN_2_FP,
+                )],
             ),
             make_record(
                 FP_RUN_3_PRECISION,
                 BASE_RECALL,
                 FP_RUN_3_NOISE,
-                vec![(FIXTURE_NAME, FIXTURE_EXPECTED, FP_RUN_3_ACTUAL, FIXTURE_TP, FP_RUN_3_FP)],
+                vec![(
+                    FIXTURE_NAME,
+                    FIXTURE_EXPECTED,
+                    FP_RUN_3_ACTUAL,
+                    FIXTURE_TP,
+                    FP_RUN_3_FP,
+                )],
             ),
         ];
         let guidance = analyze_history(&history, TEST_WINDOW);

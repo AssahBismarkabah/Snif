@@ -14,8 +14,7 @@ pub mod embeddings {
     /// Dimensions: 384
     pub const MODEL_NAME: &str = "all-MiniLM-L6-v2";
     /// Error message for empty embedding results
-    pub const ERROR_EMPTY_EMBEDDING_RESULT: &str =
-        "Embedding model returned empty result for text";
+    pub const ERROR_EMPTY_EMBEDDING_RESULT: &str = "Embedding model returned empty result for text";
     /// Batch size for embedding API calls
     pub const BATCH_SIZE: usize = 64;
 }
@@ -131,8 +130,7 @@ pub mod eval {
     pub const MIN_RECORDS_FOR_TREND: usize = 2;
 
     // Guidance text templates (used via String::from, not format!)
-    pub const GUIDANCE_HEADER: &str =
-        "## Recent Evaluation Feedback\n\n\
+    pub const GUIDANCE_HEADER: &str = "## Recent Evaluation Feedback\n\n\
          Based on analysis of recent evaluation runs, adjust your review approach:";
 
     pub const GUIDANCE_PRECISION_DECLINED: &str =
