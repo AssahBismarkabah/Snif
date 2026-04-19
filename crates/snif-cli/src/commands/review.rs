@@ -5,6 +5,16 @@ use snif_platform::PlatformAdapter;
 use snif_types::ContentTier;
 use std::path::Path;
 
+fn print_sarif_output(json: &str) {
+    println!("{}", json);
+}
+
+fn print_findings_output(json: &str) {
+    if !json.is_empty() {
+        println!("{}", json);
+    }
+}
+
 pub fn run(
     path: &str,
     platform: Option<&str>,
@@ -190,11 +200,12 @@ pub fn run(
             let sarif = snif_output::sarif::to_sarif(&findings);
             let sarif_json = serde_json::to_string_pretty(&sarif)?;
             std::fs::write("findings.sarif", &sarif_json)?;
-            println!("{}", sarif_json);
+            print_sarif_output(&sarif_json);
         }
         _ => {
             if !findings.is_empty() {
-                println!("{}", serde_json::to_string_pretty(&findings)?);
+                let json = serde_json::to_string_pretty(&findings)?;
+                print_findings_output(&json);
             }
         }
     }

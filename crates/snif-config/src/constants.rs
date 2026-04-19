@@ -1,53 +1,113 @@
+// ============================================================================
+// Snif Configuration Constants
+//
+// Centralized constants for magic numbers, thresholds, limits, timeouts,
+// prompt templates, CLI defaults, and output formatting.
+// ============================================================================
+
+// ============================================================================
+// LLM Model Configuration
+// ============================================================================
 pub mod model {
+    /// Default dimension for embedding vectors (all-MiniLM-L6-v2)
     pub const DEFAULT_EMBEDDING_DIMENSION: usize = 384;
+    /// Maximum context window for LLM requests
     pub const DEFAULT_MAX_TOKENS: usize = 128_000;
+    /// Reserved tokens for LLM output generation
     pub const DEFAULT_OUTPUT_RESERVE_TOKENS: usize = 32_000;
+    /// Maximum number of files to include in review context
     pub const DEFAULT_MAX_FILES: usize = 50;
+    /// Max concurrent summarization tasks
     pub const MAX_CONCURRENT_SUMMARIZATION: usize = 3;
+    /// Batch size for embedding API calls
     pub const EMBEDDING_BATCH_SIZE: usize = 64;
 }
 
+// ============================================================================
+// Code Retrieval Configuration
+// ============================================================================
 pub mod retrieval {
+    /// K value for KNN semantic search
     pub const SEMANTIC_KNN_K: usize = 20;
+    /// Minimum correlation for co-change analysis (low threshold)
     pub const MIN_COCHANGE_CORRELATION: f64 = 0.1;
+    /// Minimum correlation for co-change retrieval (higher threshold)
     pub const MIN_COCHANGE_RETRIEVAL_CORRELATION: f64 = 0.2;
+    /// Maximum files per commit for co-change analysis
     pub const MAX_FILES_PER_COMMIT: usize = 50;
+    /// Base score for direct imports in structural retrieval
     pub const DIRECT_IMPORT_SCORE: f64 = 1.0;
+    /// Score for reverse imports in structural retrieval
     pub const REVERSE_IMPORT_SCORE: f64 = 0.8;
+    /// Score for symbol references in structural retrieval
     pub const SYMBOL_REFERENCE_SCORE: f64 = 0.6;
+    /// Floor for semantic similarity scoring
     pub const SEMANTIC_SIMILARITY_FLOOR: f64 = 0.0;
+    /// Max keyword terms counted for retrieval scoring
     pub const MAX_KEYWORD_TERMS: usize = 3;
 }
 
+// ============================================================================
+// Size and Resource Limits
+// ============================================================================
 pub mod limits {
+    /// Maximum file size for parsing (1 MB)
     pub const MAX_FILE_SIZE_BYTES: usize = 1_000_000;
+    /// Sample size for text heuristic detection (512 bytes)
     pub const TEXT_DETECTION_SAMPLE_SIZE: usize = 512;
+    /// Maximum bytes for changed file content inclusion
     pub const MAX_CHANGED_FILE_BYTES: usize = 50_000;
+    /// Pagination limit for summary fetching
     pub const MAX_SUMMARIES_FETCH_LIMIT: usize = 50_000;
+    /// Pagination limit for symbol fetching
     pub const MAX_SYMBOLS_FETCH_LIMIT: usize = 10_000;
 }
 
+// ============================================================================
+// Timeout and Retry Configuration
+// ============================================================================
 pub mod timeouts {
+    /// LLM request timeout in seconds (5 minutes)
     pub const LLM_REQUEST_TIMEOUT_SECS: u64 = 300;
+    /// Maximum retry attempts for LLM requests
     pub const LLM_MAX_RETRIES: u32 = 5;
+    /// Base delay for exponential backoff (2 seconds)
     pub const LLM_RETRY_BASE_DELAY_SECS: u64 = 2;
+    /// Generic HTTP client timeout in seconds
     pub const HTTP_TIMEOUT_SECS: u64 = 15;
+    /// Clock drift tolerance for JWT tokens (60 seconds)
     pub const JWT_CLOCK_DRIFT_SECS: u64 = 60;
+    /// JWT token expiry duration (10 minutes)
     pub const JWT_EXPIRY_SECS: u64 = 600;
+    /// Maximum pages for GitLab API pagination
     pub const GITLAB_MAX_PAGES: usize = 100;
+    /// Items per page for GitLab API requests
     pub const GITLAB_PER_PAGE: usize = 100;
 }
 
+// ============================================================================
+// Confidence Thresholds
+// ============================================================================
 pub mod thresholds {
+    /// Confidence threshold for SARIF error-level findings
     pub const SARIF_ERROR_CONFIDENCE: f64 = 0.9;
+    /// Confidence threshold for SARIF warning-level findings
     pub const SARIF_WARNING_CONFIDENCE: f64 = 0.7;
+    /// Default minimum confidence for finding inclusion
     pub const MIN_CONFIDENCE_DEFAULT: f64 = 0.7;
+    /// Minimum signals for feedback analysis
     pub const FEEDBACK_MIN_SIGNALS: usize = 20;
+    /// Precision drop threshold for regression detection
     pub const PRECISION_REGRESSION_THRESHOLD: f64 = 0.05;
+    /// Recall drop threshold for regression detection
     pub const RECALL_REGRESSION_THRESHOLD: f64 = 0.10;
+    /// Noise increase threshold for regression detection
     pub const NOISE_REGRESSION_THRESHOLD: f64 = 0.05;
 }
 
+// ============================================================================
+// LLM Prompt Templates
+// ============================================================================
 pub mod prompts {
     // System prompt sections
     pub const SYSTEM_PROMPT_INTRO: &str =
@@ -64,11 +124,11 @@ pub mod prompts {
         "- Bias toward false negatives over false positives. If you are not confident, stay quiet.",
         "- Keep reasoning internal. Never expose chain-of-thought.",
         "- Do NOT include a finding if you are uncertain or conclude there is no real issue.",
-        "- A finding is only valid when you are confident it represents a concrete problem\n\
+        "- A finding is only valid when you are confident it represents a concrete problem \
           with specific user-visible impact. Uncertainty = empty findings array.",
-        "- Never include phrases like \"no bug\", \"no issue\", \"acceptable\", \"I will\",\n\
+        "- Never include phrases like \"no bug\", \"no issue\", \"acceptable\", \"I will\", \
           or reasoning narration in the explanation or impact fields.",
-        "- If you start analyzing something and decide it is not a bug, omit it entirely.\n\
+        "- If you start analyzing something and decide it is not a bug, omit it entirely. \
           Do NOT include a finding whose purpose is to explain why there is no bug.",
         "- Every finding MUST cite specific evidence from the provided code.",
         "- Every finding MUST explain the user-relevant impact — what breaks, what is at risk.",
@@ -100,33 +160,38 @@ pub mod prompts {
     pub const SYSTEM_PROMPT_CONVENTION_FOOTER: &str =
         "\n\nFlag violations of these conventions with category \"convention\".\n";
 
-    pub const SYSTEM_PROMPT_RESPONSE_FORMAT: &str =
-        "\nRespond with a JSON object containing two fields:\n\n\
-         1. \"summary\": A 1-2 sentence walkthrough of what this change does and why. \
-         Describe the intent and impact on the codebase, not the individual files.\n\n\
-         2. \"findings\": A JSON array of issues found. If the change is clean, \
-         use an empty array. If you are unsure about the format, return \
-         {\"summary\":\"\",\"findings\":[]} exactly.\n\n\
-         Line numbers MUST refer to the line numbers in the file content \
-         provided in the Changed Files section. If file content is omitted, \
-         use the line numbers from the diff hunks.\n\n\
-         Response format:\n\
-         {\n\
-           \"summary\": \"<1-2 sentence walkthrough of the change>\",\n\
-           \"findings\": [\n\
-             {\n\
-               \"file\": \"path/to/file\",\n\
-               \"start_line\": <line number in the file>,\n\
-               \"end_line\": <line number in the file or null>,\n\
-               \"category\": \"logic\" | \"security\" | \"convention\" | \"performance\" | \"style\" | \"other\",\n\
-               \"confidence\": <0.0 to 1.0>,\n\
-               \"evidence\": \"<quoted code from the diff or context>\",\n\
-               \"explanation\": \"<what is wrong and why>\",\n\
-               \"impact\": \"<what happens if this is not fixed>\",\n\
-               \"suggestion\": \"<optional fix suggestion or null>\"\n\
-             }\n\
-           ]\n\
-         }\n";
+    pub const SYSTEM_PROMPT_RESPONSE_FORMAT: &str = "\
+\nRespond with a JSON object containing two fields:
+
+1. \"summary\": A 1-2 sentence walkthrough of what this change does and why. \
+   Describe the intent and impact on the codebase, not the individual files.
+
+2. \"findings\": A JSON array of issues found. If the change is clean, \
+   use an empty array. If you are unsure about the format, return \
+   {\"summary\":\"\",\"findings\":[]} exactly.
+
+Line numbers MUST refer to the line numbers in the file content \
+provided in the Changed Files section. If file content is omitted, \
+use the line numbers from the diff hunks.
+
+Response format:
+{
+  \"summary\": \"<1-2 sentence walkthrough of the change>\",
+  \"findings\": [
+    {
+      \"file\": \"path/to/file\",
+      \"start_line\": <line number in the file>,
+      \"end_line\": <line number in the file or null>,
+      \"category\": \"logic\" | \"security\" | \"convention\" | \"performance\" | \"style\" | \"other\",
+      \"confidence\": <0.0 to 1.0>,
+      \"evidence\": \"<quoted code from the diff or context>\",
+      \"explanation\": \"<what is wrong and why>\",
+      \"impact\": \"<what happens if this is not fixed>\",
+      \"suggestion\": \"<optional fix suggestion or null>\"
+    }
+  ]
+}
+";
 
     // User prompt sections
     pub const USER_PROMPT_DIFF_HEADER: &str = "\n\n## Diff\n\n```diff\n";
@@ -136,11 +201,12 @@ pub mod prompts {
     pub const USER_PROMPT_LINE_FORMAT: &str = "{:>4} | {}\n";
     pub const USER_PROMPT_DIFF_ONLY_CONTENT: &str = "*{}*\n\n";
     pub const USER_PROMPT_RELEVANCE_FORMAT: &str = " (relevance: {:.2})";
-    pub const USER_PROMPT_FINAL_INSTRUCTION: &str =
-        "\nReview the diff above. Return only the JSON object described in the system prompt. \
-         Do not include markdown fences, analysis, or any extra text. Your first character \
-         must be '{' and your last character must be '}'. If you are unsure, return \
-         {\"summary\":\"\",\"findings\":[]} exactly.\n";
+    pub const USER_PROMPT_FINAL_INSTRUCTION: &str = "\
+\nReview the diff above. Return only the JSON object described in the system prompt. \
+Do not include markdown fences, analysis, or any extra text. Your first character \
+must be '{' and your last character must be '}'. If you are unsure, return \
+{\"summary\":\"\",\"findings\":[]} exactly.
+";
 
     // Metadata labels
     pub const METADATA_CHANGE_LABEL: &str = "Change: {}\n";
@@ -154,6 +220,9 @@ pub mod prompts {
     pub const METADATA_SUMMARY_LABEL: &str = "Summary: {}\n";
 }
 
+// ============================================================================
+// CLI Defaults and Configuration
+// ============================================================================
 pub mod cli {
     pub const DEFAULT_PATH: &str = ".";
     pub const DEFAULT_OUTPUT_FORMAT: &str = "json";
@@ -181,16 +250,26 @@ pub mod cli {
         "rules: - if: $CI_PIPELINE_SOURCE == \"merge_request_event\"";
 }
 
+// ============================================================================
+// Clean Command Output
+// ============================================================================
 pub mod clean {
+    /// Directories targeted for removal during clean operation
     pub const CLEAN_TARGETS: &[&str] = &[".snif", ".fastembed_cache"];
+    /// Message displayed after successful clean
     pub const CLEAN_COMPLETE_MESSAGE: &str =
         "\n  Clean complete. Configuration (.snif.json) was not touched.";
+    /// Message displayed when no targets were found to clean
     pub const CLEAN_NOTHING_TO_CLEAN: &str = "  Nothing to clean.";
+    /// Prefix for removed directory messages
     pub const CLEAN_REMOVED_PREFIX: &str = "  Removed ";
 }
 
+// ============================================================================
+// Time Unit Constants
+// ============================================================================
 pub mod time {
     pub const SECS_PER_MINUTE: u64 = 60;
-    pub const SECS_PER_HOUR: u64 = 3600;
-    pub const SECS_PER_DAY: u64 = 86400;
+    pub const SECS_PER_HOUR: u64 = 3_600;
+    pub const SECS_PER_DAY: u64 = 86_400;
 }
