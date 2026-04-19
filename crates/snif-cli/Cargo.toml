@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "snif"
+path = "src/main.rs"
+
 [dependencies]
 snif-config = { path = "../snif-config" }
 snif-cochange = { path = "../snif-cochange" }
