@@ -8,8 +8,20 @@
 // ============================================================================
 // LLM Model Configuration
 // ============================================================================
+pub mod embeddings {
+    /// Embedding model used for code summary vectorization
+    /// Model: all-MiniLM-L6-v2 (ONNX via fastembed)
+    /// Dimensions: 384
+    pub const MODEL_NAME: &str = "all-MiniLM-L6-v2";
+    /// Error message for empty embedding results
+    pub const ERROR_EMPTY_EMBEDDING_RESULT: &str =
+        "Embedding model returned empty result for text";
+    /// Batch size for embedding API calls
+    pub const BATCH_SIZE: usize = 64;
+}
+
 pub mod model {
-    /// Default dimension for embedding vectors (all-MiniLM-L6-v2)
+    /// Default dimension for embedding vectors (see embeddings::MODEL_NAME for exact model)
     pub const DEFAULT_EMBEDDING_DIMENSION: usize = 384;
     /// Maximum context window for LLM requests
     pub const DEFAULT_MAX_TOKENS: usize = 128_000;
@@ -19,8 +31,6 @@ pub mod model {
     pub const DEFAULT_MAX_FILES: usize = 50;
     /// Max concurrent summarization tasks
     pub const MAX_CONCURRENT_SUMMARIZATION: usize = 3;
-    /// Batch size for embedding API calls
-    pub const EMBEDDING_BATCH_SIZE: usize = 64;
 }
 
 // ============================================================================

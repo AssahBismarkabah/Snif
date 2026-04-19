@@ -1,6 +1,6 @@
 use anyhow::Result;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
-use snif_config::constants::model;
+use snif_config::constants::{embeddings, model};
 use snif_store::Store;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
@@ -16,9 +16,12 @@ pub struct EmbedStats {
 }
 
 impl Embedder {
+    /// Create a new Embedder instance with the configured embedding model.
+    /// Model: all-MiniLM-L6-v2 (384 dimensions, ONNX via fastembed)
     pub fn new() -> Result<Self> {
-        tracing::info!("Loading embedding model (AllMiniLML6V2)...");
+        tracing::info!("Loading embedding model ({})...", embeddings::MODEL_NAME);
         let start = Instant::now();
+        // Embedding model configuration - change MODEL_NAME in snif-config to use a different model
         let model = TextEmbedding::try_new(
             InitOptions::new(EmbeddingModel::AllMiniLML6V2).with_show_download_progress(true),
         )?;
@@ -27,11 +30,11 @@ impl Embedder {
     }
 
     pub fn embed_single(&self, text: &str) -> Result<Vec<f32>> {
-        let embeddings = self.model.embed(vec![text], None)?;
-        embeddings
+        let embeds = self.model.embed(vec![text], None)?;
+        embeds
             .into_iter()
             .next()
-            .ok_or_else(|| anyhow::anyhow!("Embedding model returned empty result for text"))
+            .ok_or_else(|| anyhow::anyhow!(embeddings::ERROR_EMPTY_EMBEDDING_RESULT))
     }
 
     pub fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
@@ -45,6 +48,7 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
     let summaries = store.get_all_summaries()?;
 
     if summaries.is_empty() {
+        tracing::info!("All summaries already embedded, skipping");
         return Ok(EmbedStats {
             summaries_embedded: 0,
             dimension: model::DEFAULT_EMBEDDING_DIMENSION,
@@ -63,7 +67,7 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
         tracing::info!("All summaries already embedded, skipping");
         return Ok(EmbedStats {
             summaries_embedded: 0,
-            dimension: 384,
+            dimension: model::DEFAULT_EMBEDDING_DIMENSION,
             duration: start.elapsed(),
         });
     }
@@ -74,10 +78,10 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
         "Embedding new summaries"
     );
 
-    // Batch in groups of 64
-    let batch_size = 64;
+    // Batch in groups of configured batch size
+    let batch_size = embeddings::BATCH_SIZE;
     let mut total_embedded = 0;
-    let mut dimension = 384;
+    let mut dimension = model::DEFAULT_EMBEDDING_DIMENSION;
 
     for chunk in summaries.chunks(batch_size) {
         let ids: Vec<i64> = chunk.iter().map(|(id, _)| *id).collect();
