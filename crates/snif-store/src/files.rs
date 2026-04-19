@@ -42,20 +42,28 @@ impl Store {
             return Ok(Vec::new());
         }
 
-        let placeholders: String = paths.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let sql = format!(
-            "SELECT id, path FROM files WHERE path IN ({})",
-            placeholders
-        );
+        // SQLite has a default limit of 999 variables per query.
+        // Chunk to stay well under that limit.
+        const SQLITE_MAX_VARIABLE_NUMBER: usize = 900;
 
-        let mut stmt = self.conn.prepare(&sql)?;
-        let params: Vec<&dyn rusqlite::ToSql> =
-            paths.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+        let mut results = Vec::new();
+        for chunk in paths.chunks(SQLITE_MAX_VARIABLE_NUMBER) {
+            let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+            let sql = format!(
+                "SELECT id, path FROM files WHERE path IN ({})",
+                placeholders
+            );
 
-        let rows = stmt
-            .query_map(params.as_slice(), |row| Ok((row.get(0)?, row.get(1)?)))?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        Ok(rows)
+            let mut stmt = self.conn.prepare(&sql)?;
+            let params: Vec<&dyn rusqlite::ToSql> =
+                chunk.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+
+            let rows = stmt
+                .query_map(params.as_slice(), |row| Ok((row.get(0)?, row.get(1)?)))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            results.extend(rows);
+        }
+        Ok(results)
     }
 
     pub fn get_all_file_paths(&self) -> Result<Vec<(i64, String)>> {
