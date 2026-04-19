@@ -2,6 +2,7 @@
 name = "snif-prompts"
 version.workspace = true
 edition.workspace = true
+repository.workspace = true
 
 [dependencies]
 snif-types = { path = "../snif-types" }

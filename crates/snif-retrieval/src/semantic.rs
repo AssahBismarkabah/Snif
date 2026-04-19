@@ -2,7 +2,7 @@ use anyhow::Result;
 use snif_embeddings::Embedder;
 use snif_store::Store;
 use snif_types::RetrievalMethod;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub fn semantic_retrieval(
     store: &Store,
@@ -11,6 +11,7 @@ pub fn semantic_retrieval(
     k: usize,
 ) -> Result<HashMap<i64, Vec<RetrievalMethod>>> {
     let mut results: HashMap<i64, Vec<RetrievalMethod>> = HashMap::new();
+    let changed_ids_set: HashSet<i64> = changed_file_ids.iter().copied().collect();
 
     for file_id in changed_file_ids {
         let summary = match store.get_summary_for_file(*file_id)? {
@@ -31,7 +32,7 @@ pub fn semantic_retrieval(
                 None => continue,
             };
 
-            if changed_file_ids.contains(&candidate_file_id) {
+            if changed_ids_set.contains(&candidate_file_id) {
                 continue;
             }
 

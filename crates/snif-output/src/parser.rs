@@ -44,6 +44,9 @@ const COT_PATTERNS: &[&str] = &[
     "step 2:",
 ];
 
+const SENTENCE_DELIMITERS: &[char] = &['.', '!', '?', '\n'];
+const CLEAN_TEXT_MIN_LENGTH: usize = 5;
+
 /// Extract the outermost balanced JSON object from a response that may contain
 /// chain-of-thought preamble text.
 fn extract_json_object(input: &str) -> Option<&str> {
@@ -112,7 +115,7 @@ fn sanitize_text(text: &str) -> String {
     }
 
     // Text starts with reasoning — find the first concrete sentence
-    let sentences: Vec<&str> = trimmed.split(&['.', '!', '?', '\n']).collect();
+    let sentences: Vec<&str> = trimmed.split(SENTENCE_DELIMITERS).collect();
     for sentence in &sentences {
         let s = sentence.trim();
         if s.is_empty() {
@@ -134,7 +137,7 @@ fn sanitize_text(text: &str) -> String {
             let clean = after
                 .trim_start_matches(|c: char| !c.is_alphabetic())
                 .trim();
-            if !clean.is_empty() && clean.len() > 5 {
+            if !clean.is_empty() && clean.len() > CLEAN_TEXT_MIN_LENGTH {
                 return clean.to_string();
             }
         }

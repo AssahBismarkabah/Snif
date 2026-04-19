@@ -2,8 +2,10 @@
 name = "snif-store"
 version.workspace = true
 edition.workspace = true
+repository.workspace = true
 
 [dependencies]
+snif-config = { path = "../snif-config" }
 snif-types = { path = "../snif-types" }
 rusqlite = { workspace = true }
 sqlite-vec = { workspace = true }

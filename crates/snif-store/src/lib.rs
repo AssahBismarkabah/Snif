@@ -4,6 +4,7 @@ pub mod files;
 pub mod imports;
 pub mod refs;
 mod schema;
+pub mod sql;
 pub mod summaries;
 pub mod symbols;
 

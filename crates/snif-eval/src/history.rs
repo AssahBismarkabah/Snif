@@ -1,19 +1,11 @@
 use anyhow::{Context, Result};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
+use snif_config::constants::{thresholds, time};
 use std::io::{BufRead, Write};
 use std::path::Path;
 
 use crate::metrics::{AggregateMetrics, FixtureResult};
-
-/// Precision drop threshold: flag regression if precision falls more than this.
-const PRECISION_REGRESSION_THRESHOLD: f64 = 0.05;
-
-/// Recall drop threshold: flag regression if recall falls more than this.
-const RECALL_REGRESSION_THRESHOLD: f64 = 0.10;
-
-/// Noise increase threshold: flag regression if noise rate rises more than this.
-const NOISE_REGRESSION_THRESHOLD: f64 = 0.05;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EvalRecord {
@@ -131,7 +123,7 @@ pub fn check_regression(current: &EvalRecord, previous: &EvalRecord) -> Vec<Regr
 
     // Aggregate metric regressions
     let precision_drop = previous.precision - current.precision;
-    if precision_drop > PRECISION_REGRESSION_THRESHOLD {
+    if precision_drop > thresholds::PRECISION_REGRESSION_THRESHOLD {
         warnings.push(RegressionWarning {
             message: format!(
                 "Precision dropped {:.1}pp ({:.1}% -> {:.1}%)",
@@ -143,7 +135,7 @@ pub fn check_regression(current: &EvalRecord, previous: &EvalRecord) -> Vec<Regr
     }
 
     let recall_drop = previous.recall - current.recall;
-    if recall_drop > RECALL_REGRESSION_THRESHOLD {
+    if recall_drop > thresholds::RECALL_REGRESSION_THRESHOLD {
         warnings.push(RegressionWarning {
             message: format!(
                 "Recall dropped {:.1}pp ({:.1}% -> {:.1}%)",
@@ -155,7 +147,7 @@ pub fn check_regression(current: &EvalRecord, previous: &EvalRecord) -> Vec<Regr
     }
 
     let noise_increase = current.noise_rate - previous.noise_rate;
-    if noise_increase > NOISE_REGRESSION_THRESHOLD {
+    if noise_increase > thresholds::NOISE_REGRESSION_THRESHOLD {
         warnings.push(RegressionWarning {
             message: format!(
                 "Noise rate increased {:.1}pp ({:.1}% -> {:.1}%)",
@@ -206,11 +198,11 @@ fn iso8601_now() -> String {
     let secs = duration.as_secs();
 
     // Convert to date/time components
-    let days = secs / 86400;
-    let time_secs = secs % 86400;
-    let hours = time_secs / 3600;
-    let minutes = (time_secs % 3600) / 60;
-    let seconds = time_secs % 60;
+    let days = secs / time::SECS_PER_DAY;
+    let time_secs = secs % time::SECS_PER_DAY;
+    let hours = time_secs / time::SECS_PER_HOUR;
+    let minutes = (time_secs % time::SECS_PER_HOUR) / time::SECS_PER_MINUTE;
+    let seconds = time_secs % time::SECS_PER_MINUTE;
 
     // Days since epoch to year/month/day
     let (year, month, day) = days_to_ymd(days);
@@ -223,10 +215,10 @@ fn iso8601_now() -> String {
 
 fn days_to_ymd(mut days: u64) -> (u64, u64, u64) {
     // Algorithm from http://howardhinnant.github.io/date_algorithms.html
-    days += 719468;
-    let era = days / 146097;
-    let doe = days - era * 146097;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    days += 719_468;
+    let era = days / 146_097;
+    let doe = days - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
     let y = yoe + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;

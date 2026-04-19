@@ -1,5 +1,41 @@
 use anyhow::Result;
+use snif_config::env::{app, keys};
 use std::path::Path;
+
+fn print_section_header(title: &str) {
+    println!();
+    println!("=== {} ===", title);
+    println!();
+}
+
+fn print_fixture_result(
+    name: &str,
+    expected: usize,
+    actual: usize,
+    tp: usize,
+    fp: usize,
+    fn_count: usize,
+) {
+    println!(
+        "  {:<40} expected={} actual={} TP={} FP={} FN={}",
+        name, expected, actual, tp, fp, fn_count
+    );
+}
+
+fn print_metric(label: &str, value: f64) {
+    println!("  {:<12} {:.1}%", label, value);
+}
+
+fn print_warning(message: &str) {
+    eprintln!("WARNING: {}", message);
+}
+
+fn print_quality_gates(passed: bool) {
+    println!(
+        "  Quality gates: {}",
+        if passed { "PASSED" } else { "FAILED" }
+    );
+}
 
 pub fn run(path: &str, fixtures: &str, history: &str) -> Result<()> {
     let repo_path = Path::new(path);
@@ -20,24 +56,24 @@ pub fn run(path: &str, fixtures: &str, history: &str) -> Result<()> {
 
     let result = snif_eval::run_evaluation(fixtures_path, &config, history_refs)?;
 
-    // Print results
-    println!("\n=== Evaluation Results ===\n");
+    // Display results
+    print_section_header("Evaluation Results");
+
     for fr in &result.fixture_results {
-        println!(
-            "  {:<40} expected={} actual={} TP={} FP={} FN={}",
-            fr.fixture_name,
+        print_fixture_result(
+            &fr.fixture_name,
             fr.expected,
             fr.actual,
             fr.true_positives,
             fr.false_positives,
-            fr.false_negatives
+            fr.false_negatives,
         );
     }
 
     println!();
-    println!("  Precision:   {:.1}%", result.aggregate.precision * 100.0);
-    println!("  Recall:      {:.1}%", result.aggregate.recall * 100.0);
-    println!("  Noise rate:  {:.1}%", result.aggregate.noise_rate * 100.0);
+    print_metric("Precision", result.aggregate.precision * 100.0);
+    print_metric("Recall", result.aggregate.recall * 100.0);
+    print_metric("Noise rate", result.aggregate.noise_rate * 100.0);
     println!();
 
     let record = snif_eval::history::build_record(
@@ -49,22 +85,22 @@ pub fn run(path: &str, fixtures: &str, history: &str) -> Result<()> {
     if let Some(previous) = history.as_ref().and_then(|h| h.last()) {
         let warnings = snif_eval::history::check_regression(&record, previous);
         if !warnings.is_empty() {
-            eprintln!("\n=== Regression Warnings ===\n");
+            print_section_header("Regression Warnings");
             for warning in &warnings {
-                eprintln!("WARNING: {}", warning.message);
+                print_warning(&warning.message);
             }
-            eprintln!();
+            println!();
         }
     }
 
     snif_eval::history::save_record(history_path, &record)?;
 
     // Report to Braintrust monitoring if configured
-    let braintrust_project_id = std::env::var("SNIF_BRAINTRUST_PROJECT_ID")
+    let braintrust_project_id = std::env::var(app::SNIF_BRAINTRUST_PROJECT_ID)
         .ok()
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| snif_eval::reporter::BRAINTRUST_DEFAULT_PROJECT_ID.to_string());
-    if let Ok(api_key) = std::env::var("BRAINTRUST_API_KEY") {
+    if let Ok(api_key) = std::env::var(keys::BRAINTRUST_API_KEY) {
         let model_name = &config.model.review_model;
         match snif_eval::reporter::report_to_braintrust(
             &api_key,
@@ -78,10 +114,8 @@ pub fn run(path: &str, fixtures: &str, history: &str) -> Result<()> {
         }
     }
 
-    if result.gates_passed {
-        println!("  Quality gates: PASSED");
-    } else {
-        println!("  Quality gates: FAILED");
+    print_quality_gates(result.gates_passed);
+    if !result.gates_passed {
         std::process::exit(1);
     }
 

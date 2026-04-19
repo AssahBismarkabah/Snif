@@ -6,6 +6,8 @@ use adapters::{
     java::JavaAdapter, python::PythonAdapter, rust::RustAdapter, typescript::TypeScriptAdapter,
 };
 use anyhow::Result;
+use rayon::prelude::*;
+use snif_config::constants::limits;
 use snif_types::FileExtraction;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -30,47 +32,51 @@ pub fn detect_adapter(path: &Path) -> Option<Box<dyn LanguageAdapter>> {
 }
 
 pub fn parse_repository(root: &Path, exclude_patterns: &[String]) -> Result<Vec<FileExtraction>> {
-    let mut extractions = Vec::new();
+    let entries: Vec<_> = WalkDir::new(root)
+        .into_iter()
+        .filter_entry(|e| {
+            let name = e.file_name().to_str().unwrap_or("");
+            e.depth() == 0
+                || (!name.starts_with('.') && !exclude_patterns.iter().any(|p| p == name))
+        })
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .collect();
 
-    for entry in WalkDir::new(root).into_iter().filter_entry(|e| {
-        let name = e.file_name().to_str().unwrap_or("");
-        // Allow the root directory itself, filter hidden dirs and excluded patterns
-        e.depth() == 0 || (!name.starts_with('.') && !exclude_patterns.iter().any(|p| p == name))
-    }) {
-        let entry = entry?;
-        if !entry.file_type().is_file() {
-            continue;
-        }
+    let extractions: Vec<_> = entries
+        .par_iter()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let a = match detect_adapter(path) {
+                Some(a) => a,
+                None => return None,
+            };
 
-        let path = entry.path();
-        let a = match detect_adapter(path) {
-            Some(a) => a,
-            None => continue,
-        };
+            let source = match std::fs::read(path) {
+                Ok(s) => s,
+                Err(_) => return None,
+            };
 
-        let source = match std::fs::read(path) {
-            Ok(s) => s,
-            Err(_) => continue,
-        };
-
-        if source.len() > 1_000_000 || !is_likely_text(&source) {
-            continue;
-        }
-
-        let rel_path = path.strip_prefix(root).unwrap_or(path);
-        match adapter::parse_file(a.as_ref(), &rel_path.to_string_lossy(), &source) {
-            Ok(extraction) => extractions.push(extraction),
-            Err(e) => {
-                tracing::warn!(path = %rel_path.display(), error = %e, "Failed to parse file");
+            if source.len() > limits::MAX_FILE_SIZE_BYTES || !is_likely_text(&source) {
+                return None;
             }
-        }
-    }
+
+            let rel_path = path.strip_prefix(root).unwrap_or(path);
+            match adapter::parse_file(a.as_ref(), &rel_path.to_string_lossy(), &source) {
+                Ok(extraction) => Some(extraction),
+                Err(e) => {
+                    tracing::warn!(path = %rel_path.display(), error = %e, "Failed to parse file");
+                    None
+                }
+            }
+        })
+        .collect();
 
     tracing::info!(files = extractions.len(), "Parsed repository");
     Ok(extractions)
 }
 
 fn is_likely_text(data: &[u8]) -> bool {
-    let check_len = data.len().min(512);
+    let check_len = data.len().min(limits::TEXT_DETECTION_SAMPLE_SIZE);
     !data[..check_len].contains(&0)
 }

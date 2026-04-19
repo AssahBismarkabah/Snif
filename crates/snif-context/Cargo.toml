@@ -2,10 +2,11 @@
 name = "snif-context"
 version.workspace = true
 edition.workspace = true
+repository.workspace = true
 
 [dependencies]
-snif-types = { path = "../snif-types" }
-snif-store = { path = "../snif-store" }
 snif-config = { path = "../snif-config" }
+snif-store = { path = "../snif-store" }
+snif-types = { path = "../snif-types" }
 anyhow = { workspace = true }
 tracing = { workspace = true }

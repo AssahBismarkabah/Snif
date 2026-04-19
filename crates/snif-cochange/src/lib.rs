@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use snif_config::constants::retrieval;
 use snif_store::Store;
 use std::collections::HashMap;
 use std::path::Path;
@@ -40,10 +41,11 @@ pub fn analyze_cochange(
         let known: Vec<&String> = changed_files
             .iter()
             .filter(|f| indexed_files.contains_key(f.as_str()))
+            .take(retrieval::MAX_FILES_PER_COMMIT)
             .collect();
 
         for f in &known {
-            *file_changes.entry((*f).clone()).or_insert(0) += 1;
+            *file_changes.entry(f.to_string()).or_insert(0) += 1;
         }
 
         for i in 0..known.len() {

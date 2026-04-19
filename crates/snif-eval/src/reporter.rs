@@ -2,21 +2,14 @@ use anyhow::{Context, Result};
 use chrono::Utc;
 use reqwest::blocking::Client;
 use serde_json::json;
+use snif_config::constants::timeouts;
+use snif_config::env::ci;
 
 use crate::history::EvalRecord;
 use crate::metrics::FixtureResult;
 
 /// Braintrust API base URL.
 const BRAINTRUST_API_BASE: &str = "https://api.braintrust.dev";
-
-/// HTTP request timeout for API calls.
-const HTTP_TIMEOUT_SECS: u64 = 15;
-
-/// Maximum number of retry attempts for Braintrust API calls.
-const MAX_RETRIES: u32 = 5;
-
-/// Base delay for exponential backoff in seconds.
-const RETRY_BASE_DELAY_SECS: u64 = 1;
 
 /// Default Braintrust project ID.
 /// Override with the `SNIF_BRAINTRUST_PROJECT_ID` environment variable in CI/CD.
@@ -57,9 +50,9 @@ fn generate_experiment_name(git_sha: &str, timestamp: &str) -> String {
 
 /// Determine if running in CI based on environment variables.
 fn detect_runner() -> &'static str {
-    if std::env::var("CI").is_ok()
-        || std::env::var("GITHUB_ACTIONS").is_ok()
-        || std::env::var("GITLAB_CI").is_ok()
+    if std::env::var(ci::CI).is_ok()
+        || std::env::var(ci::GITHUB_ACTIONS).is_ok()
+        || std::env::var(ci::GITLAB_CI).is_ok()
     {
         "ci"
     } else {
@@ -69,8 +62,8 @@ fn detect_runner() -> &'static str {
 
 /// Get the current git branch from environment or default to current branch.
 fn detect_git_branch() -> String {
-    std::env::var("GITHUB_REF_NAME")
-        .or_else(|_| std::env::var("CI_COMMIT_REF_NAME"))
+    std::env::var(ci::GITHUB_REF_NAME)
+        .or_else(|_| std::env::var(ci::CI_COMMIT_REF_NAME))
         .unwrap_or_else(|_| "unknown".to_string())
 }
 
@@ -100,16 +93,16 @@ where
     S: Fn(std::time::Duration),
 {
     let mut last_error = None;
-    for attempt in 0..=MAX_RETRIES {
+    for attempt in 0..=timeouts::LLM_MAX_RETRIES {
         match operation() {
-            Ok(result) => return Ok(result),
+            Ok(response) => return Ok(response),
             Err(e) => {
                 last_error = Some(e);
-                if attempt < MAX_RETRIES {
-                    let delay = RETRY_BASE_DELAY_SECS * (2_u64.pow(attempt));
+                if attempt < timeouts::LLM_MAX_RETRIES {
+                    let delay = timeouts::LLM_RETRY_BASE_DELAY_SECS * (2_u64.pow(attempt));
                     tracing::warn!(
                         attempt = attempt + 1,
-                        max_retries = MAX_RETRIES,
+                        max_retries = timeouts::LLM_MAX_RETRIES,
                         delay_secs = delay,
                         error = %last_error.as_ref().unwrap(),
                         "Retrying {} after transient error",
@@ -138,7 +131,7 @@ pub fn report_to_braintrust(
     fixture_results: &[FixtureResult],
 ) -> Result<()> {
     let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(HTTP_TIMEOUT_SECS))
+        .timeout(std::time::Duration::from_secs(timeouts::HTTP_TIMEOUT_SECS))
         .build()
         .context("Failed to create HTTP client")?;
 
@@ -658,7 +651,10 @@ mod tests {
 
         assert!(result.is_err());
         // Initial attempt + 5 retries = 6 total attempts
-        assert_eq!(call_count.load(Ordering::SeqCst), MAX_RETRIES + 1);
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            timeouts::LLM_MAX_RETRIES + 1
+        );
         assert!(result.unwrap_err().to_string().contains("Persistent error"));
     }
 

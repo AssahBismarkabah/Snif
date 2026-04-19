@@ -1,6 +1,7 @@
 pub mod budget;
 
 use anyhow::Result;
+use snif_config::constants::{context, limits};
 use snif_config::ContextConfig;
 use snif_store::Store;
 use snif_types::{
@@ -10,38 +11,30 @@ use snif_types::{
 use std::collections::HashMap;
 use std::path::Path;
 
-const MAX_CHANGED_FILE_BYTES: usize = 50_000;
-
-const NON_REVIEWABLE_FILES: &[&str] = &[
-    "pnpm-lock.yaml",
-    "package-lock.json",
-    "yarn.lock",
-    "Cargo.lock",
-    "Gemfile.lock",
-    "poetry.lock",
-    "composer.lock",
-    "go.sum",
-    "flake.lock",
-];
-
 fn is_non_reviewable(path: &str) -> bool {
     let filename = path.rsplit('/').next().unwrap_or(path);
-    NON_REVIEWABLE_FILES.contains(&filename)
-        || filename.ends_with(".lock")
-        || filename.ends_with(".min.js")
-        || filename.ends_with(".min.css")
-        || filename.ends_with(".bundle.js")
+    context::NON_REVIEWABLE_FILES.contains(&filename)
+        || context::NON_REVIEWABLE_EXTENSIONS
+            .iter()
+            .any(|ext| filename.ends_with(ext))
 }
 
 /// Count diff hunks per file path from a unified diff.
+/// Handles multiple diff formats: +++ b/, +++ a/, +++ , and no-prefix.
 fn count_hunks_per_file(diff: &str) -> HashMap<String, usize> {
     let mut counts: HashMap<String, usize> = HashMap::new();
     let mut current_file: Option<String> = None;
 
     for line in diff.lines() {
-        if let Some(path) = line.strip_prefix("+++ b/") {
-            if path != "/dev/null" {
-                current_file = Some(path.to_string());
+        // Handle various diff prefix formats: +++ b/path, +++ a/path, +++ path
+        let path = line
+            .strip_prefix("+++ b/")
+            .or_else(|| line.strip_prefix("+++ a/"))
+            .or_else(|| line.strip_prefix("+++ "));
+
+        if let Some(p) = path {
+            if p != "/dev/null" {
+                current_file = Some(p.to_string());
             }
         } else if line.starts_with("+++ /dev/null") {
             current_file = None;
@@ -61,6 +54,15 @@ struct FileCandidate {
     full_tokens: usize,
     hunk_count: usize,
     forced_exclude: bool,
+}
+
+fn get_file_summary(store: &Store, path: &str) -> Option<String> {
+    store
+        .get_file_id(path)
+        .ok()
+        .flatten()
+        .and_then(|fid| store.get_summary_for_file(fid).ok().flatten())
+        .map(|(_, text)| text)
 }
 
 pub fn build_context(
@@ -103,7 +105,7 @@ pub fn build_context(
             .unwrap_or(0);
 
         let (full_content, forced_exclude) =
-            if is_non_reviewable(path) || file_size > MAX_CHANGED_FILE_BYTES {
+            if is_non_reviewable(path) || file_size > limits::MAX_CHANGED_FILE_BYTES {
                 tracing::info!(
                     path = %path,
                     size = file_size,
@@ -115,12 +117,7 @@ pub fn build_context(
                 (content, false)
             };
 
-        let summary = store
-            .get_file_id(path)
-            .ok()
-            .flatten()
-            .and_then(|fid| store.get_summary_for_file(fid).ok().flatten())
-            .map(|(_, text)| text);
+        let summary = get_file_summary(store, path);
 
         let full_tokens = budget::estimate_tokens(&full_content)
             + summary
@@ -129,7 +126,7 @@ pub fn build_context(
                 .unwrap_or(0);
         let hunk_count = hunk_counts.get(path.as_str()).copied().unwrap_or(0);
         candidates.push(FileCandidate {
-            path: path.clone(),
+            path: path.to_string(),
             full_content,
             summary,
             full_tokens,
@@ -140,7 +137,7 @@ pub fn build_context(
 
     // Pass 2: Sort by hunk count descending (most changed files get priority)
     // Stable sort preserves original order for equal hunk counts
-    candidates.sort_by(|a, b| b.hunk_count.cmp(&a.hunk_count));
+    candidates.sort_by_key(|c| std::cmp::Reverse(c.hunk_count));
 
     let mut changed_files = Vec::new();
     let mut changed_files_tokens = 0;
@@ -149,14 +146,13 @@ pub fn build_context(
     let mut files_summary_only = 0_usize;
     let mut files_diff_only = 0_usize;
 
-    let diff_only_placeholder = "[See diff for changes to this file.]";
+    let diff_only_placeholder = context::CONTENT_DIFF_ONLY_PLACEHOLDER;
     let diff_only_tokens = budget::estimate_tokens(diff_only_placeholder);
 
     for candidate in candidates {
         // Non-reviewable/large files always go to DiffOnly
         if candidate.forced_exclude {
-            let content =
-                "[File content excluded — large or generated file. See diff for changes.]";
+            let content = context::CONTENT_EXCLUDED_PLACEHOLDER;
             let tokens = budget::estimate_tokens(content);
             changed_files_tokens += tokens;
             remaining = remaining.saturating_sub(tokens);
@@ -196,11 +192,11 @@ pub fn build_context(
                 omissions.push(Omission {
                     path: candidate.path.clone(),
                     score: 0.0,
-                    reason: "content_degraded_to_summary".to_string(),
+                    reason: context::REASON_CONTENT_DEGRADED_TO_SUMMARY.to_string(),
                 });
                 changed_files.push(ContextFile {
                     path: candidate.path,
-                    content: format!("[Summary — full content omitted.]\n{}", summary),
+                    content: format!("{}{}", context::SUMMARY_ONLY_CONTENT_PREFIX, summary),
                     summary: None,
                     retrieval_score: None,
                     content_tier: ContentTier::SummaryOnly,
@@ -216,7 +212,7 @@ pub fn build_context(
         omissions.push(Omission {
             path: candidate.path.clone(),
             score: 0.0,
-            reason: "content_degraded_to_diff_only".to_string(),
+            reason: context::REASON_CONTENT_DEGRADED_TO_DIFF_ONLY.to_string(),
         });
         changed_files.push(ContextFile {
             path: candidate.path,
@@ -244,7 +240,7 @@ pub fn build_context(
             omissions.push(Omission {
                 path: result.path.clone(),
                 score: result.score,
-                reason: "max_files_exceeded".to_string(),
+                reason: context::REASON_MAX_FILES_EXCEEDED.to_string(),
             });
             continue;
         }
@@ -261,7 +257,7 @@ pub fn build_context(
             omissions.push(Omission {
                 path: result.path.clone(),
                 score: result.score,
-                reason: "token_budget_exceeded".to_string(),
+                reason: context::REASON_TOKEN_BUDGET_EXCEEDED.to_string(),
             });
             continue;
         }
@@ -270,12 +266,7 @@ pub fn build_context(
         related_files_tokens += tokens;
         files_included += 1;
 
-        let summary = store
-            .get_file_id(&result.path)
-            .ok()
-            .flatten()
-            .and_then(|fid| store.get_summary_for_file(fid).ok().flatten())
-            .map(|(_, text)| text);
+        let summary = get_file_summary(store, &result.path);
 
         related_files.push(ContextFile {
             path: result.path.clone(),

@@ -1,5 +1,12 @@
 use serde_json::json;
+use snif_config::constants::thresholds;
 use snif_types::Finding;
+
+const SARIF_SCHEMA_URI: &str =
+    "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json";
+const SARIF_VERSION: &str = "2.1.0";
+const SNIF_TOOL_NAME: &str = "snif";
+const SNIF_TOOL_INFO_URI: &str = "https://github.com/snif-project/snif";
 
 pub fn to_sarif(findings: &[Finding]) -> serde_json::Value {
     let rules: Vec<serde_json::Value> = vec![
@@ -38,9 +45,9 @@ pub fn to_sarif(findings: &[Finding]) -> serde_json::Value {
     let results: Vec<serde_json::Value> = findings
         .iter()
         .map(|f| {
-            let level = if f.confidence >= 0.9 {
+            let level = if f.confidence >= thresholds::SARIF_ERROR_CONFIDENCE {
                 "error"
-            } else if f.confidence >= 0.7 {
+            } else if f.confidence >= thresholds::SARIF_WARNING_CONFIDENCE {
                 "warning"
             } else {
                 "note"
@@ -96,14 +103,14 @@ pub fn to_sarif(findings: &[Finding]) -> serde_json::Value {
         .collect();
 
     json!({
-        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
-        "version": "2.1.0",
+        "$schema": SARIF_SCHEMA_URI,
+        "version": SARIF_VERSION,
         "runs": [{
             "tool": {
                 "driver": {
-                    "name": "snif",
+                    "name": SNIF_TOOL_NAME,
                     "version": env!("CARGO_PKG_VERSION"),
-                    "informationUri": "https://github.com/snif-project/snif",
+                    "informationUri": SNIF_TOOL_INFO_URI,
                     "rules": rules
                 }
             },

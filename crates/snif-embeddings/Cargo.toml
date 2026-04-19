@@ -2,8 +2,10 @@
 name = "snif-embeddings"
 version.workspace = true
 edition.workspace = true
+repository.workspace = true
 
 [dependencies]
+snif-config = { path = "../snif-config" }
 snif-store = { path = "../snif-store" }
 fastembed = { workspace = true }
 anyhow = { workspace = true }

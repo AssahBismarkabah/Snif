@@ -2,6 +2,9 @@ use sha2::{Digest, Sha256};
 use snif_types::{Finding, Fingerprint};
 use std::collections::HashMap;
 
+const FINGERPRINT_HASH_LENGTH: usize = 16;
+const FINGERPRINT_DISAMBIGUATION_SEPARATOR: &str = ":";
+
 pub fn compute_fingerprints(findings: &mut [Finding]) {
     let mut content_counts: HashMap<String, usize> = HashMap::new();
 
@@ -14,7 +17,10 @@ pub fn compute_fingerprints(findings: &mut [Finding]) {
         let id = if *count == 0 {
             content_hash.clone()
         } else {
-            format!("{}:{}", content_hash, count)
+            format!(
+                "{}{}{}",
+                content_hash, FINGERPRINT_DISAMBIGUATION_SEPARATOR, count
+            )
         };
         *count += 1;
 
@@ -34,7 +40,7 @@ fn compute_content_hash(finding: &Finding) -> String {
     hasher.update(normalize_evidence(&finding.evidence).as_bytes());
 
     let hash = format!("{:x}", hasher.finalize());
-    hash[..16].to_string()
+    hash[..FINGERPRINT_HASH_LENGTH].to_string()
 }
 
 /// Line-based hash: backward compatible with prior fingerprints.
@@ -49,7 +55,7 @@ fn compute_line_hash(finding: &Finding) -> String {
     hasher.update(finding.category.to_string().as_bytes());
 
     let hash = format!("{:x}", hasher.finalize());
-    hash[..16].to_string()
+    hash[..FINGERPRINT_HASH_LENGTH].to_string()
 }
 
 /// Normalize evidence text for stable hashing:

@@ -34,7 +34,8 @@ impl Store {
             "SELECT s.id, s.name, s.kind, s.start_line, s.end_line, s.file_id, f.path
              FROM symbols s
              JOIN files f ON s.file_id = f.id
-             ORDER BY s.kind, s.file_id, s.start_line",
+             ORDER BY s.kind, s.file_id, s.start_line
+             LIMIT 10000",
         )?;
         let rows = stmt
             .query_map([], |row| {

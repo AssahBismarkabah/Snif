@@ -2,6 +2,7 @@
 name = "snif-summarizer"
 version.workspace = true
 edition.workspace = true
+repository.workspace = true
 
 [dependencies]
 snif-store = { path = "../snif-store" }

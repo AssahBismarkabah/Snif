@@ -3,7 +3,8 @@ pub mod filter;
 
 use anyhow::Result;
 use rusqlite::Connection;
-use snif_store::init_sqlite_vec;
+use snif_config::constants::model;
+use snif_store::{init_sqlite_vec, sql::pragmas};
 use std::path::Path;
 use zerocopy::AsBytes;
 
@@ -20,11 +21,14 @@ impl FeedbackStore {
         }
 
         let conn = Connection::open(path)?;
-        conn.execute_batch(
-            "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=OFF;",
-        )?;
+        conn.execute_batch(&format!(
+            "{}; {}; {};",
+            pragmas::JOURNAL_MODE_WAL,
+            pragmas::SYNCHRONOUS_NORMAL,
+            pragmas::FOREIGN_KEYS_OFF
+        ))?;
 
-        conn.execute_batch(
+        conn.execute_batch(&format!(
             "CREATE TABLE IF NOT EXISTS feedback_signals (
                 id INTEGER PRIMARY KEY,
                 team_id TEXT NOT NULL,
@@ -38,9 +42,10 @@ impl FeedbackStore {
 
             CREATE VIRTUAL TABLE IF NOT EXISTS feedback_embeddings USING vec0(
                 signal_id INTEGER PRIMARY KEY,
-                embedding float[384]
+                embedding float[{}]
             );",
-        )?;
+            model::DEFAULT_EMBEDDING_DIMENSION
+        ))?;
 
         Ok(Self { conn })
     }
@@ -83,11 +88,13 @@ impl FeedbackStore {
         team_id: &str,
         k: usize,
     ) -> Result<Vec<(String, f64)>> {
+        use std::collections::HashMap;
+
         // KNN search against all embeddings
         let mut knn_stmt = self.conn.prepare(
             "SELECT signal_id, distance FROM feedback_embeddings
-             WHERE embedding MATCH ?1 AND k = ?2
-             ORDER BY distance",
+              WHERE embedding MATCH ?1 AND k = ?2
+              ORDER BY distance",
         )?;
 
         let knn_results: Vec<(i64, f64)> = knn_stmt
@@ -97,20 +104,41 @@ impl FeedbackStore {
             )?
             .collect::<rusqlite::Result<Vec<_>>>()?;
 
-        // Filter by team_id and get signal_type in application code
-        let mut results = Vec::new();
-        let mut detail_stmt = self
-            .conn
-            .prepare("SELECT signal_type FROM feedback_signals WHERE id = ?1 AND team_id = ?2")?;
+        if knn_results.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        for (signal_id, distance) in knn_results {
-            if let Ok(signal_type) = detail_stmt
-                .query_row(rusqlite::params![signal_id, team_id], |row| {
-                    row.get::<_, String>(0)
-                })
-            {
-                results.push((signal_type, distance));
-            }
+        // Batch fetch with IN clause instead of N+1
+        let signal_ids: Vec<i64> = knn_results.iter().map(|(id, _)| *id).collect();
+        let distance_map: HashMap<i64, f64> = knn_results.into_iter().collect();
+
+        // SQLite has a default limit of 999 variables per query.
+        // Chunk to stay well under that limit.
+        const SQLITE_MAX_VARIABLE_NUMBER: usize = 900;
+
+        let mut results = Vec::new();
+        for chunk in signal_ids.chunks(SQLITE_MAX_VARIABLE_NUMBER) {
+            let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+            let sql = format!(
+                "SELECT id, signal_type FROM feedback_signals 
+                 WHERE id IN ({}) AND team_id = ?",
+                placeholders
+            );
+
+            let mut stmt = self.conn.prepare(&sql)?;
+            let mut params: Vec<&dyn rusqlite::ToSql> =
+                chunk.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+            params.push(&team_id);
+
+            let chunk_results = stmt
+                .query_map(params.as_slice(), |row| {
+                    let id: i64 = row.get(0)?;
+                    let signal_type: String = row.get(1)?;
+                    let distance = *distance_map.get(&id).unwrap_or(&0.0);
+                    Ok((signal_type, distance))
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            results.extend(chunk_results);
         }
 
         Ok(results)

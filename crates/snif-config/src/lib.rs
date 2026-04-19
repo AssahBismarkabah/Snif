@@ -1,4 +1,10 @@
+pub mod constants;
+pub mod env;
+pub mod formatters;
+
 use anyhow::{Context, Result};
+use constants::model;
+use constants::thresholds;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -76,7 +82,7 @@ impl Default for IndexConfig {
     fn default() -> Self {
         Self {
             db_path: ".snif/index.db".to_string(),
-            embedding_dimension: 384,
+            embedding_dimension: model::DEFAULT_EMBEDDING_DIMENSION,
             languages: vec![
                 "rust".to_string(),
                 "typescript".to_string(),
@@ -99,9 +105,9 @@ impl Default for IndexConfig {
 impl Default for ContextConfig {
     fn default() -> Self {
         Self {
-            max_tokens: 128_000,
-            max_files: 50,
-            output_reserve_tokens: 32_000,
+            max_tokens: model::DEFAULT_MAX_TOKENS,
+            max_files: model::DEFAULT_MAX_FILES,
+            output_reserve_tokens: model::DEFAULT_OUTPUT_RESERVE_TOKENS,
             retrieval_weights: RetrievalWeights::default(),
         }
     }
@@ -120,9 +126,9 @@ impl Default for RetrievalWeights {
 impl Default for FilterConfig {
     fn default() -> Self {
         Self {
-            min_confidence: 0.7,
+            min_confidence: thresholds::MIN_CONFIDENCE_DEFAULT,
             suppress_style_only: true,
-            feedback_min_signals: 20,
+            feedback_min_signals: thresholds::FEEDBACK_MIN_SIGNALS,
         }
     }
 }
@@ -144,10 +150,10 @@ impl SnifConfig {
     }
 
     fn merge_env_vars(&mut self) {
-        if let Ok(val) = std::env::var("SNIF_ENDPOINT") {
+        if let Ok(val) = std::env::var(env::app::SNIF_ENDPOINT) {
             self.model.endpoint = val;
         }
-        if let Ok(val) = std::env::var("SNIF_DB_PATH") {
+        if let Ok(val) = std::env::var(env::app::SNIF_DB_PATH) {
             self.index.db_path = val;
         }
     }

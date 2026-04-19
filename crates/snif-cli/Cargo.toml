@@ -1,10 +1,8 @@
 [package]
-name = "snif"
+name = "snif-cli"
 version.workspace = true
 edition.workspace = true
-description = "Repository-aware code review agent for CI pipelines"
-homepage = "https://github.com/AssahBismarkabah/Snif"
-repository = "https://github.com/AssahBismarkabah/Snif"
+repository.workspace = true
 
 [[bin]]
 name = "snif"
@@ -12,22 +10,22 @@ path = "src/main.rs"
 
 [dependencies]
 snif-config = { path = "../snif-config" }
-snif-types = { path = "../snif-types" }
-snif-parser = { path = "../snif-parser" }
-snif-store = { path = "../snif-store" }
-snif-graph = { path = "../snif-graph" }
 snif-cochange = { path = "../snif-cochange" }
-snif-summarizer = { path = "../snif-summarizer" }
-snif-embeddings = { path = "../snif-embeddings" }
-snif-retrieval = { path = "../snif-retrieval" }
 snif-context = { path = "../snif-context" }
-snif-prompts = { path = "../snif-prompts" }
-snif-execution = { path = "../snif-execution" }
-snif-output = { path = "../snif-output" }
-snif-platform = { path = "../snif-platform" }
 snif-eval = { path = "../snif-eval" }
+snif-execution = { path = "../snif-execution" }
+snif-embeddings = { path = "../snif-embeddings" }
+snif-graph = { path = "../snif-graph" }
+snif-output = { path = "../snif-output" }
+snif-parser = { path = "../snif-parser" }
+snif-platform = { path = "../snif-platform" }
+snif-prompts = { path = "../snif-prompts" }
+snif-retrieval = { path = "../snif-retrieval" }
+snif-store = { path = "../snif-store" }
+snif-summarizer = { path = "../snif-summarizer" }
+snif-types = { path = "../snif-types" }
 clap = { workspace = true }
-serde_json = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+serde_json = { workspace = true }
