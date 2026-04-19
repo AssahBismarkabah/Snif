@@ -92,7 +92,7 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
             dimension = first.len();
         }
 
-        let entries: Vec<(i64, Vec<f32>)> = ids.into_iter().zip(embeddings.into_iter()).collect();
+        let entries: Vec<(i64, Vec<f32>)> = ids.into_iter().zip(embeddings).collect();
 
         store.insert_summary_embeddings_batch(&entries)?;
         total_embedded += entries.len();

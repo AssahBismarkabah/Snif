@@ -24,6 +24,7 @@ resolver = "2"
 [workspace.package]
 version = "3.2.4"
 edition = "2021"
+repository = "https://github.com/AssahBismarkabah/Snif"
 
 [workspace.dependencies]
 anyhow = "1"
