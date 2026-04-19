@@ -130,7 +130,7 @@ pub fn build_context(
 
     // Pass 2: Sort by hunk count descending (most changed files get priority)
     // Stable sort preserves original order for equal hunk counts
-    candidates.sort_by(|a, b| b.hunk_count.cmp(&a.hunk_count));
+    candidates.sort_by_key(|c| std::cmp::Reverse(c.hunk_count));
 
     let mut changed_files = Vec::new();
     let mut changed_files_tokens = 0;
