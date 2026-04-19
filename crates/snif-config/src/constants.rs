@@ -223,6 +223,43 @@ must be '{' and your last character must be '}'. If you are unsure, return \
 // ============================================================================
 // CLI Defaults and Configuration
 // ============================================================================
+pub mod context {
+    /// Files that should not be included in code review context
+    pub const NON_REVIEWABLE_FILES: &[&str] = &[
+        "pnpm-lock.yaml",
+        "package-lock.json",
+        "yarn.lock",
+        "Cargo.lock",
+        "Gemfile.lock",
+        "poetry.lock",
+        "composer.lock",
+        "go.sum",
+        "flake.lock",
+    ];
+
+    /// Non-reviewable file extension patterns
+    pub const NON_REVIEWABLE_EXTENSIONS: &[&str] = &[".lock", ".min.js", ".min.css", ".bundle.js"];
+
+    /// Placeholder text for excluded file content
+    pub const CONTENT_EXCLUDED_PLACEHOLDER: &str =
+        "[File content excluded — large or generated file. See diff for changes.]";
+
+    /// Placeholder text when content is degraded to diff-only tier
+    pub const CONTENT_DIFF_ONLY_PLACEHOLDER: &str = "[See diff for changes to this file.]";
+
+    /// Template for summary-only content with omitted message
+    pub const SUMMARY_ONLY_CONTENT_FORMAT: &str = "[Summary — full content omitted.]\n{}";
+
+    /// Omission reason codes for tracking why content was excluded
+    pub const REASON_CONTENT_DEGRADED_TO_SUMMARY: &str = "content_degraded_to_summary";
+    pub const REASON_CONTENT_DEGRADED_TO_DIFF_ONLY: &str = "content_degraded_to_diff_only";
+    pub const REASON_MAX_FILES_EXCEEDED: &str = "max_files_exceeded";
+    pub const REASON_TOKEN_BUDGET_EXCEEDED: &str = "token_budget_exceeded";
+
+    /// Token estimation: conservative ratio of characters per token for code
+    pub const TOKENS_PER_CHAR_RATIO: usize = 3;
+}
+
 pub mod cli {
     pub const DEFAULT_PATH: &str = ".";
     pub const DEFAULT_OUTPUT_FORMAT: &str = "json";
