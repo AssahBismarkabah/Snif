@@ -113,8 +113,69 @@ pub mod thresholds {
     pub const RECALL_REGRESSION_THRESHOLD: f64 = 0.10;
     /// Noise increase threshold for regression detection
     pub const NOISE_REGRESSION_THRESHOLD: f64 = 0.05;
+    /// Eval quality gate: minimum acceptable precision
+    pub const EVAL_MIN_PRECISION: f64 = 0.70;
+    /// Eval quality gate: maximum acceptable noise rate
+    pub const EVAL_MAX_NOISE_RATE: f64 = 0.20;
+    /// Line number tolerance for fixture matching in eval
+    pub const EVAL_LINE_TOLERANCE: usize = 5;
 }
 
+// ============================================================================
+// Eval Module Guidance Templates
+// ============================================================================
+pub mod eval {
+    /// History window size for trend analysis
+    pub const HISTORY_WINDOW: usize = 5;
+    /// Minimum records required for trend analysis
+    pub const MIN_RECORDS_FOR_TREND: usize = 2;
+
+    // Guidance text templates (used via String::from, not format!)
+    pub const GUIDANCE_HEADER: &str =
+        "## Recent Evaluation Feedback\n\n\
+         Based on analysis of recent evaluation runs, adjust your review approach:";
+
+    pub const GUIDANCE_PRECISION_DECLINED: &str =
+        "- Precision has declined recently. Be more conservative — only report \
+         findings with clear, concrete evidence and user-visible impact. \
+         When in doubt, stay quiet.";
+
+    pub const GUIDANCE_PRECISION_STRONG: &str =
+        "- Precision is strong and trending up. Maintain this level of rigor.";
+
+    pub const GUIDANCE_RECALL_DECLINED: &str =
+        "- Recall has declined — findings are being missed. Be more thorough, \
+         especially around error handling, resource management, and edge cases.";
+
+    pub const GUIDANCE_RECALL_STRONG: &str = "- Recall is strong and trending up.";
+
+    pub const GUIDANCE_NOISE_RISING: &str =
+        "- Noise rate (false positives) is rising. Avoid flagging speculative issues, \
+         code style, or patterns that don't have a clear behavioral impact.";
+}
+
+// ============================================================================
+// Eval Thresholds
+// ============================================================================
+pub mod eval_thresholds {
+    /// Minimum number of runs before considering a fixture pattern persistent
+    pub const MIN_RUNS_FOR_PATTERN: usize = 3;
+    /// Ratio threshold: if a fixture's FP or FN count exceeds this fraction of runs, flag it as persistent
+    pub const PERSISTENT_PATTERN_RATIO: f64 = 0.6;
+    /// Maximum fixture names to include in guidance to avoid prompt bloat
+    pub const MAX_FIXTURE_NAMES_IN_GUIDANCE: usize = 3;
+
+    /// Precision decline threshold for conservative guidance
+    pub const PRECISION_DECLINE_THRESHOLD: f64 = -0.10;
+    /// Precision improvement threshold
+    pub const PRECISION_IMPROVEMENT_THRESHOLD: f64 = 0.05;
+    /// Recall decline threshold
+    pub const RECALL_DECLINE_THRESHOLD: f64 = -0.10;
+    /// Recall improvement threshold
+    pub const RECALL_IMPROVEMENT_THRESHOLD: f64 = 0.05;
+    /// Noise increase threshold for suppression guidance
+    pub const NOISE_INCREASE_THRESHOLD: f64 = 0.10;
+}
 // ============================================================================
 // LLM Prompt Templates
 // ============================================================================

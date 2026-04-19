@@ -5,6 +5,7 @@ pub mod metrics;
 pub mod reporter;
 
 use anyhow::Result;
+use snif_config::constants::{eval, model, thresholds};
 use snif_config::SnifConfig;
 use snif_types::{BudgetReport, ChangeMetadata, ContentTier, ContextFile, ContextPackage};
 use std::path::Path;
@@ -14,9 +15,6 @@ pub struct EvalResult {
     pub aggregate: metrics::AggregateMetrics,
     pub gates_passed: bool,
 }
-
-/// History window size for trend analysis.
-const EVAL_HISTORY_WINDOW: usize = 5;
 
 pub fn run_evaluation(
     fixtures_path: &Path,
@@ -31,7 +29,7 @@ pub fn run_evaluation(
 
     // Generate guidance from past eval history
     let guidance = history
-        .map(|h| adapter::analyze_history(h, EVAL_HISTORY_WINDOW))
+        .map(|h| adapter::analyze_history(h, eval::HISTORY_WINDOW))
         .filter(|g| !g.prompt_augmentation.is_empty());
 
     if let Some(ref g) = guidance {
@@ -65,11 +63,11 @@ pub fn run_evaluation(
             related_files: vec![],
             omissions: vec![],
             budget: BudgetReport {
-                total_budget: 128_000,
+                total_budget: model::DEFAULT_MAX_TOKENS,
                 diff_tokens: 0,
                 changed_files_tokens: 0,
                 related_files_tokens: 0,
-                remaining_tokens: 128_000,
+                remaining_tokens: model::DEFAULT_MAX_TOKENS,
                 files_included: fix.files.len(),
                 files_omitted: 0,
                 files_full: fix.files.len(),
@@ -115,7 +113,7 @@ pub fn run_evaluation(
         }
 
         let fixture_result =
-            metrics::compute_fixture_result(&fix.name, &fix.expected_findings, &findings, 5);
+            metrics::compute_fixture_result(&fix.name, &fix.expected_findings, &findings, thresholds::EVAL_LINE_TOLERANCE);
 
         tracing::info!(
             name = %fix.name,

@@ -1,28 +1,5 @@
 use crate::history::EvalRecord;
-
-/// Precision trend threshold: if precision drops more than this, generate conservative guidance.
-const PRECISION_DECLINE_THRESHOLD: f64 = -0.10;
-
-/// Precision improvement threshold: if precision rises more than this, generate positive guidance.
-const PRECISION_IMPROVEMENT_THRESHOLD: f64 = 0.05;
-
-/// Recall decline threshold.
-const RECALL_DECLINE_THRESHOLD: f64 = -0.10;
-
-/// Recall improvement threshold.
-const RECALL_IMPROVEMENT_THRESHOLD: f64 = 0.05;
-
-/// Noise increase threshold: if false positive rate rises above this, generate suppression guidance.
-const NOISE_INCREASE_THRESHOLD: f64 = 0.10;
-
-/// Minimum number of runs before considering a fixture pattern persistent.
-const MIN_RUNS_FOR_PATTERN: usize = 3;
-
-/// Ratio threshold: if a fixture's FP or FN count exceeds this fraction of runs, flag it as persistent.
-const PERSISTENT_PATTERN_RATIO: f64 = 0.6;
-
-/// Maximum number of fixture names to include in guidance to avoid prompt bloat.
-const MAX_FIXTURE_NAMES_IN_GUIDANCE: usize = 3;
+use snif_config::constants::{eval, eval_thresholds};
 
 /// Guidance text generated from analysis of past eval runs.
 /// Appended to the system prompt to steer the model based on
@@ -30,6 +7,13 @@ const MAX_FIXTURE_NAMES_IN_GUIDANCE: usize = 3;
 #[derive(Debug, Clone, Default)]
 pub struct EvalGuidance {
     pub prompt_augmentation: String,
+}
+
+/// Helper to conditionally add guidance text
+fn push_guidance_if(lines: &mut Vec<String>, condition: bool, text: &str) {
+    if condition {
+        lines.push(String::from(text));
+    }
 }
 
 /// Analyzes the last N eval records and produces guidance text
@@ -46,7 +30,7 @@ pub fn analyze_history(history: &[EvalRecord], window: usize) -> EvalGuidance {
     }
 
     let recent: Vec<&EvalRecord> = history.iter().rev().take(window).collect();
-    if recent.len() < 2 {
+    if recent.len() < eval::MIN_RECORDS_FOR_TREND {
         // Not enough data for trend analysis; still check for persistent fixture patterns
         return analyze_fixture_patterns(&recent);
     }
@@ -58,38 +42,12 @@ pub fn analyze_history(history: &[EvalRecord], window: usize) -> EvalGuidance {
     let recall_trend = compute_trend(&recent, |r| r.recall);
     let noise_trend = compute_trend(&recent, |r| r.noise_rate);
 
-    lines.push(String::from(
-        "## Recent Evaluation Feedback\n\n\
-         Based on analysis of recent evaluation runs, adjust your review approach:",
-    ));
-
-    if precision_trend < PRECISION_DECLINE_THRESHOLD {
-        lines.push(String::from(
-            "- Precision has declined recently. Be more conservative — only report \
-             findings with clear, concrete evidence and user-visible impact. \
-             When in doubt, stay quiet.",
-        ));
-    } else if precision_trend > PRECISION_IMPROVEMENT_THRESHOLD {
-        lines.push(String::from(
-            "- Precision is strong and trending up. Maintain this level of rigor.",
-        ));
-    }
-
-    if recall_trend < RECALL_DECLINE_THRESHOLD {
-        lines.push(String::from(
-            "- Recall has declined — findings are being missed. Be more thorough, \
-             especially around error handling, resource management, and edge cases.",
-        ));
-    } else if recall_trend > RECALL_IMPROVEMENT_THRESHOLD {
-        lines.push(String::from("- Recall is strong and trending up."));
-    }
-
-    if noise_trend > NOISE_INCREASE_THRESHOLD {
-        lines.push(String::from(
-            "- Noise rate (false positives) is rising. Avoid flagging speculative issues, \
-             code style, or patterns that don't have a clear behavioral impact.",
-        ));
-    }
+    lines.push(String::from(eval::GUIDANCE_HEADER));
+    push_guidance_if(&mut lines, precision_trend < eval_thresholds::PRECISION_DECLINE_THRESHOLD, eval::GUIDANCE_PRECISION_DECLINED);
+    push_guidance_if(&mut lines, precision_trend > eval_thresholds::PRECISION_IMPROVEMENT_THRESHOLD, eval::GUIDANCE_PRECISION_STRONG);
+    push_guidance_if(&mut lines, recall_trend < eval_thresholds::RECALL_DECLINE_THRESHOLD, eval::GUIDANCE_RECALL_DECLINED);
+    push_guidance_if(&mut lines, recall_trend > eval_thresholds::RECALL_IMPROVEMENT_THRESHOLD, eval::GUIDANCE_RECALL_STRONG);
+    push_guidance_if(&mut lines, noise_trend > eval_thresholds::NOISE_INCREASE_THRESHOLD, eval::GUIDANCE_NOISE_RISING);
 
     // Fixture-level pattern analysis
     let fixture_guidance = analyze_fixture_patterns(&recent);
@@ -136,26 +94,18 @@ fn analyze_fixture_patterns(recent: &[&EvalRecord]) -> EvalGuidance {
 
     let mut lines: Vec<String> = Vec::new();
 
-    // Find fixtures with persistent FP issues (FP in > 50% of runs)
-    let persistent_fp: Vec<(&String, &usize)> = fixture_fp_counts
-        .iter()
-        .filter(|(name, fp_count)| {
-            let runs = fixture_runs.get(name.as_str()).copied().unwrap_or(1);
-            runs >= MIN_RUNS_FOR_PATTERN
-                && **fp_count as f64 / runs as f64 > PERSISTENT_PATTERN_RATIO
-        })
-        .collect();
-
+    // Find fixtures with persistent FP issues
+    let persistent_fp = find_persistent_fixtures(&fixture_fp_counts, &fixture_runs);
     if !persistent_fp.is_empty() {
         let names: Vec<&str> = persistent_fp
             .iter()
             .map(|(n, _)| n.as_str())
-            .take(MAX_FIXTURE_NAMES_IN_GUIDANCE)
+            .take(eval_thresholds::MAX_FIXTURE_NAMES_IN_GUIDANCE)
             .collect();
-        let suffix = if persistent_fp.len() > MAX_FIXTURE_NAMES_IN_GUIDANCE {
+        let suffix = if persistent_fp.len() > eval_thresholds::MAX_FIXTURE_NAMES_IN_GUIDANCE {
             format!(
                 " and {} more",
-                persistent_fp.len() - MAX_FIXTURE_NAMES_IN_GUIDANCE
+                persistent_fp.len() - eval_thresholds::MAX_FIXTURE_NAMES_IN_GUIDANCE
             )
         } else {
             String::new()
@@ -169,26 +119,18 @@ fn analyze_fixture_patterns(recent: &[&EvalRecord]) -> EvalGuidance {
         ));
     }
 
-    // Find fixtures with persistent FN issues (missed in > 60% of runs)
-    let persistent_fn: Vec<(&String, &usize)> = fixture_fn_counts
-        .iter()
-        .filter(|(name, fn_count)| {
-            let runs = fixture_runs.get(name.as_str()).copied().unwrap_or(1);
-            runs >= MIN_RUNS_FOR_PATTERN
-                && **fn_count as f64 / runs as f64 > PERSISTENT_PATTERN_RATIO
-        })
-        .collect();
-
+    // Find fixtures with persistent FN issues
+    let persistent_fn = find_persistent_fixtures(&fixture_fn_counts, &fixture_runs);
     if !persistent_fn.is_empty() {
         let names: Vec<&str> = persistent_fn
             .iter()
             .map(|(n, _)| n.as_str())
-            .take(MAX_FIXTURE_NAMES_IN_GUIDANCE)
+            .take(eval_thresholds::MAX_FIXTURE_NAMES_IN_GUIDANCE)
             .collect();
-        let suffix = if persistent_fn.len() > MAX_FIXTURE_NAMES_IN_GUIDANCE {
+        let suffix = if persistent_fn.len() > eval_thresholds::MAX_FIXTURE_NAMES_IN_GUIDANCE {
             format!(
                 " and {} more",
-                persistent_fn.len() - MAX_FIXTURE_NAMES_IN_GUIDANCE
+                persistent_fn.len() - eval_thresholds::MAX_FIXTURE_NAMES_IN_GUIDANCE
             )
         } else {
             String::new()
@@ -206,6 +148,21 @@ fn analyze_fixture_patterns(recent: &[&EvalRecord]) -> EvalGuidance {
         guidance.prompt_augmentation = lines.join("\n");
     }
     guidance
+}
+
+/// Helper to find fixtures with persistent issues (FP or FN)
+fn find_persistent_fixtures<'a>(
+    counts: &'a std::collections::HashMap<String, usize>,
+    runs: &'a std::collections::HashMap<String, usize>,
+) -> Vec<(&'a String, &'a usize)> {
+    counts
+        .iter()
+        .filter(|(name, count)| {
+            let run_count = runs.get(name.as_str()).copied().unwrap_or(1);
+            run_count >= eval_thresholds::MIN_RUNS_FOR_PATTERN
+                && **count as f64 / run_count as f64 > eval_thresholds::PERSISTENT_PATTERN_RATIO
+        })
+        .collect()
 }
 
 fn compute_trend(records: &[&EvalRecord], metric: fn(&EvalRecord) -> f64) -> f64 {
@@ -228,6 +185,50 @@ mod tests {
     use super::*;
     use crate::history::FixtureRecord;
 
+    // Test constants
+    const TEST_WINDOW: usize = 5;
+    const TEST_TIMESTAMP: &str = "2026-04-10T00:00:00Z";
+    const TEST_GIT_SHA: &str = "test";
+
+    // Baseline metric values
+    const BASE_PRECISION: f64 = 0.90;
+    const BASE_RECALL: f64 = 0.96;
+    const BASE_NOISE: f64 = 0.10;
+
+    // High precision values
+    const HIGH_PRECISION: f64 = 0.95;
+
+    // Low precision values
+    const LOW_PRECISION: f64 = 0.84;
+    const LOW_NOISE: f64 = 0.04;
+    const HIGH_NOISE: f64 = 0.18;
+
+    // Single record test values
+    const SINGLE_RECORD_PRECISION: f64 = 0.80;
+    const SINGLE_RECORD_RECALL: f64 = 0.90;
+    const SINGLE_RECORD_NOISE: f64 = 0.10;
+
+    // Fixture test data
+    const FIXTURE_NAME: &str = "style-ts";
+    const FIXTURE_EXPECTED: usize = 5;
+    const FIXTURE_TP: usize = 5;
+
+    // FP test scenario progression (3 runs with increasing FP counts)
+    const FP_RUN_1_PRECISION: f64 = 0.90;
+    const FP_RUN_1_NOISE: f64 = 0.10;
+    const FP_RUN_1_ACTUAL: usize = 7;
+    const FP_RUN_1_FP: usize = 2;
+
+    const FP_RUN_2_PRECISION: f64 = 0.85;
+    const FP_RUN_2_NOISE: f64 = 0.15;
+    const FP_RUN_2_ACTUAL: usize = 8;
+    const FP_RUN_2_FP: usize = 3;
+
+    const FP_RUN_3_PRECISION: f64 = 0.82;
+    const FP_RUN_3_NOISE: f64 = 0.18;
+    const FP_RUN_3_ACTUAL: usize = 9;
+    const FP_RUN_3_FP: usize = 4;
+
     fn make_record(
         precision: f64,
         recall: f64,
@@ -235,8 +236,8 @@ mod tests {
         fixtures: Vec<(&str, usize, usize, usize, usize)>,
     ) -> EvalRecord {
         EvalRecord {
-            timestamp: "2026-04-10T00:00:00Z".to_string(),
-            git_sha: "test".to_string(),
+            timestamp: TEST_TIMESTAMP.to_string(),
+            git_sha: TEST_GIT_SHA.to_string(),
             fixture_count: fixtures.len(),
             precision,
             recall,
@@ -258,14 +259,14 @@ mod tests {
 
     #[test]
     fn empty_history_returns_empty_guidance() {
-        let guidance = analyze_history(&[], 5);
+        let guidance = analyze_history(&[], TEST_WINDOW);
         assert!(guidance.prompt_augmentation.is_empty());
     }
 
     #[test]
     fn single_record_returns_no_trend_guidance() {
-        let history = vec![make_record(0.80, 0.90, 0.10, vec![])];
-        let guidance = analyze_history(&history, 5);
+        let history = vec![make_record(SINGLE_RECORD_PRECISION, SINGLE_RECORD_RECALL, SINGLE_RECORD_NOISE, vec![])];
+        let guidance = analyze_history(&history, TEST_WINDOW);
         // Single record, no trend possible; fixture patterns need 2+ runs
         assert!(guidance.prompt_augmentation.is_empty());
     }
@@ -273,11 +274,11 @@ mod tests {
     #[test]
     fn declining_precision_generates_conservative_guidance() {
         let history = vec![
-            make_record(0.95, 0.90, 0.05, vec![]),
-            make_record(0.90, 0.90, 0.10, vec![]),
-            make_record(0.84, 0.96, 0.16, vec![]),
+            make_record(HIGH_PRECISION, BASE_RECALL, BASE_NOISE, vec![]),
+            make_record(BASE_PRECISION, BASE_RECALL, BASE_NOISE, vec![]),
+            make_record(LOW_PRECISION, BASE_RECALL, HIGH_NOISE, vec![]),
         ];
-        let guidance = analyze_history(&history, 5);
+        let guidance = analyze_history(&history, TEST_WINDOW);
         assert!(
             guidance.prompt_augmentation.contains("more conservative"),
             "expected conservative guidance, got: {}",
@@ -288,11 +289,11 @@ mod tests {
     #[test]
     fn rising_noise_generates_suppression_guidance() {
         let history = vec![
-            make_record(0.95, 0.90, 0.04, vec![]),
-            make_record(0.90, 0.90, 0.10, vec![]),
-            make_record(0.84, 0.96, 0.16, vec![]),
+            make_record(HIGH_PRECISION, BASE_RECALL, LOW_NOISE, vec![]),
+            make_record(BASE_PRECISION, BASE_RECALL, BASE_NOISE, vec![]),
+            make_record(LOW_PRECISION, BASE_RECALL, HIGH_NOISE, vec![]),
         ];
-        let guidance = analyze_history(&history, 5);
+        let guidance = analyze_history(&history, TEST_WINDOW);
         assert!(
             guidance.prompt_augmentation.contains("Noise rate")
                 || guidance.prompt_augmentation.contains("false positive"),
@@ -306,25 +307,25 @@ mod tests {
         // Need 3+ runs (MIN_RUNS_FOR_PATTERN) and >60% FP rate
         let history = vec![
             make_record(
-                0.90,
-                0.90,
-                0.10,
-                vec![("style-ts", 5, 7, 5, 2)], // FP present
+                FP_RUN_1_PRECISION,
+                BASE_RECALL,
+                FP_RUN_1_NOISE,
+                vec![(FIXTURE_NAME, FIXTURE_EXPECTED, FP_RUN_1_ACTUAL, FIXTURE_TP, FP_RUN_1_FP)],
             ),
             make_record(
-                0.85,
-                0.90,
-                0.15,
-                vec![("style-ts", 5, 8, 5, 3)], // FP again
+                FP_RUN_2_PRECISION,
+                BASE_RECALL,
+                FP_RUN_2_NOISE,
+                vec![(FIXTURE_NAME, FIXTURE_EXPECTED, FP_RUN_2_ACTUAL, FIXTURE_TP, FP_RUN_2_FP)],
             ),
             make_record(
-                0.82,
-                0.90,
-                0.18,
-                vec![("style-ts", 5, 9, 5, 4)], // FP again
+                FP_RUN_3_PRECISION,
+                BASE_RECALL,
+                FP_RUN_3_NOISE,
+                vec![(FIXTURE_NAME, FIXTURE_EXPECTED, FP_RUN_3_ACTUAL, FIXTURE_TP, FP_RUN_3_FP)],
             ),
         ];
-        let guidance = analyze_history(&history, 5);
+        let guidance = analyze_history(&history, TEST_WINDOW);
         assert!(
             guidance
                 .prompt_augmentation
