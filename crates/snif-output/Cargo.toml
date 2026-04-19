@@ -2,6 +2,7 @@
 name = "snif-output"
 version.workspace = true
 edition.workspace = true
+repository.workspace = true
 
 [dependencies]
 snif-config = { path = "../snif-config" }
