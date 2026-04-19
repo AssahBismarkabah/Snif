@@ -189,7 +189,7 @@ pub fn build_context(
                 });
                 changed_files.push(ContextFile {
                     path: candidate.path,
-                    content: context::SUMMARY_ONLY_CONTENT_FORMAT.replace("{}", summary),
+                    content: format!("{}{}", context::SUMMARY_ONLY_CONTENT_PREFIX, summary),
                     summary: None,
                     retrieval_score: None,
                     content_tier: ContentTier::SummaryOnly,

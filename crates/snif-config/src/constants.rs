@@ -317,7 +317,7 @@ pub mod context {
     pub const CONTENT_DIFF_ONLY_PLACEHOLDER: &str = "[See diff for changes to this file.]";
 
     /// Template for summary-only content with omitted message
-    pub const SUMMARY_ONLY_CONTENT_FORMAT: &str = "[Summary — full content omitted.]\n{}";
+    pub const SUMMARY_ONLY_CONTENT_PREFIX: &str = "[Summary — full content omitted.]\n";
 
     /// Omission reason codes for tracking why content was excluded
     pub const REASON_CONTENT_DEGRADED_TO_SUMMARY: &str = "content_degraded_to_summary";
