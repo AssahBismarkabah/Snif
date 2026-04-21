@@ -2,28 +2,16 @@ use anyhow::{Context, Result};
 use chrono::Utc;
 use reqwest::blocking::Client;
 use serde_json::json;
-use snif_config::constants::timeouts;
+use snif_config::constants::{braintrust, eval_output, timeouts};
 use snif_config::env::ci;
 
 use crate::history::EvalRecord;
 use crate::metrics::FixtureResult;
 
-/// Braintrust API base URL.
-const BRAINTRUST_API_BASE: &str = "https://api.braintrust.dev";
+pub use braintrust::DEFAULT_PROJECT_ID;
 
-/// Default Braintrust project ID.
-/// Override with the `SNIF_BRAINTRUST_PROJECT_ID` environment variable in CI/CD.
-pub const BRAINTRUST_DEFAULT_PROJECT_ID: &str = "7c476f2d-a083-4eb2-bd93-430266782cd0";
-
-/// Human-readable description for experiments in the Braintrust dashboard.
-const EXPERIMENT_DESCRIPTION: &str = "Snif eval harness results";
-
-/// Tag applied to all experiments from this eval harness.
-const EVAL_TAG: &str = "snif-eval";
-
-/// Tag applied when quality gates pass; inverted-gates tag used otherwise.
-const GATES_PASSED_TAG: &str = "gates-passed";
-const GATES_FAILED_TAG: &str = "gates-failed";
+const RUNNER_CI: &str = "ci";
+const RUNNER_LOCAL: &str = "local";
 
 /// Generate a unique experiment name per eval run.
 /// Format: snif-eval-{git_sha_short}-{YYYYMMDD-HHMMSS}
@@ -45,7 +33,7 @@ fn generate_experiment_name(git_sha: &str, timestamp: &str) -> String {
             Utc::now().format("%Y%m%d-%H%M%S").to_string()
         });
 
-    format!("snif-eval-{sha_short}-{formatted_time}")
+    format!("{}-{}-{}", braintrust::EVAL_TAG, sha_short, formatted_time)
 }
 
 /// Determine if running in CI based on environment variables.
@@ -54,9 +42,9 @@ fn detect_runner() -> &'static str {
         || std::env::var(ci::GITHUB_ACTIONS).is_ok()
         || std::env::var(ci::GITLAB_CI).is_ok()
     {
-        "ci"
+        RUNNER_CI
     } else {
-        "local"
+        RUNNER_LOCAL
     }
 }
 
@@ -64,20 +52,8 @@ fn detect_runner() -> &'static str {
 fn detect_git_branch() -> String {
     std::env::var(ci::GITHUB_REF_NAME)
         .or_else(|_| std::env::var(ci::CI_COMMIT_REF_NAME))
-        .unwrap_or_else(|_| "unknown".to_string())
+        .unwrap_or_else(|_| eval_output::UNKNOWN_GIT_SHA.to_string())
 }
-
-/// F1 score coefficient (2.0 for harmonic mean of precision and recall).
-const F1_COEFFICIENT: f64 = 2.0;
-
-/// Default score values when a fixture has no findings to evaluate.
-const DEFAULT_SCORE_WHEN_NO_DATA: f64 = 1.0;
-const DEFAULT_F1_WHEN_NO_DATA: f64 = 0.0;
-
-/// Ideal baseline scores for aggregate events — perfect precision and recall, zero noise.
-const IDEAL_PRECISION: f64 = 1.0;
-const IDEAL_RECALL: f64 = 1.0;
-const IDEAL_NOISE_RATE: f64 = 0.0;
 
 /// Retry an operation with exponential backoff.
 ///
@@ -139,7 +115,7 @@ pub fn report_to_braintrust(
 
     report_to_braintrust_inner(
         &client,
-        BRAINTRUST_API_BASE,
+        braintrust::API_BASE,
         api_key,
         project_id,
         model_name,
@@ -239,7 +215,7 @@ fn create_experiment<S: Fn(std::time::Duration)>(
     let body = json!({
         "project_id": project_id,
         "name": experiment_name,
-        "description": EXPERIMENT_DESCRIPTION,
+        "description": braintrust::EXPERIMENT_DESCRIPTION,
         "repo_info": {
             "commit": record.git_sha,
             "branch": detect_git_branch(),
@@ -252,8 +228,8 @@ fn create_experiment<S: Fn(std::time::Duration)>(
         },
         "ensure_new": true,
         "tags": [
-            EVAL_TAG,
-            if record.gates_passed { GATES_PASSED_TAG } else { GATES_FAILED_TAG },
+            braintrust::EVAL_TAG,
+            if record.gates_passed { braintrust::GATES_PASSED_TAG } else { braintrust::GATES_FAILED_TAG },
             format!("model-{}", model_name),
             format!("sha-{}", record.git_sha.get(..7).unwrap_or(&record.git_sha)),
         ],
@@ -309,21 +285,21 @@ fn insert_fixture_events<S: Fn(std::time::Duration)>(
         .iter()
         .enumerate()
         .map(|(i, fr)| {
-            let fixture_precision = if fr.true_positives + fr.false_positives > 0 {
+            let fixture_precision = if fr.true_positives + fr.false_positives > eval_output::DEFAULT_COUNTER {
                 fr.true_positives as f64 / (fr.true_positives + fr.false_positives) as f64
             } else {
-                DEFAULT_SCORE_WHEN_NO_DATA
+                braintrust::DEFAULT_PRECISION_WHEN_NO_DATA
             };
-            let fixture_recall = if fr.true_positives + fr.false_negatives > 0 {
+            let fixture_recall = if fr.true_positives + fr.false_negatives > eval_output::DEFAULT_COUNTER {
                 fr.true_positives as f64 / (fr.true_positives + fr.false_negatives) as f64
             } else {
-                DEFAULT_SCORE_WHEN_NO_DATA
+                braintrust::DEFAULT_RECALL_WHEN_NO_DATA
             };
-            let fixture_f1 = if fixture_precision + fixture_recall > 0.0 {
-                F1_COEFFICIENT * fixture_precision * fixture_recall
+            let fixture_f1 = if fixture_precision + fixture_recall > eval_output::DEFAULT_NOISE_RATE {
+                braintrust::F1_COEFFICIENT * fixture_precision * fixture_recall
                     / (fixture_precision + fixture_recall)
             } else {
-                DEFAULT_F1_WHEN_NO_DATA
+                braintrust::DEFAULT_F1_WHEN_NO_DATA
             };
 
             json!({
@@ -340,8 +316,8 @@ fn insert_fixture_events<S: Fn(std::time::Duration)>(
                 },
                 "expected": {
                     "tp": fr.expected,
-                    "fp": 0,
-                    "fn": 0,
+                    "fp": eval_output::DEFAULT_COUNTER,
+                    "fn": eval_output::DEFAULT_COUNTER,
                 },
                 "scores": {
                     "precision": fixture_precision,
@@ -413,9 +389,9 @@ fn insert_aggregate_event<S: Fn(std::time::Duration)>(
                 "fixture_count": record.fixture_count,
             },
             "expected": {
-                "precision": IDEAL_PRECISION,
-                "recall": IDEAL_RECALL,
-                "noise_rate": IDEAL_NOISE_RATE,
+                "precision": braintrust::IDEAL_PRECISION,
+                "recall": braintrust::IDEAL_RECALL,
+                "noise_rate": braintrust::IDEAL_NOISE_RATE,
             },
             "scores": {
                 "precision": record.precision,
@@ -472,32 +448,51 @@ mod tests {
     const TEST_API_KEY: &str = "test-api-key";
     const TEST_MODEL: &str = "test-model";
     const TEST_EXPERIMENT_NAME: &str = "snif-eval-abc1234-20240101-000000";
+    const TEST_TIMEOUT_SECS: u64 = 5;
+    const TEST_TIMEOUT_SHORT_SECS: u64 = 2;
+
+    const TEST_TIMESTAMP: &str = "2024-01-01T00:00:00Z";
+    const TEST_GIT_SHA: &str = "abc1234def5678abc1234def5678abc1234def56";
+    const TEST_FIXTURE_COUNT: usize = 2;
+    const TEST_PRECISION: f64 = 0.85;
+    const TEST_RECALL: f64 = 0.90;
+    const TEST_NOISE: f64 = 0.05;
+
+    const TEST_FIXTURE_SECURITY: &str = "basic-security";
+    const TEST_FIXTURE_ERROR: &str = "error-handling";
+    const TEST_EXPECTED_HIGH: usize = 3;
+    const TEST_EXPECTED_LOW: usize = 2;
+    const TEST_ACTUAL: usize = 3;
+    const TEST_TP_HIGH: usize = 3;
+    const TEST_TP_MID: usize = 2;
+    const TEST_FP_ZERO: usize = 0;
+    const TEST_FP_MID: usize = 1;
 
     fn test_record() -> EvalRecord {
         EvalRecord {
-            timestamp: "2024-01-01T00:00:00Z".to_string(),
-            git_sha: "abc1234def5678abc1234def5678abc1234def56".to_string(),
-            fixture_count: 2,
-            precision: 0.85,
-            recall: 0.90,
-            noise_rate: 0.05,
+            timestamp: TEST_TIMESTAMP.to_string(),
+            git_sha: TEST_GIT_SHA.to_string(),
+            fixture_count: TEST_FIXTURE_COUNT,
+            precision: TEST_PRECISION,
+            recall: TEST_RECALL,
+            noise_rate: TEST_NOISE,
             gates_passed: true,
             per_fixture: vec![
                 crate::history::FixtureRecord {
-                    name: "basic-security".to_string(),
-                    expected: 3,
-                    actual: 3,
-                    tp: 3,
-                    fp: 0,
-                    fn_count: 0,
+                    name: TEST_FIXTURE_SECURITY.to_string(),
+                    expected: TEST_EXPECTED_HIGH,
+                    actual: TEST_ACTUAL,
+                    tp: TEST_TP_HIGH,
+                    fp: TEST_FP_ZERO,
+                    fn_count: TEST_FP_ZERO,
                 },
                 crate::history::FixtureRecord {
-                    name: "error-handling".to_string(),
-                    expected: 2,
-                    actual: 3,
-                    tp: 2,
-                    fp: 1,
-                    fn_count: 0,
+                    name: TEST_FIXTURE_ERROR.to_string(),
+                    expected: TEST_EXPECTED_LOW,
+                    actual: TEST_ACTUAL,
+                    tp: TEST_TP_MID,
+                    fp: TEST_FP_MID,
+                    fn_count: TEST_FP_ZERO,
                 },
             ],
         }
@@ -506,20 +501,20 @@ mod tests {
     fn test_fixture_results() -> Vec<FixtureResult> {
         vec![
             FixtureResult {
-                fixture_name: "basic-security".to_string(),
-                expected: 3,
-                actual: 3,
-                true_positives: 3,
-                false_positives: 0,
-                false_negatives: 0,
+                fixture_name: TEST_FIXTURE_SECURITY.to_string(),
+                expected: TEST_EXPECTED_HIGH,
+                actual: TEST_ACTUAL,
+                true_positives: TEST_TP_HIGH,
+                false_positives: TEST_FP_ZERO,
+                false_negatives: TEST_FP_ZERO,
             },
             FixtureResult {
-                fixture_name: "error-handling".to_string(),
-                expected: 2,
-                actual: 3,
-                true_positives: 2,
-                false_positives: 1,
-                false_negatives: 0,
+                fixture_name: TEST_FIXTURE_ERROR.to_string(),
+                expected: TEST_EXPECTED_LOW,
+                actual: TEST_ACTUAL,
+                true_positives: TEST_TP_MID,
+                false_positives: TEST_FP_MID,
+                false_negatives: TEST_FP_ZERO,
             },
         ]
     }
@@ -545,7 +540,7 @@ mod tests {
             .create();
 
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(5))
+            .timeout(std::time::Duration::from_secs(TEST_TIMEOUT_SECS))
             .build()
             .unwrap();
 
@@ -556,7 +551,7 @@ mod tests {
             &client,
             &server.url(),
             TEST_API_KEY,
-            BRAINTRUST_DEFAULT_PROJECT_ID,
+            braintrust::DEFAULT_PROJECT_ID,
             TEST_MODEL,
             TEST_EXPERIMENT_NAME,
             &record,
@@ -590,7 +585,7 @@ mod tests {
             .create();
 
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(5))
+            .timeout(std::time::Duration::from_secs(TEST_TIMEOUT_SECS))
             .build()
             .unwrap();
 
@@ -601,7 +596,7 @@ mod tests {
             &client,
             &server.url(),
             TEST_API_KEY,
-            BRAINTRUST_DEFAULT_PROJECT_ID,
+            braintrust::DEFAULT_PROJECT_ID,
             TEST_MODEL,
             TEST_EXPERIMENT_NAME,
             &record,
@@ -670,7 +665,7 @@ mod tests {
             .create();
 
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(2))
+            .timeout(std::time::Duration::from_secs(TEST_TIMEOUT_SHORT_SECS))
             .build()
             .unwrap();
 
@@ -680,7 +675,7 @@ mod tests {
             &client,
             &server.url(),
             TEST_API_KEY,
-            BRAINTRUST_DEFAULT_PROJECT_ID,
+            braintrust::DEFAULT_PROJECT_ID,
             TEST_MODEL,
             TEST_EXPERIMENT_NAME,
             &record,
@@ -712,7 +707,7 @@ mod tests {
             .create();
 
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(2))
+            .timeout(std::time::Duration::from_secs(TEST_TIMEOUT_SHORT_SECS))
             .build()
             .unwrap();
 

@@ -9,14 +9,24 @@
 // LLM Model Configuration
 // ============================================================================
 pub mod embeddings {
-    /// Embedding model used for code summary vectorization
+    /// Embedding model name for display and logging.
+    ///
+    /// **Note:** This constant is for documentation/logging only.
+    /// The actual runtime model is selected via `EmbeddingModel::AllMiniLML6V2`
+    /// in the embedder code. To change models:
+    /// 1. Update this constant name
+    /// 2. Update `RUNTIME_MODEL` in snif-embeddings crate
     /// Model: all-MiniLM-L6-v2 (ONNX via fastembed)
-    /// Dimensions: 384
     pub const MODEL_NAME: &str = "all-MiniLM-L6-v2";
+
     /// Error message for empty embedding results
     pub const ERROR_EMPTY_EMBEDDING_RESULT: &str = "Embedding model returned empty result for text";
     /// Batch size for embedding API calls
     pub const BATCH_SIZE: usize = 64;
+    /// Default/initial count value (no items processed yet)
+    pub const DEFAULT_COUNT: usize = 0;
+    /// Initial value for running totals
+    pub const INITIAL_TOTAL: usize = 0;
 }
 
 pub mod model {
@@ -173,6 +183,43 @@ pub mod eval_thresholds {
     pub const RECALL_IMPROVEMENT_THRESHOLD: f64 = 0.05;
     /// Noise increase threshold for suppression guidance
     pub const NOISE_INCREASE_THRESHOLD: f64 = 0.10;
+}
+
+// ============================================================================
+// Eval Output Formatting
+// ============================================================================
+pub mod eval_output {
+    /// Default token count (zero)
+    pub const DEFAULT_TOKEN_COUNT: usize = 0;
+    /// Default file count (zero)
+    pub const DEFAULT_FILE_COUNT: usize = 0;
+    /// Default count for counters (initial value for HashMap counters)
+    pub const DEFAULT_COUNTER: usize = 0;
+    /// Fixture metadata filename
+    pub const FIXTURE_META_FILE: &str = "fixture.json";
+    /// Patch file name
+    pub const PATCH_FILE: &str = "change.patch";
+    /// Default value when git SHA is unavailable
+    pub const UNKNOWN_GIT_SHA: &str = "unknown";
+    /// Multiplier for converting decimal to percentage
+    pub const PERCENTAGE_MULTIPLIER: f64 = 100.0;
+    /// Default precision when total is zero
+    pub const DEFAULT_PRECISION: f64 = 1.0;
+    /// Default recall when total is zero
+    pub const DEFAULT_RECALL: f64 = 1.0;
+    /// Default noise rate (zero is ideal)
+    pub const DEFAULT_NOISE_RATE: f64 = 0.0;
+    /// Category aliases for finding matching.
+    /// Pairs where categories are semantically equivalent.
+    pub const CATEGORY_ALIASES: &[(&str, &str)] = &[
+        ("security", "logic"),
+        ("performance", "logic"),
+        ("performance", "security"),
+        ("convention", "style"),
+        ("other", "logic"),
+        ("other", "security"),
+        ("other", "performance"),
+    ];
 }
 // ============================================================================
 // LLM Prompt Templates
@@ -369,6 +416,38 @@ pub mod clean {
     pub const CLEAN_NOTHING_TO_CLEAN: &str = "  Nothing to clean.";
     /// Prefix for removed directory messages
     pub const CLEAN_REMOVED_PREFIX: &str = "  Removed ";
+}
+
+// ============================================================================
+// Braintrust Integration Constants
+// ============================================================================
+pub mod braintrust {
+    /// Braintrust API base URL.
+    pub const API_BASE: &str = "https://api.braintrust.dev";
+    /// Default Braintrust project ID for eval.
+    pub const DEFAULT_PROJECT_ID: &str = "7c476f2d-a083-4eb2-bd93-430266782cd0";
+    /// Human-readable description for experiments in the Braintrust dashboard.
+    pub const EXPERIMENT_DESCRIPTION: &str = "Snif eval harness results";
+    /// Tag applied to all experiments from this eval harness.
+    pub const EVAL_TAG: &str = "snif-eval";
+    /// Tag applied when quality gates pass.
+    pub const GATES_PASSED_TAG: &str = "gates-passed";
+    /// Tag applied when quality gates fail.
+    pub const GATES_FAILED_TAG: &str = "gates-failed";
+    /// F1 score coefficient (2.0 for harmonic mean of precision and recall).
+    pub const F1_COEFFICIENT: f64 = 2.0;
+    /// Default precision when a fixture has no findings to evaluate.
+    pub const DEFAULT_PRECISION_WHEN_NO_DATA: f64 = 1.0;
+    /// Default recall when a fixture has no findings to evaluate.
+    pub const DEFAULT_RECALL_WHEN_NO_DATA: f64 = 1.0;
+    /// Default F1 when a fixture has no findings to evaluate.
+    pub const DEFAULT_F1_WHEN_NO_DATA: f64 = 0.0;
+    /// Ideal baseline precision — perfect precision.
+    pub const IDEAL_PRECISION: f64 = 1.0;
+    /// Ideal baseline recall — perfect recall.
+    pub const IDEAL_RECALL: f64 = 1.0;
+    /// Ideal baseline noise rate — zero noise.
+    pub const IDEAL_NOISE_RATE: f64 = 0.0;
 }
 
 // ============================================================================
