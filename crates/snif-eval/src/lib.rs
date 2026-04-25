@@ -5,7 +5,7 @@ pub mod metrics;
 pub mod reporter;
 
 use anyhow::Result;
-use snif_config::constants::{eval, eval_output, model, thresholds};
+use snif_config::constants::{eval, model, thresholds};
 use snif_config::SnifConfig;
 use snif_types::{BudgetReport, ChangeMetadata, ContentTier, ContextFile, ContextPackage};
 use std::path::Path;
@@ -64,15 +64,15 @@ pub fn run_evaluation(
             omissions: vec![],
             budget: BudgetReport {
                 total_budget: model::DEFAULT_MAX_TOKENS,
-                diff_tokens: eval_output::DEFAULT_TOKEN_COUNT,
-                changed_files_tokens: eval_output::DEFAULT_TOKEN_COUNT,
-                related_files_tokens: eval_output::DEFAULT_TOKEN_COUNT,
+                diff_tokens: 0,
+                changed_files_tokens: 0,
+                related_files_tokens: 0,
                 remaining_tokens: model::DEFAULT_MAX_TOKENS,
                 files_included: fix.files.len(),
-                files_omitted: eval_output::DEFAULT_FILE_COUNT,
+                files_omitted: 0,
                 files_full: fix.files.len(),
-                files_summary_only: eval_output::DEFAULT_FILE_COUNT,
-                files_diff_only: eval_output::DEFAULT_FILE_COUNT,
+                files_summary_only: 0,
+                files_diff_only: 0,
             },
         };
 

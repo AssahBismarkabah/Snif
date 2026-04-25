@@ -169,8 +169,8 @@ fn generate_jwt(app_id: &str, private_key: &str) -> Result<String> {
         .as_secs();
 
     let claims = Claims {
-        iat: now - timeouts::JWT_CLOCK_DRIFT_SECS as u64,
-        exp: now + timeouts::JWT_EXPIRY_SECS as u64,
+        iat: now - timeouts::JWT_CLOCK_DRIFT_SECS,
+        exp: now + timeouts::JWT_EXPIRY_SECS,
         iss: app_id.to_string(),
     };
 

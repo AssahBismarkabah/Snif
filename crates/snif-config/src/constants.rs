@@ -6,85 +6,19 @@
 // ============================================================================
 
 // ============================================================================
-// Timeouts
-// ============================================================================
-pub mod timeouts {
-    /// Timeout for LLM HTTP requests (seconds)
-    pub const LLM_REQUEST_TIMEOUT_SECS: u64 = 120;
-    /// Maximum retry attempts for LLM requests
-    pub const LLM_MAX_RETRIES: u32 = 3;
-    /// Base delay for retry backoff (seconds)
-    pub const LLM_RETRY_BASE_DELAY_SECS: u64 = 2;
-    /// HTTP request timeout (seconds)
-    pub const HTTP_TIMEOUT_SECS: u64 = 30;
-    /// JWT clock drift tolerance (seconds)
-    pub const JWT_CLOCK_DRIFT_SECS: i64 = 30;
-    /// JWT token expiry (seconds)
-    pub const JWT_EXPIRY_SECS: i64 = 600;
-    /// GitLab API max pages
-    pub const GITLAB_MAX_PAGES: usize = 10;
-    /// GitLab API per page
-    pub const GITLAB_PER_PAGE: usize = 100;
-}
-
-// ============================================================================
-// HTTP and API Constants
-// ============================================================================
-pub mod http {
-    /// OpenAI chat completions endpoint path
-    pub const OPENAI_CHAT_COMPLETIONS: &str = "/chat/completions";
-    /// HTTP header: Authorization Bearer prefix
-    pub const AUTHORIZATION_BEARER: &str = "Bearer";
-    /// HTTP header: Content-Type application/json
-    pub const CONTENT_TYPE_JSON: &str = "application/json";
-    /// HTTP header: role for system messages
-    pub const ROLE_SYSTEM: &str = "system";
-    /// HTTP header: role for user messages
-    pub const ROLE_USER: &str = "user";
-    /// HTTP status: Too Many Requests
-    pub const STATUS_TOO_MANY_REQUESTS: u16 = 429;
-    /// HTTP status: Request Timeout
-    pub const STATUS_REQUEST_TIMEOUT: u16 = 408;
-    /// Error message: LLM provider returned non-success
-    pub const ERROR_LLM_PROVIDER: &str = "LLM provider returned";
-    /// Error message: Failed to parse LLM provider response
-    pub const ERROR_PARSE_RESPONSE: &str = "Failed to parse LLM provider response";
-    /// Error message: LLM provider returned no choices
-    pub const ERROR_NO_CHOICES: &str = "LLM provider returned no choices";
-    /// Tracing message: retrying after server error
-    pub const TRACE_RETRY: &str = "Retrying LLM request after server error";
-    /// Tracing message: review execution complete
-    pub const TRACE_COMPLETE: &str = "Review execution complete";
-}
-
-// ============================================================================
 // LLM Model Configuration
 // ============================================================================
 pub mod embeddings {
-    /// Embedding model name for display and logging.
-    ///
-    /// **Note:** This constant is for documentation/logging only.
-    /// The actual runtime model is selected via `EmbeddingModel::AllMiniLML6V2`
-    /// in the embedder code. To change models:
-    /// 1. Update this constant name
-    /// 2. Update `RUNTIME_MODEL` in snif-embeddings crate
-    ///
+    /// Embedding model used for code summary vectorization
     /// Model: all-MiniLM-L6-v2 (ONNX via fastembed)
+    /// Dimensions: 384
     pub const MODEL_NAME: &str = "all-MiniLM-L6-v2";
-
     /// Error message for empty embedding results
     pub const ERROR_EMPTY_EMBEDDING_RESULT: &str = "Embedding model returned empty result for text";
     /// Batch size for embedding API calls
     pub const BATCH_SIZE: usize = 64;
-    /// Default/initial count value (no items processed yet)
-    pub const DEFAULT_COUNT: usize = 0;
-    /// Initial value for running totals
-    pub const INITIAL_TOTAL: usize = 0;
 }
 
-// ============================================================================
-// LLM Model Configuration
-// ============================================================================
 pub mod model {
     /// Default dimension for embedding vectors (see embeddings::MODEL_NAME for exact model)
     pub const DEFAULT_EMBEDDING_DIMENSION: usize = 384;
@@ -96,14 +30,10 @@ pub mod model {
     pub const DEFAULT_MAX_FILES: usize = 50;
     /// Max concurrent summarization tasks
     pub const MAX_CONCURRENT_SUMMARIZATION: usize = 3;
-    /// Default temperature for LLM requests (deterministic output)
-    pub const DEFAULT_TEMPERATURE: f64 = 0.0;
-    /// Response format type for JSON output
-    pub const RESPONSE_FORMAT_JSON: &str = "json_object";
 }
 
 // ============================================================================
-// Confidence Thresholds
+// Code Retrieval Configuration
 // ============================================================================
 pub mod retrieval {
     /// K value for KNN semantic search
@@ -114,10 +44,6 @@ pub mod retrieval {
     pub const MIN_COCHANGE_RETRIEVAL_CORRELATION: f64 = 0.2;
     /// Maximum files per commit for co-change analysis
     pub const MAX_FILES_PER_COMMIT: usize = 50;
-    /// Maximum symbols to fetch in a single query
-    pub const MAX_SYMBOLS_FETCH: usize = 10_000;
-    /// Maximum summaries to fetch in a single query
-    pub const MAX_SUMMARIES_FETCH: usize = 50_000;
     /// Base score for direct imports in structural retrieval
     pub const DIRECT_IMPORT_SCORE: f64 = 1.0;
     /// Score for reverse imports in structural retrieval
@@ -128,16 +54,6 @@ pub mod retrieval {
     pub const SEMANTIC_SIMILARITY_FLOOR: f64 = 0.0;
     /// Max keyword terms counted for retrieval scoring
     pub const MAX_KEYWORD_TERMS: usize = 3;
-    /// Max similar signals to query for feedback matching
-    pub const FEEDBACK_KNN_K: usize = 10;
-    /// Maximum distance for similar signal matching
-    pub const MAX_SIMILAR_DISTANCE: f64 = 0.3;
-    /// Dismissed signal threshold for suppression
-    pub const DISMISSED_SUPPRESSION_THRESHOLD: usize = 3;
-    /// Accepted signal threshold for boost
-    pub const ACCEPTED_BOOST_THRESHOLD: usize = 3;
-    /// Confidence boost for accepted signals
-    pub const ACCEPTED_CONFIDENCE_BOOST: f64 = 0.1;
 }
 
 // ============================================================================
@@ -154,8 +70,28 @@ pub mod limits {
     pub const MAX_SUMMARIES_FETCH_LIMIT: usize = 50_000;
     /// Pagination limit for symbol fetching
     pub const MAX_SYMBOLS_FETCH_LIMIT: usize = 10_000;
-    /// SQLite maximum variables per query (stay under 999)
-    pub const SQLITE_MAX_VARIABLE_NUMBER: usize = 900;
+}
+
+// ============================================================================
+// Timeout and Retry Configuration
+// ============================================================================
+pub mod timeouts {
+    /// LLM request timeout in seconds (5 minutes)
+    pub const LLM_REQUEST_TIMEOUT_SECS: u64 = 300;
+    /// Maximum retry attempts for LLM requests
+    pub const LLM_MAX_RETRIES: u32 = 5;
+    /// Base delay for exponential backoff (2 seconds)
+    pub const LLM_RETRY_BASE_DELAY_SECS: u64 = 2;
+    /// Generic HTTP client timeout in seconds
+    pub const HTTP_TIMEOUT_SECS: u64 = 15;
+    /// Clock drift tolerance for JWT tokens (60 seconds)
+    pub const JWT_CLOCK_DRIFT_SECS: u64 = 60;
+    /// JWT token expiry duration (10 minutes)
+    pub const JWT_EXPIRY_SECS: u64 = 600;
+    /// Maximum pages for GitLab API pagination
+    pub const GITLAB_MAX_PAGES: usize = 100;
+    /// Items per page for GitLab API requests
+    pub const GITLAB_PER_PAGE: usize = 100;
 }
 
 // ============================================================================
@@ -168,8 +104,6 @@ pub mod thresholds {
     pub const SARIF_WARNING_CONFIDENCE: f64 = 0.7;
     /// Default minimum confidence for finding inclusion
     pub const MIN_CONFIDENCE_DEFAULT: f64 = 0.7;
-    /// Maximum confidence value (1.0 = 100%)
-    pub const MAX_CONFIDENCE: f64 = 1.0;
     /// Minimum signals for feedback analysis
     pub const FEEDBACK_MIN_SIGNALS: usize = 20;
     /// Precision drop threshold for regression detection
@@ -239,43 +173,6 @@ pub mod eval_thresholds {
     pub const RECALL_IMPROVEMENT_THRESHOLD: f64 = 0.05;
     /// Noise increase threshold for suppression guidance
     pub const NOISE_INCREASE_THRESHOLD: f64 = 0.10;
-}
-
-// ============================================================================
-// Eval Output Formatting
-// ============================================================================
-pub mod eval_output {
-    /// Default token count (zero)
-    pub const DEFAULT_TOKEN_COUNT: usize = 0;
-    /// Default file count (zero)
-    pub const DEFAULT_FILE_COUNT: usize = 0;
-    /// Default count for counters (initial value for HashMap counters)
-    pub const DEFAULT_COUNTER: usize = 0;
-    /// Fixture metadata filename
-    pub const FIXTURE_META_FILE: &str = "fixture.json";
-    /// Patch file name
-    pub const PATCH_FILE: &str = "change.patch";
-    /// Default value when git SHA is unavailable
-    pub const UNKNOWN_GIT_SHA: &str = "unknown";
-    /// Multiplier for converting decimal to percentage
-    pub const PERCENTAGE_MULTIPLIER: f64 = 100.0;
-    /// Default precision when total is zero
-    pub const DEFAULT_PRECISION: f64 = 1.0;
-    /// Default recall when total is zero
-    pub const DEFAULT_RECALL: f64 = 1.0;
-    /// Default noise rate (zero is ideal)
-    pub const DEFAULT_NOISE_RATE: f64 = 0.0;
-    /// Category aliases for finding matching.
-    /// Pairs where categories are semantically equivalent.
-    pub const CATEGORY_ALIASES: &[(&str, &str)] = &[
-        ("security", "logic"),
-        ("performance", "logic"),
-        ("performance", "security"),
-        ("convention", "style"),
-        ("other", "logic"),
-        ("other", "security"),
-        ("other", "performance"),
-    ];
 }
 // ============================================================================
 // LLM Prompt Templates
@@ -390,90 +287,6 @@ must be '{' and your last character must be '}'. If you are unsure, return \
     pub const METADATA_COMMIT_ITEM: &str = "- {}\n";
     pub const METADATA_FILE_HEADER: &str = "### {}\n";
     pub const METADATA_SUMMARY_LABEL: &str = "Summary: {}\n";
-
-    // Repair prompt for malformed LLM responses
-    pub const REPAIR_SYSTEM_PROMPT: &str = r#"You convert code review text into a single valid JSON object. \
-Return ONLY JSON with this exact shape: {"summary":"...","findings":[...]}. \
-Preserve only findings explicitly supported by the provided review text. Do not invent new \
-issues, line numbers, or categories. If the review text does not contain a clear issue, use \
-{"summary":"","findings":[]}. Your first character must be '{' and your last character \
-must be '}'."#;
-    pub const REPAIR_USER_PROMPT_INTRO: &str = "\
-Rewrite the following review into the required JSON object without adding commentary:\n\n";
-}
-
-// ============================================================================
-// Output Filter Constants
-// ============================================================================
-pub mod output_filter {
-    /// Self-dismissal patterns — LLM phrases that indicate it reasoned out of reporting
-    pub const DISMISSAL_PATTERNS: &[&str] = &[
-        "no bug",
-        "no issue",
-        "not a bug",
-        "not an issue",
-        "no real issue",
-        "no real problem",
-        "no real ",
-        "not a real ",
-        "not a critical",
-        "acceptable behavior",
-        "acceptable for",
-        "this is fine",
-        "this seems correct",
-        "i will look for",
-        "i will remove",
-        "i will lower",
-        "no bug here",
-        "no critical bug",
-        "not a strong",
-        "minor robustness",
-        "just a dependency",
-        "just relying on",
-    ];
-    /// Impact patterns indicating dismissal
-    pub const IMPACT_NONE_PATTERNS: &[&str] = &["impact: none", "impact:none"];
-    /// Minimal impact dismissal patterns
-    pub const MINIMAL_IMPACT_PATTERNS: &[&str] = &["minimal security impact", "minimal impact"];
-    /// Fingerprint hash length (number of hex characters)
-    pub const FINGERPRINT_HASH_LENGTH: usize = 16;
-    /// Disambiguation separator for duplicate fingerprints
-    pub const FINGERPRINT_DISAMBIGUATION_SEPARATOR: &str = ":";
-    /// Chain-of-thought patterns that indicate leaked reasoning
-    pub const COT_PATTERNS: &[&str] = &[
-        "let me think",
-        "let's look",
-        "let me analyze",
-        "i need to",
-        "i should",
-        "i will look for",
-        "i will remove this finding",
-        "i will lower the confidence",
-        "the code slices",
-        "the real issue is not",
-        "let's look closer",
-        "looking at the code, i",
-        "examining this, i",
-        "the most concrete issue i can",
-        "the most significant issue i can",
-        "i will now",
-        "let me check",
-        "first, let me",
-        "step 1:",
-        "step 2:",
-    ];
-    /// Sentence delimiters for text parsing
-    pub const SENTENCE_DELIMITERS: &[char] = &['.', '!', '?', '\n'];
-    /// Minimum length for cleaned text
-    pub const CLEAN_TEXT_MIN_LENGTH: usize = 5;
-    /// JSON keys for finding arrays
-    pub const FINDING_KEYS: &[&str] = &["findings", "issues", "results"];
-    /// JSON array start delimiter
-    pub const JSON_ARRAY_START: char = '[';
-    /// JSON object start delimiter
-    pub const JSON_OBJECT_START: char = '{';
-    /// JSON object end delimiter
-    pub const JSON_OBJECT_END: char = '}';
 }
 
 // ============================================================================
@@ -559,70 +372,10 @@ pub mod clean {
 }
 
 // ============================================================================
-// Braintrust Integration Constants
-// ============================================================================
-pub mod braintrust {
-    /// Braintrust API base URL.
-    pub const API_BASE: &str = "https://api.braintrust.dev";
-    /// Default Braintrust project ID for eval.
-    pub const DEFAULT_PROJECT_ID: &str = "7c476f2d-a083-4eb2-bd93-430266782cd0";
-    /// Human-readable description for experiments in the Braintrust dashboard.
-    pub const EXPERIMENT_DESCRIPTION: &str = "Snif eval harness results";
-    /// Tag applied to all experiments from this eval harness.
-    pub const EVAL_TAG: &str = "snif-eval";
-    /// Tag applied when quality gates pass.
-    pub const GATES_PASSED_TAG: &str = "gates-passed";
-    /// Tag applied when quality gates fail.
-    pub const GATES_FAILED_TAG: &str = "gates-failed";
-    /// F1 score coefficient (2.0 for harmonic mean of precision and recall).
-    pub const F1_COEFFICIENT: f64 = 2.0;
-    /// Default precision when a fixture has no findings to evaluate.
-    pub const DEFAULT_PRECISION_WHEN_NO_DATA: f64 = 1.0;
-    /// Default recall when a fixture has no findings to evaluate.
-    pub const DEFAULT_RECALL_WHEN_NO_DATA: f64 = 1.0;
-    /// Default F1 when a fixture has no findings to evaluate.
-    pub const DEFAULT_F1_WHEN_NO_DATA: f64 = 0.0;
-    /// Ideal baseline precision — perfect precision.
-    pub const IDEAL_PRECISION: f64 = 1.0;
-    /// Ideal baseline recall — perfect recall.
-    pub const IDEAL_RECALL: f64 = 1.0;
-    /// Ideal baseline noise rate — zero noise.
-    pub const IDEAL_NOISE_RATE: f64 = 0.0;
-}
-
-// ============================================================================
 // Time Unit Constants
 // ============================================================================
 pub mod time {
     pub const SECS_PER_MINUTE: u64 = 60;
     pub const SECS_PER_HOUR: u64 = 3_600;
     pub const SECS_PER_DAY: u64 = 86_400;
-}
-
-// ============================================================================
-// Feedback Store Schema Constants
-// ============================================================================
-pub mod feedback_schema {
-    /// Feedback signals table name
-    pub const TABLE_SIGNALS: &str = "feedback_signals";
-    /// Feedback embeddings table name
-    pub const TABLE_EMBEDDINGS: &str = "feedback_embeddings";
-    /// Team ID column name
-    pub const COLUMN_TEAM_ID: &str = "team_id";
-    /// Signal type column name
-    pub const COLUMN_SIGNAL_TYPE: &str = "signal_type";
-    /// Finding text column name
-    pub const COLUMN_FINDING_TEXT: &str = "finding_text";
-    /// Finding category column name
-    pub const COLUMN_FINDING_CATEGORY: &str = "finding_category";
-    /// Timestamp column name
-    pub const COLUMN_TIMESTAMP: &str = "timestamp";
-    /// Signal ID column name
-    pub const COLUMN_SIGNAL_ID: &str = "signal_id";
-    /// Signal type: accepted
-    pub const SIGNAL_ACCEPTED: &str = "accepted";
-    /// Signal type: dismissed
-    pub const SIGNAL_DISMISSED: &str = "dismissed";
-    /// Signal type: ignored
-    pub const SIGNAL_IGNORED: &str = "ignored";
 }

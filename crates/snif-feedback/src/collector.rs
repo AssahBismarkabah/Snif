@@ -1,5 +1,4 @@
 use anyhow::Result;
-use snif_config::constants::feedback_schema;
 use snif_embeddings::Embedder;
 use snif_types::Finding;
 
@@ -15,9 +14,9 @@ pub enum SignalType {
 impl SignalType {
     pub fn as_str(&self) -> &str {
         match self {
-            SignalType::Accepted => feedback_schema::SIGNAL_ACCEPTED,
-            SignalType::Dismissed => feedback_schema::SIGNAL_DISMISSED,
-            SignalType::Ignored => feedback_schema::SIGNAL_IGNORED,
+            SignalType::Accepted => "accepted",
+            SignalType::Dismissed => "dismissed",
+            SignalType::Ignored => "ignored",
         }
     }
 }

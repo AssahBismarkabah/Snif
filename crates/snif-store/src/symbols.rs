@@ -1,6 +1,5 @@
 use crate::Store;
 use anyhow::Result;
-use snif_config::constants::retrieval;
 use snif_types::{Symbol, SymbolForSummary};
 
 impl Store {
@@ -35,11 +34,11 @@ impl Store {
             "SELECT s.id, s.name, s.kind, s.start_line, s.end_line, s.file_id, f.path
              FROM symbols s
              JOIN files f ON s.file_id = f.id
-ORDER BY s.kind, s.file_id, s.start_line
-             LIMIT ?1",
+             ORDER BY s.kind, s.file_id, s.start_line
+             LIMIT 10000",
         )?;
         let rows = stmt
-            .query_map([retrieval::MAX_SYMBOLS_FETCH as i64], |row| {
+            .query_map([], |row| {
                 Ok(SymbolForSummary {
                     id: row.get(0)?,
                     name: row.get(1)?,

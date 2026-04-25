@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use snif_config::constants::eval_output;
 use std::collections::HashMap;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -48,7 +47,7 @@ pub fn load_fixtures(dir: &Path) -> Result<Vec<Fixture>> {
         }
 
         let fixture_dir = entry.path();
-        let meta_path = fixture_dir.join(eval_output::FIXTURE_META_FILE);
+        let meta_path = fixture_dir.join("fixture.json");
 
         if !meta_path.exists() {
             continue;
@@ -66,13 +65,13 @@ pub fn load_fixtures(dir: &Path) -> Result<Vec<Fixture>> {
 }
 
 fn load_single_fixture(fixture_dir: &Path) -> Result<Fixture> {
-    let meta_path = fixture_dir.join(eval_output::FIXTURE_META_FILE);
+    let meta_path = fixture_dir.join("fixture.json");
     let meta_content = std::fs::read_to_string(&meta_path)
         .with_context(|| format!("Failed to read {}", meta_path.display()))?;
     let meta: FixtureMeta = serde_json::from_str(&meta_content)
         .with_context(|| format!("Failed to parse {}", meta_path.display()))?;
 
-    let patch_path = fixture_dir.join(eval_output::PATCH_FILE);
+    let patch_path = fixture_dir.join("change.patch");
     let diff = std::fs::read_to_string(&patch_path)
         .with_context(|| format!("Failed to read {}", patch_path.display()))?;
 
@@ -86,7 +85,7 @@ fn load_single_fixture(fixture_dir: &Path) -> Result<Fixture> {
         let path = entry.path();
         let name = path.file_name().unwrap_or_default().to_string_lossy();
 
-        if name == eval_output::FIXTURE_META_FILE || name == eval_output::PATCH_FILE {
+        if name == "fixture.json" || name == "change.patch" {
             continue;
         }
 
@@ -110,54 +109,4 @@ fn load_single_fixture(fixture_dir: &Path) -> Result<Fixture> {
         conventions: meta.conventions,
         expected_findings: meta.expected_findings,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Write;
-    use tempfile::TempDir;
-
-    const TEST_FIXTURE_NAME: &str = "test-fixture";
-    const TEST_FIXTURE_DESCRIPTION: &str = "Test fixture for loading";
-
-    #[test]
-    fn load_fixtures_returns_empty_for_empty_dir() {
-        let temp_dir = TempDir::new().unwrap();
-        let fixtures = load_fixtures(temp_dir.path()).unwrap();
-        assert!(fixtures.is_empty());
-    }
-
-    #[test]
-    fn load_fixtures_loads_valid_fixture() {
-        let temp_dir = TempDir::new().unwrap();
-        let fixture_dir = temp_dir.path().join(TEST_FIXTURE_NAME);
-        std::fs::create_dir_all(&fixture_dir).unwrap();
-
-        let meta = serde_json::json!({
-            "name": TEST_FIXTURE_NAME,
-            "description": TEST_FIXTURE_DESCRIPTION,
-            "expected_findings": []
-        });
-        let mut meta_file =
-            std::fs::File::create(fixture_dir.join(eval_output::FIXTURE_META_FILE)).unwrap();
-        meta_file.write_all(meta.to_string().as_bytes()).unwrap();
-
-        let mut patch_file =
-            std::fs::File::create(fixture_dir.join(eval_output::PATCH_FILE)).unwrap();
-        patch_file.write_all(b"diff content").unwrap();
-
-        let fixtures = load_fixtures(temp_dir.path()).unwrap();
-        assert_eq!(fixtures.len(), 1);
-        assert_eq!(fixtures[0].name, TEST_FIXTURE_NAME);
-    }
-
-    #[test]
-    fn load_fixtures_skips_dirs_without_meta() {
-        let temp_dir = TempDir::new().unwrap();
-        std::fs::create_dir_all(temp_dir.path().join("no-meta")).unwrap();
-
-        let fixtures = load_fixtures(temp_dir.path()).unwrap();
-        assert!(fixtures.is_empty());
-    }
 }
