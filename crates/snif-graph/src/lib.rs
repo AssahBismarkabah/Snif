@@ -3,6 +3,7 @@ use sha2::{Digest, Sha256};
 use snif_store::Store;
 use snif_types::FileExtraction;
 
+#[derive(Default)]
 pub struct GraphStats {
     pub files_indexed: usize,
     pub files_skipped: usize,
@@ -12,13 +13,7 @@ pub struct GraphStats {
 }
 
 pub fn build_graph(store: &Store, extractions: &[FileExtraction]) -> Result<GraphStats> {
-    let mut stats = GraphStats {
-        files_indexed: 0,
-        files_skipped: 0,
-        symbols_extracted: 0,
-        imports_extracted: 0,
-        references_extracted: 0,
-    };
+    let mut stats = GraphStats::default();
 
     for extraction in extractions {
         let content_hash = compute_hash(extraction);

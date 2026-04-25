@@ -1,5 +1,5 @@
 use crate::history::EvalRecord;
-use snif_config::constants::{eval, eval_thresholds};
+use snif_config::constants::{eval, eval_output, eval_thresholds};
 
 /// Guidance text generated from analysis of past eval runs.
 /// Appended to the system prompt to steer the model based on
@@ -99,14 +99,20 @@ fn analyze_fixture_patterns(recent: &[&EvalRecord]) -> EvalGuidance {
 
     for record in recent {
         for fix in &record.per_fixture {
-            let runs = fixture_runs.entry(fix.name.clone()).or_insert(0);
+            let runs = fixture_runs
+                .entry(fix.name.clone())
+                .or_insert(eval_output::DEFAULT_COUNTER);
             *runs += 1;
-            if fix.fp > 0 {
-                let count = fixture_fp_counts.entry(fix.name.clone()).or_insert(0);
+            if fix.fp > eval_output::DEFAULT_COUNTER {
+                let count = fixture_fp_counts
+                    .entry(fix.name.clone())
+                    .or_insert(eval_output::DEFAULT_COUNTER);
                 *count += fix.fp;
             }
-            if fix.fn_count > 0 {
-                let count = fixture_fn_counts.entry(fix.name.clone()).or_insert(0);
+            if fix.fn_count > eval_output::DEFAULT_COUNTER {
+                let count = fixture_fn_counts
+                    .entry(fix.name.clone())
+                    .or_insert(eval_output::DEFAULT_COUNTER);
                 *count += fix.fn_count;
             }
         }
@@ -180,14 +186,14 @@ fn find_persistent_fixtures<'a>(
         .filter(|(name, count)| {
             let run_count = runs.get(name.as_str()).copied().unwrap_or(1);
             run_count >= eval_thresholds::MIN_RUNS_FOR_PATTERN
-                && **count as f64 / run_count as f64 > eval_thresholds::PERSISTENT_PATTERN_RATIO
+                && (**count as f64 / run_count as f64) > eval_thresholds::PERSISTENT_PATTERN_RATIO
         })
         .collect()
 }
 
 fn compute_trend(records: &[&EvalRecord], metric: fn(&EvalRecord) -> f64) -> f64 {
     if records.len() < 2 {
-        return 0.0;
+        return eval_output::DEFAULT_TOKEN_COUNT as f64;
     }
     // `records` comes from `history.iter().rev().take(window)`,
     // so records[0] is the most recent, records[last] is the oldest.
@@ -271,7 +277,13 @@ mod tests {
                     actual,
                     tp,
                     fp,
-                    fn_count: if tp == 0 && expected > 0 { 1 } else { 0 },
+                    fn_count: if tp == eval_output::DEFAULT_COUNTER
+                        && expected > eval_output::DEFAULT_COUNTER
+                    {
+                        1
+                    } else {
+                        eval_output::DEFAULT_COUNTER
+                    },
                 })
                 .collect(),
         }

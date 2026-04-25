@@ -5,6 +5,11 @@ use snif_store::Store;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
+/// Runtime embedding model selection.
+/// This must match `embeddings::MODEL_NAME` in snif-config.
+/// Change here when switching embedding models.
+const RUNTIME_MODEL: EmbeddingModel = EmbeddingModel::AllMiniLML6V2;
+
 pub struct Embedder {
     model: TextEmbedding,
 }
@@ -17,13 +22,14 @@ pub struct EmbedStats {
 
 impl Embedder {
     /// Create a new Embedder instance with the configured embedding model.
+    ///
     /// Model: all-MiniLM-L6-v2 (384 dimensions, ONNX via fastembed)
+    /// See `RUNTIME_MODEL` constant - must match `embeddings::MODEL_NAME` in snif-config.
     pub fn new() -> Result<Self> {
         tracing::info!("Loading embedding model ({})...", embeddings::MODEL_NAME);
         let start = Instant::now();
-        // Embedding model configuration - change MODEL_NAME in snif-config to use a different model
         let model = TextEmbedding::try_new(
-            InitOptions::new(EmbeddingModel::AllMiniLML6V2).with_show_download_progress(true),
+            InitOptions::new(RUNTIME_MODEL).with_show_download_progress(true),
         )?;
         tracing::info!(elapsed = ?start.elapsed(), "Embedding model loaded");
         Ok(Self { model })
@@ -50,7 +56,7 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
     if summaries.is_empty() {
         tracing::info!("All summaries already embedded, skipping");
         return Ok(EmbedStats {
-            summaries_embedded: 0,
+            summaries_embedded: embeddings::DEFAULT_COUNT,
             dimension: model::DEFAULT_EMBEDDING_DIMENSION,
             duration: start.elapsed(),
         });
@@ -66,7 +72,7 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
     if summaries.is_empty() {
         tracing::info!("All summaries already embedded, skipping");
         return Ok(EmbedStats {
-            summaries_embedded: 0,
+            summaries_embedded: embeddings::DEFAULT_COUNT,
             dimension: model::DEFAULT_EMBEDDING_DIMENSION,
             duration: start.elapsed(),
         });
@@ -80,7 +86,7 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
 
     // Batch in groups of configured batch size
     let batch_size = embeddings::BATCH_SIZE;
-    let mut total_embedded = 0;
+    let mut total_embedded = embeddings::INITIAL_TOTAL;
     let mut dimension = model::DEFAULT_EMBEDDING_DIMENSION;
 
     for chunk in summaries.chunks(batch_size) {

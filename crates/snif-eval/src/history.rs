@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
-use snif_config::constants::{thresholds, time};
+use snif_config::constants::{eval_output, thresholds, time};
 use std::io::{BufRead, Write};
 use std::path::Path;
 
@@ -124,36 +124,39 @@ pub fn check_regression(current: &EvalRecord, previous: &EvalRecord) -> Vec<Regr
     // Aggregate metric regressions
     let precision_drop = previous.precision - current.precision;
     if precision_drop > thresholds::PRECISION_REGRESSION_THRESHOLD {
+        let pct_drop = precision_drop * eval_output::PERCENTAGE_MULTIPLIER;
+        let prev_pct = previous.precision * eval_output::PERCENTAGE_MULTIPLIER;
+        let curr_pct = current.precision * eval_output::PERCENTAGE_MULTIPLIER;
         warnings.push(RegressionWarning {
             message: format!(
                 "Precision dropped {:.1}pp ({:.1}% -> {:.1}%)",
-                precision_drop * 100.0,
-                previous.precision * 100.0,
-                current.precision * 100.0,
+                pct_drop, prev_pct, curr_pct,
             ),
         });
     }
 
     let recall_drop = previous.recall - current.recall;
     if recall_drop > thresholds::RECALL_REGRESSION_THRESHOLD {
+        let recall_pct_drop = recall_drop * eval_output::PERCENTAGE_MULTIPLIER;
+        let prev_recall_pct = previous.recall * eval_output::PERCENTAGE_MULTIPLIER;
+        let curr_recall_pct = current.recall * eval_output::PERCENTAGE_MULTIPLIER;
         warnings.push(RegressionWarning {
             message: format!(
                 "Recall dropped {:.1}pp ({:.1}% -> {:.1}%)",
-                recall_drop * 100.0,
-                previous.recall * 100.0,
-                current.recall * 100.0,
+                recall_pct_drop, prev_recall_pct, curr_recall_pct,
             ),
         });
     }
 
     let noise_increase = current.noise_rate - previous.noise_rate;
     if noise_increase > thresholds::NOISE_REGRESSION_THRESHOLD {
+        let noise_pct_increase = noise_increase * eval_output::PERCENTAGE_MULTIPLIER;
+        let prev_noise_pct = previous.noise_rate * eval_output::PERCENTAGE_MULTIPLIER;
+        let curr_noise_pct = current.noise_rate * eval_output::PERCENTAGE_MULTIPLIER;
         warnings.push(RegressionWarning {
             message: format!(
                 "Noise rate increased {:.1}pp ({:.1}% -> {:.1}%)",
-                noise_increase * 100.0,
-                previous.noise_rate * 100.0,
-                current.noise_rate * 100.0,
+                noise_pct_increase, prev_noise_pct, curr_noise_pct,
             ),
         });
     }
@@ -167,7 +170,9 @@ pub fn check_regression(current: &EvalRecord, previous: &EvalRecord) -> Vec<Regr
 
     for curr_fix in &current.per_fixture {
         if let Some(prev_fix) = prev_by_name.get(curr_fix.name.as_str()) {
-            if prev_fix.tp > 0 && curr_fix.tp == 0 {
+            if prev_fix.tp > eval_output::DEFAULT_COUNTER
+                && curr_fix.tp == eval_output::DEFAULT_COUNTER
+            {
                 warnings.push(RegressionWarning {
                     message: format!(
                         "Fixture '{}': lost detection (TP {} -> 0)",
@@ -176,7 +181,9 @@ pub fn check_regression(current: &EvalRecord, previous: &EvalRecord) -> Vec<Regr
                 });
             }
 
-            if prev_fix.fp == 0 && curr_fix.fp > 0 {
+            if prev_fix.fp == eval_output::DEFAULT_COUNTER
+                && curr_fix.fp > eval_output::DEFAULT_COUNTER
+            {
                 warnings.push(RegressionWarning {
                     message: format!(
                         "Fixture '{}': new false positives (FP 0 -> {})",
@@ -242,14 +249,77 @@ fn current_git_sha() -> String {
                 None
             }
         })
-        .unwrap_or_else(|| "unknown".to_string())
+        .unwrap_or_else(|| eval_output::UNKNOWN_GIT_SHA.to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{check_regression, load_history, save_record, EvalRecord, FixtureRecord};
+    use snif_config::constants::eval_output;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    const TEST_TIMESTAMP: &str = "2026-04-09T00:00:00Z";
+    const TEST_FIXTURE_NAME: &str = "fixture-a";
+    const TEST_FIXTURE_EXPECTED: usize = 1;
+
+    const TEST_SHA_1: &str = "sha-1";
+    const TEST_SHA_2: &str = "sha-2";
+
+    const TEST_PRECISION_HIGH: f64 = 0.90;
+    const TEST_RECALL_HIGH: f64 = 0.95;
+    const TEST_NOISE_LOW: f64 = 0.05;
+    const TEST_TP_HIGH: usize = 1;
+    const TEST_FP_ZERO: usize = 0;
+
+    const TEST_PRECISION_MID_1: f64 = 0.82;
+    const TEST_RECALL_MID: f64 = 0.90;
+    const TEST_NOISE_VERY_LOW: f64 = 0.08;
+
+    const TEST_PRECISION_MID_2: f64 = 0.79;
+    const TEST_NOISE_LOW_2: f64 = 0.10;
+
+    const TEST_PRECISION_LOW: f64 = 0.80;
+    const TEST_RECALL_LOW: f64 = 0.80;
+    const TEST_NOISE_HIGH: f64 = 0.12;
+    const TEST_TP_ZERO: usize = 0;
+    const TEST_FP_MID: usize = 2;
+
+    fn sample_record(
+        git_sha: &str,
+        precision: f64,
+        recall: f64,
+        noise_rate: f64,
+        tp: usize,
+        fp: usize,
+    ) -> EvalRecord {
+        EvalRecord {
+            timestamp: TEST_TIMESTAMP.to_string(),
+            git_sha: git_sha.to_string(),
+            fixture_count: TEST_FIXTURE_EXPECTED,
+            precision,
+            recall,
+            noise_rate,
+            gates_passed: true,
+            per_fixture: vec![FixtureRecord {
+                name: TEST_FIXTURE_NAME.to_string(),
+                expected: TEST_FIXTURE_EXPECTED,
+                actual: tp + fp,
+                tp,
+                fp,
+                fn_count: usize::from(tp == eval_output::DEFAULT_COUNTER),
+            }],
+        }
+    }
+
+    fn unique_history_path(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+
+        std::env::temp_dir().join(format!("snif-eval-history-{label}-{nanos}.jsonl"))
+    }
 
     #[test]
     fn load_history_returns_empty_for_missing_file() {
@@ -261,24 +331,52 @@ mod tests {
     #[test]
     fn save_and_load_history_round_trip() {
         let path = unique_history_path("round-trip");
-        let first = sample_record("sha-1", 0.82, 0.90, 0.08, 1, 0);
-        let second = sample_record("sha-2", 0.79, 0.88, 0.10, 1, 1);
+        let first = sample_record(
+            TEST_SHA_1,
+            TEST_PRECISION_MID_1,
+            TEST_RECALL_MID,
+            TEST_NOISE_VERY_LOW,
+            TEST_TP_HIGH,
+            TEST_FP_ZERO,
+        );
+        let second = sample_record(
+            TEST_SHA_2,
+            TEST_PRECISION_MID_2,
+            TEST_RECALL_MID,
+            TEST_NOISE_LOW_2,
+            TEST_TP_HIGH,
+            TEST_TP_HIGH,
+        );
 
         save_record(&path, &first).expect("first record should save");
         save_record(&path, &second).expect("second record should save");
 
         let loaded = load_history(&path).expect("history should load");
         assert_eq!(loaded.len(), 2);
-        assert_eq!(loaded[0].git_sha, "sha-1");
-        assert_eq!(loaded[1].git_sha, "sha-2");
+        assert_eq!(loaded[0].git_sha, TEST_SHA_1);
+        assert_eq!(loaded[1].git_sha, TEST_SHA_2);
 
         std::fs::remove_file(path).expect("test history should be removed");
     }
 
     #[test]
     fn regression_detection_reports_aggregate_and_fixture_changes() {
-        let previous = sample_record("sha-1", 0.90, 0.95, 0.05, 1, 0);
-        let current = sample_record("sha-2", 0.80, 0.80, 0.12, 0, 2);
+        let previous = sample_record(
+            TEST_SHA_1,
+            TEST_PRECISION_HIGH,
+            TEST_RECALL_HIGH,
+            TEST_NOISE_LOW,
+            TEST_TP_HIGH,
+            TEST_FP_ZERO,
+        );
+        let current = sample_record(
+            TEST_SHA_2,
+            TEST_PRECISION_LOW,
+            TEST_RECALL_LOW,
+            TEST_NOISE_HIGH,
+            TEST_TP_ZERO,
+            TEST_FP_MID,
+        );
 
         let warnings = check_regression(&current, &previous);
         let messages: Vec<&str> = warnings
@@ -316,41 +414,5 @@ mod tests {
                 .any(|message| message.contains("new false positives")),
             "expected false positive warning"
         );
-    }
-
-    fn sample_record(
-        git_sha: &str,
-        precision: f64,
-        recall: f64,
-        noise_rate: f64,
-        tp: usize,
-        fp: usize,
-    ) -> EvalRecord {
-        EvalRecord {
-            timestamp: "2026-04-09T00:00:00Z".to_string(),
-            git_sha: git_sha.to_string(),
-            fixture_count: 1,
-            precision,
-            recall,
-            noise_rate,
-            gates_passed: true,
-            per_fixture: vec![FixtureRecord {
-                name: "fixture-a".to_string(),
-                expected: 1,
-                actual: tp + fp,
-                tp,
-                fp,
-                fn_count: usize::from(tp == 0),
-            }],
-        }
-    }
-
-    fn unique_history_path(label: &str) -> PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock should be after unix epoch")
-            .as_nanos();
-
-        std::env::temp_dir().join(format!("snif-eval-history-{label}-{nanos}.jsonl"))
     }
 }
