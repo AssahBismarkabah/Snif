@@ -1,3 +1,4 @@
+use snif_config::constants::output_filter;
 use anyhow::Result;
 use serde::Deserialize;
 use serde_json::Value;
@@ -14,38 +15,21 @@ pub struct ParsedResponse {
     pub findings: Vec<Finding>,
 }
 
-/// Chain-of-thought patterns that indicate leaked reasoning.
-///
-/// Only patterns that are clearly reasoning/meta-commentary — not common
-/// English phrases that could appear in legitimate finding text.
-/// Over-broad patterns (e.g. "actually", "but the", "so the") were
-/// removed because they caused false COT detection, triggering
-/// unnecessary repair calls that changed finding categories.
-const COT_PATTERNS: &[&str] = &[
-    "let me think",
-    "let's look",
-    "let me analyze",
-    "i need to",
-    "i should",
-    "i will look for",
-    "i will remove this finding",
-    "i will lower the confidence",
-    "the code slices",
-    "the real issue is not",
-    "let's look closer",
-    "looking at the code, i",
-    "examining this, i",
-    "the most concrete issue i can",
-    "the most significant issue i can",
-    "i will now",
-    "let me check",
-    "first, let me",
-    "step 1:",
-    "step 2:",
-];
-
-const SENTENCE_DELIMITERS: &[char] = &['.', '!', '?', '\n'];
-const CLEAN_TEXT_MIN_LENGTH: usize = 5;
+/// Update JSON parser state for a character
+#[inline]
+fn update_json_state(ch: char, in_string: &mut bool, escape: &mut bool) {
+    if *in_string {
+        if *escape {
+            *escape = false;
+        } else if ch == '\\' {
+            *escape = true;
+        } else if ch == '"' {
+            *in_string = false;
+        }
+    } else if ch == '"' {
+        *in_string = true;
+    }
+}
 
 /// Extract the outermost balanced JSON object from a response that may contain
 /// chain-of-thought preamble text.
@@ -59,28 +43,20 @@ fn extract_json_object(input: &str) -> Option<&str> {
     let mut end_pos = None;
 
     for (i, ch) in after_open.char_indices() {
-        if in_string {
-            if escape {
-                escape = false;
-            } else if ch == '\\' {
-                escape = true;
-            } else if ch == '"' {
-                in_string = false;
-            }
-            continue;
-        }
+        update_json_state(ch, &mut in_string, &mut escape);
 
-        match ch {
-            '"' => in_string = true,
-            '{' => depth += 1,
-            '}' => {
-                depth -= 1;
-                if depth == 0 {
-                    end_pos = Some(i);
-                    break;
+        if !in_string {
+            match ch {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end_pos = Some(i);
+                        break;
+                    }
                 }
+                _ => {}
             }
-            _ => {}
         }
     }
 
@@ -90,7 +66,7 @@ fn extract_json_object(input: &str) -> Option<&str> {
 /// Check if the response contains chain-of-thought leakage patterns.
 fn contains_cot_patterns(response: &str) -> bool {
     let lower = response.to_lowercase();
-    COT_PATTERNS.iter().any(|pattern| lower.contains(pattern))
+    output_filter::COT_PATTERNS.iter().any(|pattern| lower.contains(pattern))
 }
 
 /// Sanitize a finding's text fields by removing chain-of-thought preamble.
@@ -108,21 +84,21 @@ fn sanitize_text(text: &str) -> String {
 
     // Only sanitize if the text STARTS with a COT pattern — this is the
     // hallmark of leaked reasoning. Mid-text occurrences are legitimate.
-    let starts_with_cot = COT_PATTERNS.iter().any(|p| lower.starts_with(p));
+    let starts_with_cot = output_filter::COT_PATTERNS.iter().any(|p| lower.starts_with(p));
 
     if !starts_with_cot {
         return trimmed.to_string();
     }
 
     // Text starts with reasoning — find the first concrete sentence
-    let sentences: Vec<&str> = trimmed.split(SENTENCE_DELIMITERS).collect();
+    let sentences: Vec<&str> = trimmed.split(output_filter::SENTENCE_DELIMITERS).collect();
     for sentence in &sentences {
         let s = sentence.trim();
         if s.is_empty() {
             continue;
         }
         let s_lower = s.to_lowercase();
-        if !COT_PATTERNS.iter().any(|p| s_lower.starts_with(p)) {
+        if !output_filter::COT_PATTERNS.iter().any(|p| s_lower.starts_with(p)) {
             return format!(
                 "{}.",
                 s.trim_start_matches(|c: char| !c.is_alphabetic()).trim()
@@ -131,13 +107,13 @@ fn sanitize_text(text: &str) -> String {
     }
     // If all sentences start with COT patterns, return the last part after the
     // last COT marker
-    for pattern in COT_PATTERNS {
+    for pattern in output_filter::COT_PATTERNS {
         if let Some(pos) = lower.find(pattern) {
             let after = &trimmed[pos + pattern.len()..];
             let clean = after
                 .trim_start_matches(|c: char| !c.is_alphabetic())
                 .trim();
-            if !clean.is_empty() && clean.len() > CLEAN_TEXT_MIN_LENGTH {
+            if !clean.is_empty() && clean.len() > output_filter::CLEAN_TEXT_MIN_LENGTH {
                 return clean.to_string();
             }
         }
@@ -247,8 +223,8 @@ fn parsed_response_from_value(value: &Value) -> Option<ParsedResponse> {
                 .unwrap_or_default()
                 .to_string();
 
-            for key in ["findings", "issues", "results"] {
-                if let Some(Value::Array(items)) = map.get(key) {
+            for key in output_filter::FINDING_KEYS {
+                if let Some(Value::Array(items)) = map.get(*key) {
                     let findings = parse_findings(items);
                     if !findings.is_empty() || !summary.is_empty() {
                         return Some(ParsedResponse { summary, findings });
@@ -295,8 +271,8 @@ fn parse_findings(items: &[Value]) -> Vec<Finding> {
 
 fn salvage_findings(response: &str) -> Vec<Finding> {
     let object_region = response
-        .find("\"findings\"")
-        .and_then(|index| response[index..].find('[').map(|offset| index + offset))
+        .find(output_filter::FINDING_KEYS[0])
+        .and_then(|index| response[index..].find(output_filter::JSON_ARRAY_START).map(|offset| index + offset))
         .map(|index| &response[index..])
         .unwrap_or(response);
 
@@ -318,38 +294,30 @@ fn extract_balanced_objects(input: &str) -> Vec<String> {
     let mut escape = false;
 
     for (index, ch) in input.char_indices() {
-        if in_string {
-            if escape {
-                escape = false;
-            } else if ch == '\\' {
-                escape = true;
-            } else if ch == '"' {
-                in_string = false;
-            }
-            continue;
-        }
+        update_json_state(ch, &mut in_string, &mut escape);
 
-        match ch {
-            '"' => in_string = true,
-            '{' => {
-                if depth == 0 {
-                    start = Some(index);
+        if !in_string {
+            match ch {
+                '{' => {
+                    if depth == 0 {
+                        start = Some(index);
+                    }
+                    depth += 1;
                 }
-                depth += 1;
-            }
-            '}' => {
-                if depth == 0 {
-                    continue;
-                }
+                '}' => {
+                    if depth == 0 {
+                        continue;
+                    }
 
-                depth -= 1;
-                if depth == 0 {
-                    if let Some(start_index) = start.take() {
-                        objects.push(input[start_index..=index].to_string());
+                    depth -= 1;
+                    if depth == 0 {
+                        if let Some(start_index) = start.take() {
+                            objects.push(input[start_index..=index].to_string());
+                        }
                     }
                 }
+                _ => {}
             }
-            _ => {}
         }
     }
 
@@ -359,6 +327,13 @@ fn extract_balanced_objects(input: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::{has_chain_of_thought, parse_response};
+
+    const TEST_FILE: &str = "src/lib.rs";
+    const TEST_FILE_OTHER: &str = "src/other.rs";
+    const TEST_LINE: usize = 7;
+    const TEST_LINE_OTHER: usize = 12;
+    const TEST_CONFIDENCE: f64 = 0.9;
+    const TEST_CONFIDENCE_HIGH: f64 = 1.0;
 
     #[test]
     fn parses_object_with_issues_field() {
@@ -410,7 +385,7 @@ mod tests {
 
         let parsed = parse_response(response).unwrap();
         assert_eq!(parsed.findings.len(), 1);
-        assert_eq!(parsed.findings[0].location.file, "src/lib.rs");
+        assert_eq!(parsed.findings[0].location.file, TEST_FILE);
     }
 
     #[test]

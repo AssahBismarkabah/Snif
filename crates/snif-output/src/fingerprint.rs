@@ -1,9 +1,7 @@
+use snif_config::constants::{eval_output, output_filter};
 use sha2::{Digest, Sha256};
 use snif_types::{Finding, Fingerprint};
 use std::collections::HashMap;
-
-const FINGERPRINT_HASH_LENGTH: usize = 16;
-const FINGERPRINT_DISAMBIGUATION_SEPARATOR: &str = ":";
 
 pub fn compute_fingerprints(findings: &mut [Finding]) {
     let mut content_counts: HashMap<String, usize> = HashMap::new();
@@ -13,13 +11,13 @@ pub fn compute_fingerprints(findings: &mut [Finding]) {
         let line_hash = compute_line_hash(finding);
 
         // Disambiguate when the same content hash appears multiple times
-        let count = content_counts.entry(content_hash.clone()).or_insert(0);
-        let id = if *count == 0 {
+        let count = content_counts.entry(content_hash.clone()).or_insert(eval_output::DEFAULT_COUNTER);
+        let id = if *count == eval_output::DEFAULT_COUNTER {
             content_hash.clone()
         } else {
             format!(
                 "{}{}{}",
-                content_hash, FINGERPRINT_DISAMBIGUATION_SEPARATOR, count
+                content_hash, output_filter::FINGERPRINT_DISAMBIGUATION_SEPARATOR, count
             )
         };
         *count += 1;
@@ -40,7 +38,7 @@ fn compute_content_hash(finding: &Finding) -> String {
     hasher.update(normalize_evidence(&finding.evidence).as_bytes());
 
     let hash = format!("{:x}", hasher.finalize());
-    hash[..FINGERPRINT_HASH_LENGTH].to_string()
+    hash[..output_filter::FINGERPRINT_HASH_LENGTH].to_string()
 }
 
 /// Line-based hash: backward compatible with prior fingerprints.
@@ -55,7 +53,7 @@ fn compute_line_hash(finding: &Finding) -> String {
     hasher.update(finding.category.to_string().as_bytes());
 
     let hash = format!("{:x}", hasher.finalize());
-    hash[..FINGERPRINT_HASH_LENGTH].to_string()
+    hash[..output_filter::FINGERPRINT_HASH_LENGTH].to_string()
 }
 
 /// Normalize evidence text for stable hashing:

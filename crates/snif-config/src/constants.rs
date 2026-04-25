@@ -402,6 +402,83 @@ Rewrite the following review into the required JSON object without adding commen
 }
 
 // ============================================================================
+// Output Filter Constants
+// ============================================================================
+pub mod output_filter {
+    /// Self-dismissal patterns — LLM phrases that indicate it reasoned out of reporting
+    pub const DISMISSAL_PATTERNS: &[&str] = &[
+        "no bug",
+        "no issue",
+        "not a bug",
+        "not an issue",
+        "no real issue",
+        "no real problem",
+        "no real ",
+        "not a real ",
+        "not a critical",
+        "acceptable behavior",
+        "acceptable for",
+        "this is fine",
+        "this seems correct",
+        "i will look for",
+        "i will remove",
+        "i will lower",
+        "no bug here",
+        "no critical bug",
+        "not a strong",
+        "minor robustness",
+        "just a dependency",
+        "just relying on",
+    ];
+    /// Impact patterns indicating dismissal
+    pub const IMPACT_NONE_PATTERNS: &[&str] = &["impact: none", "impact:none"];
+    /// Minimal impact dismissal patterns
+    pub const MINIMAL_IMPACT_PATTERNS: &[&str] = &[
+        "minimal security impact",
+        "minimal impact",
+    ];
+    /// Fingerprint hash length (number of hex characters)
+    pub const FINGERPRINT_HASH_LENGTH: usize = 16;
+    /// Disambiguation separator for duplicate fingerprints
+    pub const FINGERPRINT_DISAMBIGUATION_SEPARATOR: &str = ":";
+    /// Chain-of-thought patterns that indicate leaked reasoning
+    pub const COT_PATTERNS: &[&str] = &[
+        "let me think",
+        "let's look",
+        "let me analyze",
+        "i need to",
+        "i should",
+        "i will look for",
+        "i will remove this finding",
+        "i will lower the confidence",
+        "the code slices",
+        "the real issue is not",
+        "let's look closer",
+        "looking at the code, i",
+        "examining this, i",
+        "the most concrete issue i can",
+        "the most significant issue i can",
+        "i will now",
+        "let me check",
+        "first, let me",
+        "step 1:",
+        "step 2:",
+    ];
+    /// Sentence delimiters for text parsing
+    pub const SENTENCE_DELIMITERS: &[char] = &['.', '!', '?', '\n'];
+    /// Minimum length for cleaned text
+    pub const CLEAN_TEXT_MIN_LENGTH: usize = 5;
+    /// JSON keys for finding arrays
+    pub const FINDING_KEYS: &[&str] = &["findings", "issues", "results"];
+    /// JSON array start delimiter
+    pub const JSON_ARRAY_START: char = '[';
+    /// JSON object start delimiter
+    pub const JSON_OBJECT_START: char = '{';
+    /// JSON object end delimiter
+    pub const JSON_OBJECT_END: char = '}';
+}
+
+// ============================================================================
 // CLI Defaults and Configuration
 // ============================================================================
 pub mod context {
