@@ -68,6 +68,7 @@ pub mod embeddings {
     /// in the embedder code. To change models:
     /// 1. Update this constant name
     /// 2. Update `RUNTIME_MODEL` in snif-embeddings crate
+    ///
     /// Model: all-MiniLM-L6-v2 (ONNX via fastembed)
     pub const MODEL_NAME: &str = "all-MiniLM-L6-v2";
 
