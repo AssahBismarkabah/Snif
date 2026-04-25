@@ -3,7 +3,7 @@ pub mod filter;
 
 use anyhow::Result;
 use rusqlite::Connection;
-use snif_config::constants::model;
+use snif_config::constants::{feedback_schema, limits, model};
 use snif_store::{init_sqlite_vec, sql::pragmas};
 use std::path::Path;
 use zerocopy::AsBytes;
@@ -29,21 +29,31 @@ impl FeedbackStore {
         ))?;
 
         conn.execute_batch(&format!(
-            "CREATE TABLE IF NOT EXISTS feedback_signals (
+            "CREATE TABLE IF NOT EXISTS {} (
                 id INTEGER PRIMARY KEY,
-                team_id TEXT NOT NULL,
-                signal_type TEXT NOT NULL,
-                finding_text TEXT NOT NULL,
-                finding_category TEXT NOT NULL,
-                timestamp TEXT NOT NULL DEFAULT (datetime('now'))
+                {} TEXT NOT NULL,
+                {} TEXT NOT NULL,
+                {} TEXT NOT NULL,
+                {} TEXT NOT NULL,
+                {} TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
-            CREATE INDEX IF NOT EXISTS idx_signals_team ON feedback_signals(team_id);
+            CREATE INDEX IF NOT EXISTS idx_signals_team ON {}({});
 
-            CREATE VIRTUAL TABLE IF NOT EXISTS feedback_embeddings USING vec0(
-                signal_id INTEGER PRIMARY KEY,
+            CREATE VIRTUAL TABLE IF NOT EXISTS {} USING vec0(
+                {} INTEGER PRIMARY KEY,
                 embedding float[{}]
             );",
+            feedback_schema::TABLE_SIGNALS,
+            feedback_schema::COLUMN_TEAM_ID,
+            feedback_schema::COLUMN_SIGNAL_TYPE,
+            feedback_schema::COLUMN_FINDING_TEXT,
+            feedback_schema::COLUMN_FINDING_CATEGORY,
+            feedback_schema::COLUMN_TIMESTAMP,
+            feedback_schema::TABLE_SIGNALS,
+            feedback_schema::COLUMN_TEAM_ID,
+            feedback_schema::TABLE_EMBEDDINGS,
+            feedback_schema::COLUMN_SIGNAL_ID,
             model::DEFAULT_EMBEDDING_DIMENSION
         ))?;
 
@@ -58,8 +68,14 @@ impl FeedbackStore {
         finding_category: &str,
     ) -> Result<i64> {
         self.conn.execute(
-            "INSERT INTO feedback_signals (team_id, signal_type, finding_text, finding_category)
-             VALUES (?1, ?2, ?3, ?4)",
+            &format!(
+                "INSERT INTO {} ({}, {}, {}, {}) VALUES (?1, ?2, ?3, ?4)",
+                feedback_schema::TABLE_SIGNALS,
+                feedback_schema::COLUMN_TEAM_ID,
+                feedback_schema::COLUMN_SIGNAL_TYPE,
+                feedback_schema::COLUMN_FINDING_TEXT,
+                feedback_schema::COLUMN_FINDING_CATEGORY
+            ),
             rusqlite::params![team_id, signal_type, finding_text, finding_category],
         )?;
         Ok(self.conn.last_insert_rowid())
@@ -67,7 +83,11 @@ impl FeedbackStore {
 
     pub fn insert_signal_embedding(&self, signal_id: i64, embedding: &[f32]) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO feedback_embeddings (signal_id, embedding) VALUES (?1, ?2)",
+            &format!(
+                "INSERT INTO {} ({}, embedding) VALUES (?1, ?2)",
+                feedback_schema::TABLE_EMBEDDINGS,
+                feedback_schema::COLUMN_SIGNAL_ID
+            ),
             rusqlite::params![signal_id, embedding.as_bytes()],
         )?;
         Ok(())
@@ -75,7 +95,11 @@ impl FeedbackStore {
 
     pub fn get_signal_count(&self, team_id: &str) -> Result<usize> {
         let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM feedback_signals WHERE team_id = ?1",
+            &format!(
+                "SELECT COUNT(*) FROM {} WHERE {} = ?1",
+                feedback_schema::TABLE_SIGNALS,
+                feedback_schema::COLUMN_TEAM_ID
+            ),
             [team_id],
             |row| row.get(0),
         )?;
@@ -91,11 +115,13 @@ impl FeedbackStore {
         use std::collections::HashMap;
 
         // KNN search against all embeddings
-        let mut knn_stmt = self.conn.prepare(
-            "SELECT signal_id, distance FROM feedback_embeddings
-              WHERE embedding MATCH ?1 AND k = ?2
-              ORDER BY distance",
-        )?;
+        let mut knn_stmt = self.conn.prepare(&format!(
+            "SELECT {}, distance FROM {}
+                  WHERE embedding MATCH ?1 AND k = ?2
+                  ORDER BY distance",
+            feedback_schema::COLUMN_SIGNAL_ID,
+            feedback_schema::TABLE_EMBEDDINGS
+        ))?;
 
         let knn_results: Vec<(i64, f64)> = knn_stmt
             .query_map(
@@ -114,15 +140,16 @@ impl FeedbackStore {
 
         // SQLite has a default limit of 999 variables per query.
         // Chunk to stay well under that limit.
-        const SQLITE_MAX_VARIABLE_NUMBER: usize = 900;
-
         let mut results = Vec::new();
-        for chunk in signal_ids.chunks(SQLITE_MAX_VARIABLE_NUMBER) {
+        for chunk in signal_ids.chunks(limits::SQLITE_MAX_VARIABLE_NUMBER) {
             let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
             let sql = format!(
-                "SELECT id, signal_type FROM feedback_signals 
-                 WHERE id IN ({}) AND team_id = ?",
-                placeholders
+                "SELECT id, {} FROM {} 
+                 WHERE id IN ({}) AND {} = ?",
+                feedback_schema::COLUMN_SIGNAL_TYPE,
+                feedback_schema::TABLE_SIGNALS,
+                placeholders,
+                feedback_schema::COLUMN_TEAM_ID
             );
 
             let mut stmt = self.conn.prepare(&sql)?;

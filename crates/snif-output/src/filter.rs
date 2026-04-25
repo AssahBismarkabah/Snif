@@ -1,3 +1,4 @@
+use snif_config::constants::output_filter;
 use snif_config::FilterConfig;
 use snif_types::{Finding, FindingCategory};
 
@@ -13,43 +14,21 @@ fn is_self_dismissed(finding: &Finding) -> bool {
         finding.impact.to_lowercase()
     );
 
-    let dismissal_patterns = [
-        "no bug",
-        "no issue",
-        "not a bug",
-        "not an issue",
-        "no real issue",
-        "no real problem",
-        "no real ",
-        "not a real ",
-        "not a critical",
-        "acceptable behavior",
-        "acceptable for",
-        "this is fine",
-        "this seems correct",
-        "i will look for",
-        "i will remove",
-        "i will lower",
-        "no bug here",
-        "no critical bug",
-        "not a strong",
-        "minor robustness",
-        "just a dependency",
-        "just relying on",
-    ];
+    let dismissal_patterns = output_filter::DISMISSAL_PATTERNS;
 
     if dismissal_patterns.iter().any(|p| body.contains(p)) {
         return true;
     }
 
     // Detect "impact: none" or "impact: none," patterns (case-insensitive)
-    if body.contains("impact: none") || body.contains("impact:none") {
+    let impact_none = output_filter::IMPACT_NONE_PATTERNS;
+    if impact_none.iter().any(|p| body.contains(p)) {
         return true;
     }
 
     // "minimal security impact" without being a legitimate qualifier
-    if body.contains("minimal security impact")
-        || body.contains("minimal impact") && !body.contains("minimal impact on")
+    let minimal = output_filter::MINIMAL_IMPACT_PATTERNS;
+    if body.contains(minimal[0]) || body.contains(minimal[1]) && !body.contains("minimal impact on")
     {
         return true;
     }
@@ -151,9 +130,16 @@ fn deduplicate(findings: Vec<Finding>) -> Vec<Finding> {
 mod tests {
     use super::*;
 
+    const TEST_MIN_CONFIDENCE: f64 = 0.5;
+    const TEST_CONFIDENCE_HIGH: f64 = 0.9;
+    const TEST_CONFIDENCE_MID: f64 = 0.8;
+    const TEST_LINE: usize = 10;
+    const TEST_FILE: &str = "src/test.rs";
+    const TEST_EVIDENCE: &str = "fn test() {}";
+
     fn default_config() -> FilterConfig {
         FilterConfig {
-            min_confidence: 0.5,
+            min_confidence: TEST_MIN_CONFIDENCE,
             suppress_style_only: false,
             feedback_min_signals: 0,
         }
@@ -162,13 +148,13 @@ mod tests {
     fn make_finding(explanation: &str, impact: &str, confidence: f64) -> Finding {
         Finding {
             location: snif_types::FileLocation {
-                file: "src/test.rs".to_string(),
-                start_line: 10,
+                file: TEST_FILE.to_string(),
+                start_line: TEST_LINE,
                 end_line: None,
             },
             category: FindingCategory::Logic,
             confidence,
-            evidence: "fn test() {}".to_string(),
+            evidence: TEST_EVIDENCE.to_string(),
             explanation: explanation.to_string(),
             impact: impact.to_string(),
             suggestion: None,
@@ -178,7 +164,7 @@ mod tests {
 
     #[test]
     fn self_dismissed_no_bug() {
-        let f = make_finding("no bug here", "None", 0.9);
+        let f = make_finding("no bug here", "None", TEST_CONFIDENCE_HIGH);
         assert!(is_self_dismissed(&f));
     }
 
@@ -187,14 +173,14 @@ mod tests {
         let f = make_finding(
             "I will remove this finding as it's speculative",
             "Minimal impact",
-            0.8,
+            TEST_CONFIDENCE_MID,
         );
         assert!(is_self_dismissed(&f));
     }
 
     #[test]
     fn self_dismissed_impact_none() {
-        let f = make_finding("logic seems correct", "impact: none", 0.8);
+        let f = make_finding("logic seems correct", "impact: none", TEST_CONFIDENCE_MID);
         assert!(is_self_dismissed(&f));
     }
 
@@ -203,14 +189,18 @@ mod tests {
         let f = make_finding(
             "This is acceptable behavior for this use case",
             "No real issue",
-            0.7,
+            TEST_CONFIDENCE_MID,
         );
         assert!(is_self_dismissed(&f));
     }
 
     #[test]
     fn self_dismissed_i_will_look_for() {
-        let f = make_finding("I will look for a stronger bug", "Minor issue", 0.8);
+        let f = make_finding(
+            "I will look for a stronger bug",
+            "Minor issue",
+            TEST_CONFIDENCE_MID,
+        );
         assert!(is_self_dismissed(&f));
     }
 
@@ -219,7 +209,7 @@ mod tests {
         let f = make_finding(
             "Minor robustness issue, but not a critical security vulnerability",
             "Minimal security impact",
-            0.9,
+            TEST_CONFIDENCE_HIGH,
         );
         assert!(is_self_dismissed(&f));
     }
@@ -247,7 +237,7 @@ mod tests {
     #[test]
     fn filter_chain_removes_self_dismissed() {
         let findings = vec![
-            make_finding("no bug here", "None", 0.9), // should be filtered
+            make_finding("no bug here", "None", TEST_CONFIDENCE_HIGH), // should be filtered
             make_finding(
                 "Concurrent writes corrupt JSONL",
                 "Data corruption risk",
