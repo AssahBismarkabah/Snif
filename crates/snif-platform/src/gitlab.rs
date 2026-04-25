@@ -1,7 +1,7 @@
 use crate::{extract_fingerprints, PlatformAdapter, BOT_MARKER};
 use anyhow::{bail, Context, Result};
 use snif_config::constants::timeouts;
-use snif_config::env::{ci, keys};
+use snif_config::env::{ci, keys, get_api_key};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
 const GITLAB_DEFAULT_API_BASE: &str = "https://gitlab.com/api/v4";
@@ -17,13 +17,7 @@ pub struct GitLabAdapter {
 
 impl GitLabAdapter {
     pub fn new(project_path: &str, mr_iid: u64, api_base: Option<&str>) -> Result<Self> {
-        let token = std::env::var(keys::GITLAB_TOKEN)
-            .or_else(|_| std::env::var(keys::CI_JOB_TOKEN))
-            .context(format!(
-                "{} or {} must be set",
-                keys::GITLAB_TOKEN,
-                keys::CI_JOB_TOKEN
-            ))?;
+        let token = get_api_key(keys::GITLAB_TOKEN, keys::CI_JOB_TOKEN)?;
 
         let encoded_path = project_path.replace('/', "%2F");
         let base = api_base.unwrap_or(GITLAB_DEFAULT_API_BASE).to_string();

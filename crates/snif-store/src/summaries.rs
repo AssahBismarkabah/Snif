@@ -1,5 +1,6 @@
 use crate::Store;
 use anyhow::Result;
+use snif_config::constants::retrieval;
 
 impl Store {
     pub fn insert_summary(
@@ -62,11 +63,9 @@ impl Store {
     }
 
     pub fn get_all_summaries(&self) -> Result<Vec<(i64, String)>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT id, summary FROM summaries LIMIT 50000")?;
+        let mut stmt = self.conn.prepare("SELECT id, summary FROM summaries LIMIT ?1")?;
         let rows = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .query_map([retrieval::MAX_SUMMARIES_FETCH as i64], |row| Ok((row.get(0)?, row.get(1)?)))?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
