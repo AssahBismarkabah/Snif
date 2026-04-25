@@ -127,6 +127,16 @@ pub mod retrieval {
     pub const SEMANTIC_SIMILARITY_FLOOR: f64 = 0.0;
     /// Max keyword terms counted for retrieval scoring
     pub const MAX_KEYWORD_TERMS: usize = 3;
+    /// Max similar signals to query for feedback matching
+    pub const FEEDBACK_KNN_K: usize = 10;
+    /// Maximum distance for similar signal matching
+    pub const MAX_SIMILAR_DISTANCE: f64 = 0.3;
+    /// Dismissed signal threshold for suppression
+    pub const DISMISSED_SUPPRESSION_THRESHOLD: usize = 3;
+    /// Accepted signal threshold for boost
+    pub const ACCEPTED_BOOST_THRESHOLD: usize = 3;
+    /// Confidence boost for accepted signals
+    pub const ACCEPTED_CONFIDENCE_BOOST: f64 = 0.1;
 }
 
 // ============================================================================
@@ -143,6 +153,8 @@ pub mod limits {
     pub const MAX_SUMMARIES_FETCH_LIMIT: usize = 50_000;
     /// Pagination limit for symbol fetching
     pub const MAX_SYMBOLS_FETCH_LIMIT: usize = 10_000;
+    /// SQLite maximum variables per query (stay under 999)
+    pub const SQLITE_MAX_VARIABLE_NUMBER: usize = 900;
 }
 
 // ============================================================================
@@ -155,6 +167,8 @@ pub mod thresholds {
     pub const SARIF_WARNING_CONFIDENCE: f64 = 0.7;
     /// Default minimum confidence for finding inclusion
     pub const MIN_CONFIDENCE_DEFAULT: f64 = 0.7;
+    /// Maximum confidence value (1.0 = 100%)
+    pub const MAX_CONFIDENCE: f64 = 1.0;
     /// Minimum signals for feedback analysis
     pub const FEEDBACK_MIN_SIGNALS: usize = 20;
     /// Precision drop threshold for regression detection
@@ -508,4 +522,32 @@ pub mod time {
     pub const SECS_PER_MINUTE: u64 = 60;
     pub const SECS_PER_HOUR: u64 = 3_600;
     pub const SECS_PER_DAY: u64 = 86_400;
+}
+
+// ============================================================================
+// Feedback Store Schema Constants
+// ============================================================================
+pub mod feedback_schema {
+    /// Feedback signals table name
+    pub const TABLE_SIGNALS: &str = "feedback_signals";
+    /// Feedback embeddings table name
+    pub const TABLE_EMBEDDINGS: &str = "feedback_embeddings";
+    /// Team ID column name
+    pub const COLUMN_TEAM_ID: &str = "team_id";
+    /// Signal type column name
+    pub const COLUMN_SIGNAL_TYPE: &str = "signal_type";
+    /// Finding text column name
+    pub const COLUMN_FINDING_TEXT: &str = "finding_text";
+    /// Finding category column name
+    pub const COLUMN_FINDING_CATEGORY: &str = "finding_category";
+    /// Timestamp column name
+    pub const COLUMN_TIMESTAMP: &str = "timestamp";
+    /// Signal ID column name
+    pub const COLUMN_SIGNAL_ID: &str = "signal_id";
+    /// Signal type: accepted
+    pub const SIGNAL_ACCEPTED: &str = "accepted";
+    /// Signal type: dismissed
+    pub const SIGNAL_DISMISSED: &str = "dismissed";
+    /// Signal type: ignored
+    pub const SIGNAL_IGNORED: &str = "ignored";
 }

@@ -1,22 +1,11 @@
 use anyhow::Result;
+use snif_config::constants::{retrieval, thresholds};
 use snif_config::FilterConfig;
 use snif_embeddings::Embedder;
 use snif_types::Finding;
 
 use crate::collector::SignalType;
 use crate::FeedbackStore;
-
-/// Maximum cosine distance for a signal to be considered similar.
-const MAX_SIMILAR_DISTANCE: f64 = 0.3;
-
-/// Minimum number of dismissed signals to suppress a finding.
-const DISMISSED_SUPPRESSION_THRESHOLD: usize = 3;
-
-/// Minimum number of accepted signals to boost finding confidence.
-const ACCEPTED_BOOST_THRESHOLD: usize = 3;
-
-/// Confidence boost applied when a finding matches accepted signals.
-const ACCEPTED_CONFIDENCE_BOOST: f64 = 0.1;
 
 pub fn apply_feedback_filter(
     findings: Vec<Finding>,
@@ -53,13 +42,13 @@ pub fn apply_feedback_filter(
             }
         };
 
-        let similar = store.query_similar_signals(&embedding, team_id, 10)?;
+        let similar = store.query_similar_signals(&embedding, team_id, retrieval::FEEDBACK_KNN_K)?;
 
         let mut dismissed_count = 0;
         let mut accepted_count = 0;
 
         for (signal_type, distance) in &similar {
-            if *distance > MAX_SIMILAR_DISTANCE {
+            if *distance > retrieval::MAX_SIMILAR_DISTANCE {
                 continue;
             }
             match signal_type.as_str() {
@@ -69,7 +58,7 @@ pub fn apply_feedback_filter(
             }
         }
 
-        if dismissed_count >= DISMISSED_SUPPRESSION_THRESHOLD {
+        if dismissed_count >= retrieval::DISMISSED_SUPPRESSION_THRESHOLD {
             tracing::debug!(
                 file = %finding.location.file,
                 dismissed = dismissed_count,
@@ -78,8 +67,8 @@ pub fn apply_feedback_filter(
             continue;
         }
 
-        if accepted_count >= ACCEPTED_BOOST_THRESHOLD {
-            finding.confidence = (finding.confidence + ACCEPTED_CONFIDENCE_BOOST).min(1.0);
+        if accepted_count >= retrieval::ACCEPTED_BOOST_THRESHOLD {
+            finding.confidence = (finding.confidence + retrieval::ACCEPTED_CONFIDENCE_BOOST).min(thresholds::MAX_CONFIDENCE);
         }
 
         if finding.confidence >= config.min_confidence {
