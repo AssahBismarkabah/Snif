@@ -1,7 +1,7 @@
-use snif_config::constants::output_filter;
 use anyhow::Result;
 use serde::Deserialize;
 use serde_json::Value;
+use snif_config::constants::output_filter;
 use snif_types::Finding;
 
 #[derive(Debug, Deserialize)]
@@ -66,7 +66,9 @@ fn extract_json_object(input: &str) -> Option<&str> {
 /// Check if the response contains chain-of-thought leakage patterns.
 fn contains_cot_patterns(response: &str) -> bool {
     let lower = response.to_lowercase();
-    output_filter::COT_PATTERNS.iter().any(|pattern| lower.contains(pattern))
+    output_filter::COT_PATTERNS
+        .iter()
+        .any(|pattern| lower.contains(pattern))
 }
 
 /// Sanitize a finding's text fields by removing chain-of-thought preamble.
@@ -84,7 +86,9 @@ fn sanitize_text(text: &str) -> String {
 
     // Only sanitize if the text STARTS with a COT pattern — this is the
     // hallmark of leaked reasoning. Mid-text occurrences are legitimate.
-    let starts_with_cot = output_filter::COT_PATTERNS.iter().any(|p| lower.starts_with(p));
+    let starts_with_cot = output_filter::COT_PATTERNS
+        .iter()
+        .any(|p| lower.starts_with(p));
 
     if !starts_with_cot {
         return trimmed.to_string();
@@ -98,7 +102,10 @@ fn sanitize_text(text: &str) -> String {
             continue;
         }
         let s_lower = s.to_lowercase();
-        if !output_filter::COT_PATTERNS.iter().any(|p| s_lower.starts_with(p)) {
+        if !output_filter::COT_PATTERNS
+            .iter()
+            .any(|p| s_lower.starts_with(p))
+        {
             return format!(
                 "{}.",
                 s.trim_start_matches(|c: char| !c.is_alphabetic()).trim()
@@ -272,7 +279,11 @@ fn parse_findings(items: &[Value]) -> Vec<Finding> {
 fn salvage_findings(response: &str) -> Vec<Finding> {
     let object_region = response
         .find(output_filter::FINDING_KEYS[0])
-        .and_then(|index| response[index..].find(output_filter::JSON_ARRAY_START).map(|offset| index + offset))
+        .and_then(|index| {
+            response[index..]
+                .find(output_filter::JSON_ARRAY_START)
+                .map(|offset| index + offset)
+        })
         .map(|index| &response[index..])
         .unwrap_or(response);
 
@@ -337,53 +348,64 @@ mod tests {
 
     #[test]
     fn parses_object_with_issues_field() {
-        let response = r#"{
+        let response = format!(
+            r#"{{
           "summary": "Found a bug.",
           "issues": [
-            {
-              "file": "src/lib.rs",
-              "start_line": 7,
+            {{
+              "file": "{}",
+              "start_line": {},
               "end_line": 8,
               "category": "logic",
-              "confidence": 0.9,
+              "confidence": {},
               "evidence": "panic!()",
               "explanation": "This panics.",
               "impact": "The process crashes.",
               "suggestion": null
-            }
+            }}
           ]
-        }"#;
+        }}"#,
+            TEST_FILE, TEST_LINE, TEST_CONFIDENCE
+        );
 
-        let parsed = parse_response(response).unwrap();
+        let parsed = parse_response(&response).unwrap();
         assert_eq!(parsed.findings.len(), 1);
         assert_eq!(parsed.summary, "Found a bug.");
     }
 
     #[test]
     fn recovers_complete_finding_from_truncated_response() {
-        let response = r#"{
+        let response = format!(
+            r#"{{
           "summary": "Found a bug.",
           "findings": [
-            {
-              "file": "src/lib.rs",
-              "start_line": 7,
+            {{
+              "file": "{}",
+              "start_line": {},
               "end_line": 8,
               "category": "logic",
-              "confidence": 0.9,
+              "confidence": {},
               "evidence": "panic!()",
               "explanation": "This panics.",
               "impact": "The process crashes.",
               "suggestion": null
-            },
-            {
-              "file": "src/other.rs",
-              "start_line": 12,
+            }},
+            {{
+              "file": "{}",
+              "start_line": {},
               "category": "security",
-              "confidence": 1.0,
+              "confidence": {},
               "evidence": "unterminated
-        "#;
+        "#,
+            TEST_FILE,
+            TEST_LINE,
+            TEST_CONFIDENCE,
+            TEST_FILE_OTHER,
+            TEST_LINE_OTHER,
+            TEST_CONFIDENCE_HIGH
+        );
 
-        let parsed = parse_response(response).unwrap();
+        let parsed = parse_response(&response).unwrap();
         assert_eq!(parsed.findings.len(), 1);
         assert_eq!(parsed.findings[0].location.file, TEST_FILE);
     }
@@ -402,27 +424,29 @@ mod tests {
 
     #[test]
     fn sanitizes_cot_from_finding_explanation() {
-        let response = r#"Let me think about this.
-        {
+        let response = format!(
+            r#"Let me think about this.
+        {{
           "summary": "Found issue",
           "findings": [
-            {
-              "file": "src/lib.rs",
-              "start_line": 7,
+            {{
+              "file": "{}",
+              "start_line": {},
               "end_line": 8,
               "category": "logic",
-              "confidence": 0.9,
+              "confidence": {},
               "evidence": "panic!()",
               "explanation": "Let me analyze this. The code panics here.",
               "impact": "The process crashes.",
               "suggestion": null
-            }
+            }}
           ]
-        }"#;
+        }}"#,
+            TEST_FILE, TEST_LINE, TEST_CONFIDENCE
+        );
 
-        let parsed = parse_response(response).unwrap();
+        let parsed = parse_response(&response).unwrap();
         assert_eq!(parsed.findings.len(), 1);
-        // The explanation should be sanitized - "Let me analyze" should be stripped
         let explanation = &parsed.findings[0].explanation;
         assert!(!explanation.to_lowercase().contains("let me analyze"));
     }
