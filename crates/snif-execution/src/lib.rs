@@ -1,11 +1,6 @@
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
-use snif_config::{
-    constants,
-    constants::timeouts,
-    env::{get_api_key, keys},
-    ModelConfig,
-};
+use snif_config::{constants::timeouts, env::keys, ModelConfig};
 use std::time::Instant;
 
 pub struct LlmClient {
@@ -77,25 +72,23 @@ impl LlmClient {
     }
 
     pub async fn chat_completion(&self, system_prompt: &str, user_prompt: &str) -> Result<String> {
-        use snif_config::constants::http;
-
-        let url = format!("{}{}", self.endpoint, http::OPENAI_CHAT_COMPLETIONS);
+        let url = format!("{}/chat/completions", self.endpoint);
 
         let request = ChatRequest {
             model: self.model.clone(),
             messages: vec![
                 Message {
-                    role: http::ROLE_SYSTEM.to_string(),
+                    role: "system".to_string(),
                     content: system_prompt.to_string(),
                 },
                 Message {
-                    role: http::ROLE_USER.to_string(),
+                    role: "user".to_string(),
                     content: user_prompt.to_string(),
                 },
             ],
-            temperature: constants::model::DEFAULT_TEMPERATURE,
+            temperature: 0.0,
             response_format: ResponseFormat {
-                kind: constants::model::RESPONSE_FORMAT_JSON,
+                kind: "json_object",
             },
         };
 
@@ -118,11 +111,8 @@ impl LlmClient {
             let response = match self
                 .http
                 .post(&url)
-                .header(
-                    "Authorization",
-                    format!("{} {}", http::AUTHORIZATION_BEARER, self.api_key),
-                )
-                .header("Content-Type", http::CONTENT_TYPE_JSON)
+                .header("Authorization", format!("Bearer {}", self.api_key))
+                .header("Content-Type", "application/json")
                 .json(&request)
                 .send()
                 .await
@@ -135,28 +125,27 @@ impl LlmClient {
             };
 
             let status = response.status();
-            if status.is_server_error()
-                || status.as_u16() == http::STATUS_TOO_MANY_REQUESTS
-                || status.as_u16() == http::STATUS_REQUEST_TIMEOUT
-            {
+            if status.is_server_error() || status.as_u16() == 429 || status.as_u16() == 408 {
                 last_error = format!("Server error {}", status);
                 continue;
             }
 
             if !status.is_success() {
                 let body = response.text().await.unwrap_or_default();
-                bail!("{} {}: {}", http::ERROR_LLM_PROVIDER, status, body);
+                bail!("LLM provider returned {}: {}", status, body);
             }
 
-            let chat_response: ChatResponse =
-                response.json().await.context(http::ERROR_PARSE_RESPONSE)?;
+            let chat_response: ChatResponse = response
+                .json()
+                .await
+                .context("Failed to parse LLM provider response")?;
 
             return chat_response
                 .choices
                 .into_iter()
                 .next()
                 .map(|c| c.message.content.trim().to_string())
-                .context(http::ERROR_NO_CHOICES);
+                .context("LLM provider returned no choices");
         }
 
         bail!(
@@ -172,7 +161,13 @@ pub fn execute_review(
     user_prompt: &str,
     config: &ModelConfig,
 ) -> Result<ExecutionResult> {
-    let api_key = get_api_key(keys::SNIF_API_KEY, keys::OPENAI_API_KEY)?;
+    let api_key = std::env::var(keys::SNIF_API_KEY)
+        .or_else(|_| std::env::var(keys::OPENAI_API_KEY))
+        .context(format!(
+            "{} or {} must be set",
+            keys::SNIF_API_KEY,
+            keys::OPENAI_API_KEY
+        ))?;
 
     let client = LlmClient::from_config(config, &api_key, true);
 
@@ -193,10 +188,15 @@ pub fn execute_review(
 }
 
 pub fn repair_review_response(raw_response: &str, config: &ModelConfig) -> Result<ExecutionResult> {
-    let repair_system_prompt = constants::prompts::REPAIR_SYSTEM_PROMPT;
+    let repair_system_prompt = "You convert code review text into a single valid JSON object. \
+Return ONLY JSON with this exact shape: {\"summary\":\"...\",\"findings\":[...]}. \
+Preserve only findings explicitly supported by the provided review text. Do not invent new \
+issues, line numbers, or categories. If the review text does not contain a clear issue, use \
+{\"summary\":\"\",\"findings\":[]}. Your first character must be '{' and your last character \
+must be '}'.";
+
     let repair_user_prompt = format!(
-        "{}{}",
-        constants::prompts::REPAIR_USER_PROMPT_INTRO,
+        "Rewrite the following review into the required JSON object without adding commentary:\n\n{}",
         raw_response
     );
 

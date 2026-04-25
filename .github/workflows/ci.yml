@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Check
         run: cargo check --all-targets
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
         run: cargo test --all
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
       - name: Check formatting

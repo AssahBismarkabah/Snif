@@ -99,7 +99,7 @@ pub fn run(path: &str, fixtures: &str, history: &str) -> Result<()> {
     let braintrust_project_id = std::env::var(app::SNIF_BRAINTRUST_PROJECT_ID)
         .ok()
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| snif_config::constants::braintrust::DEFAULT_PROJECT_ID.to_string());
+        .unwrap_or_else(|| snif_eval::reporter::BRAINTRUST_DEFAULT_PROJECT_ID.to_string());
     if let Ok(api_key) = std::env::var(keys::BRAINTRUST_API_KEY) {
         let model_name = &config.model.review_model;
         match snif_eval::reporter::report_to_braintrust(

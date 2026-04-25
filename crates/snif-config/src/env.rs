@@ -7,18 +7,6 @@ pub mod keys {
     pub const CI_JOB_TOKEN: &str = "CI_JOB_TOKEN";
 }
 
-use anyhow::Context;
-
-pub fn missing_key_error(key1: &str, key2: &str) -> anyhow::Error {
-    anyhow::anyhow!("{} or {} must be set", key1, key2)
-}
-
-pub fn get_api_key(primary: &str, fallback: &str) -> anyhow::Result<String> {
-    std::env::var(primary)
-        .or_else(|_| std::env::var(fallback))
-        .context(missing_key_error(primary, fallback))
-}
-
 pub mod app {
     pub const SNIF_APP_ID: &str = "SNIF_APP_ID";
     pub const SNIF_APP_PRIVATE_KEY: &str = "SNIF_APP_PRIVATE_KEY";
