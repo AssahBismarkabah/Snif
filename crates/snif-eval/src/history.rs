@@ -170,7 +170,9 @@ pub fn check_regression(current: &EvalRecord, previous: &EvalRecord) -> Vec<Regr
 
     for curr_fix in &current.per_fixture {
         if let Some(prev_fix) = prev_by_name.get(curr_fix.name.as_str()) {
-            if prev_fix.tp > eval_output::DEFAULT_COUNTER && curr_fix.tp == eval_output::DEFAULT_COUNTER {
+            if prev_fix.tp > eval_output::DEFAULT_COUNTER
+                && curr_fix.tp == eval_output::DEFAULT_COUNTER
+            {
                 warnings.push(RegressionWarning {
                     message: format!(
                         "Fixture '{}': lost detection (TP {} -> 0)",
@@ -179,7 +181,9 @@ pub fn check_regression(current: &EvalRecord, previous: &EvalRecord) -> Vec<Regr
                 });
             }
 
-            if prev_fix.fp == eval_output::DEFAULT_COUNTER && curr_fix.fp > eval_output::DEFAULT_COUNTER {
+            if prev_fix.fp == eval_output::DEFAULT_COUNTER
+                && curr_fix.fp > eval_output::DEFAULT_COUNTER
+            {
                 warnings.push(RegressionWarning {
                     message: format!(
                         "Fixture '{}': new false positives (FP 0 -> {})",
@@ -327,8 +331,22 @@ mod tests {
     #[test]
     fn save_and_load_history_round_trip() {
         let path = unique_history_path("round-trip");
-        let first = sample_record(TEST_SHA_1, TEST_PRECISION_MID_1, TEST_RECALL_MID, TEST_NOISE_VERY_LOW, TEST_TP_HIGH, TEST_FP_ZERO);
-        let second = sample_record(TEST_SHA_2, TEST_PRECISION_MID_2, TEST_RECALL_MID, TEST_NOISE_LOW_2, TEST_TP_HIGH, TEST_TP_HIGH);
+        let first = sample_record(
+            TEST_SHA_1,
+            TEST_PRECISION_MID_1,
+            TEST_RECALL_MID,
+            TEST_NOISE_VERY_LOW,
+            TEST_TP_HIGH,
+            TEST_FP_ZERO,
+        );
+        let second = sample_record(
+            TEST_SHA_2,
+            TEST_PRECISION_MID_2,
+            TEST_RECALL_MID,
+            TEST_NOISE_LOW_2,
+            TEST_TP_HIGH,
+            TEST_TP_HIGH,
+        );
 
         save_record(&path, &first).expect("first record should save");
         save_record(&path, &second).expect("second record should save");
@@ -343,8 +361,22 @@ mod tests {
 
     #[test]
     fn regression_detection_reports_aggregate_and_fixture_changes() {
-        let previous = sample_record(TEST_SHA_1, TEST_PRECISION_HIGH, TEST_RECALL_HIGH, TEST_NOISE_LOW, TEST_TP_HIGH, TEST_FP_ZERO);
-        let current = sample_record(TEST_SHA_2, TEST_PRECISION_LOW, TEST_RECALL_LOW, TEST_NOISE_HIGH, TEST_TP_ZERO, TEST_FP_MID);
+        let previous = sample_record(
+            TEST_SHA_1,
+            TEST_PRECISION_HIGH,
+            TEST_RECALL_HIGH,
+            TEST_NOISE_LOW,
+            TEST_TP_HIGH,
+            TEST_FP_ZERO,
+        );
+        let current = sample_record(
+            TEST_SHA_2,
+            TEST_PRECISION_LOW,
+            TEST_RECALL_LOW,
+            TEST_NOISE_HIGH,
+            TEST_TP_ZERO,
+            TEST_FP_MID,
+        );
 
         let warnings = check_regression(&current, &previous);
         let messages: Vec<&str> = warnings

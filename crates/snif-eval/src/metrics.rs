@@ -217,7 +217,8 @@ mod tests {
             TEST_CONFIDENCE_HIGH,
         )];
 
-        let result = compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
+        let result =
+            compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
         assert_eq!(result.true_positives, TEST_EXPECTED_COUNT);
         assert_eq!(result.false_positives, TEST_ZERO_COUNT);
         assert_eq!(result.false_negatives, TEST_ZERO_COUNT);
@@ -238,7 +239,8 @@ mod tests {
             TEST_CONFIDENCE_HIGH,
         )];
 
-        let result = compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
+        let result =
+            compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
         assert_eq!(result.true_positives, TEST_EXPECTED_COUNT);
         assert_eq!(result.false_positives, TEST_ZERO_COUNT);
     }
@@ -249,7 +251,10 @@ mod tests {
             file: TEST_FILE_TRACKER.to_string(),
             start_line: TEST_LINE_TRACKER,
             category: TEST_CATEGORY_LOGIC.to_string(),
-            acceptable_categories: vec![TEST_CATEGORY_PERFORMANCE.to_string(), TEST_CATEGORY_OTHER.to_string()],
+            acceptable_categories: vec![
+                TEST_CATEGORY_PERFORMANCE.to_string(),
+                TEST_CATEGORY_OTHER.to_string(),
+            ],
         }];
         let actual = vec![make_finding(
             TEST_FILE_TRACKER,
@@ -258,7 +263,8 @@ mod tests {
             TEST_CONFIDENCE_HIGH,
         )];
 
-        let result = compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
+        let result =
+            compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
         assert_eq!(result.true_positives, TEST_EXPECTED_COUNT);
         assert_eq!(result.false_positives, TEST_ZERO_COUNT);
     }
@@ -271,9 +277,15 @@ mod tests {
             category: TEST_CATEGORY_SECURITY.to_string(),
             acceptable_categories: vec![],
         }];
-        let actual = vec![make_finding(TEST_FILE_LIB, TEST_LINE_LIB, FindingCategory::Style, TEST_CONFIDENCE_HIGH)];
+        let actual = vec![make_finding(
+            TEST_FILE_LIB,
+            TEST_LINE_LIB,
+            FindingCategory::Style,
+            TEST_CONFIDENCE_HIGH,
+        )];
 
-        let result = compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
+        let result =
+            compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
         assert_eq!(result.true_positives, TEST_ZERO_COUNT);
         assert_eq!(result.false_positives, TEST_EXPECTED_COUNT);
         assert_eq!(result.false_negatives, TEST_EXPECTED_COUNT);
@@ -281,13 +293,45 @@ mod tests {
 
     #[test]
     fn categories_match_function_tests() {
-        assert!(categories_match(TEST_CATEGORY_SECURITY, TEST_CATEGORY_LOGIC, &[]));
-        assert!(categories_match(TEST_CATEGORY_LOGIC, TEST_CATEGORY_SECURITY, &[]));
-        assert!(categories_match(TEST_CATEGORY_PERFORMANCE, TEST_CATEGORY_LOGIC, &[]));
-        assert!(categories_match(TEST_CATEGORY_OTHER, TEST_CATEGORY_SECURITY, &[]));
-        assert!(categories_match(TEST_CATEGORY_LOGIC, TEST_CATEGORY_LOGIC, &[]));
-        assert!(!categories_match(TEST_CATEGORY_STYLE, TEST_CATEGORY_SECURITY, &[]));
-        assert!(!categories_match(TEST_CATEGORY_CONVENTION, TEST_CATEGORY_SECURITY, &[]));
-        assert!(categories_match(TEST_CATEGORY_STYLE, TEST_CATEGORY_CONVENTION, &[]));
+        assert!(categories_match(
+            TEST_CATEGORY_SECURITY,
+            TEST_CATEGORY_LOGIC,
+            &[]
+        ));
+        assert!(categories_match(
+            TEST_CATEGORY_LOGIC,
+            TEST_CATEGORY_SECURITY,
+            &[]
+        ));
+        assert!(categories_match(
+            TEST_CATEGORY_PERFORMANCE,
+            TEST_CATEGORY_LOGIC,
+            &[]
+        ));
+        assert!(categories_match(
+            TEST_CATEGORY_OTHER,
+            TEST_CATEGORY_SECURITY,
+            &[]
+        ));
+        assert!(categories_match(
+            TEST_CATEGORY_LOGIC,
+            TEST_CATEGORY_LOGIC,
+            &[]
+        ));
+        assert!(!categories_match(
+            TEST_CATEGORY_STYLE,
+            TEST_CATEGORY_SECURITY,
+            &[]
+        ));
+        assert!(!categories_match(
+            TEST_CATEGORY_CONVENTION,
+            TEST_CATEGORY_SECURITY,
+            &[]
+        ));
+        assert!(categories_match(
+            TEST_CATEGORY_STYLE,
+            TEST_CATEGORY_CONVENTION,
+            &[]
+        ));
     }
 }

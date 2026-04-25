@@ -28,8 +28,7 @@ fn is_self_dismissed(finding: &Finding) -> bool {
 
     // "minimal security impact" without being a legitimate qualifier
     let minimal = output_filter::MINIMAL_IMPACT_PATTERNS;
-    if body.contains(minimal[0])
-        || body.contains(minimal[1]) && !body.contains("minimal impact on")
+    if body.contains(minimal[0]) || body.contains(minimal[1]) && !body.contains("minimal impact on")
     {
         return true;
     }
@@ -197,7 +196,11 @@ mod tests {
 
     #[test]
     fn self_dismissed_i_will_look_for() {
-        let f = make_finding("I will look for a stronger bug", "Minor issue", TEST_CONFIDENCE_MID);
+        let f = make_finding(
+            "I will look for a stronger bug",
+            "Minor issue",
+            TEST_CONFIDENCE_MID,
+        );
         assert!(is_self_dismissed(&f));
     }
 

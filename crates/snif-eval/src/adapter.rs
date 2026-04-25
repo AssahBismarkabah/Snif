@@ -99,14 +99,20 @@ fn analyze_fixture_patterns(recent: &[&EvalRecord]) -> EvalGuidance {
 
     for record in recent {
         for fix in &record.per_fixture {
-            let runs = fixture_runs.entry(fix.name.clone()).or_insert(eval_output::DEFAULT_COUNTER);
+            let runs = fixture_runs
+                .entry(fix.name.clone())
+                .or_insert(eval_output::DEFAULT_COUNTER);
             *runs += 1;
             if fix.fp > eval_output::DEFAULT_COUNTER {
-                let count = fixture_fp_counts.entry(fix.name.clone()).or_insert(eval_output::DEFAULT_COUNTER);
+                let count = fixture_fp_counts
+                    .entry(fix.name.clone())
+                    .or_insert(eval_output::DEFAULT_COUNTER);
                 *count += fix.fp;
             }
             if fix.fn_count > eval_output::DEFAULT_COUNTER {
-                let count = fixture_fn_counts.entry(fix.name.clone()).or_insert(eval_output::DEFAULT_COUNTER);
+                let count = fixture_fn_counts
+                    .entry(fix.name.clone())
+                    .or_insert(eval_output::DEFAULT_COUNTER);
                 *count += fix.fn_count;
             }
         }
@@ -271,7 +277,13 @@ mod tests {
                     actual,
                     tp,
                     fp,
-                    fn_count: if tp == eval_output::DEFAULT_COUNTER && expected > eval_output::DEFAULT_COUNTER { 1 } else { eval_output::DEFAULT_COUNTER },
+                    fn_count: if tp == eval_output::DEFAULT_COUNTER
+                        && expected > eval_output::DEFAULT_COUNTER
+                    {
+                        1
+                    } else {
+                        eval_output::DEFAULT_COUNTER
+                    },
                 })
                 .collect(),
         }

@@ -134,15 +134,11 @@ pub fn run_evaluation(
     let aggregate = metrics::aggregate(&fixture_results);
     let gates_passed = metrics::check_quality_gates(&aggregate);
 
-tracing::info!(
+    tracing::info!(
         precision = format!("{:.1}%", aggregate.precision * 100.0),
         recall = format!("{:.1}%", aggregate.recall * 100.0),
         noise = format!("{:.1}%", aggregate.noise_rate * 100.0),
-        gates = if gates_passed {
-            "PASSED"
-        } else {
-            "FAILED"
-        },
+        gates = if gates_passed { "PASSED" } else { "FAILED" },
         "Evaluation complete"
     );
 

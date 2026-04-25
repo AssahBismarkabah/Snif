@@ -1,6 +1,11 @@
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
-use snif_config::{constants::timeouts, constants, env::{keys, get_api_key}, ModelConfig};
+use snif_config::{
+    constants,
+    constants::timeouts,
+    env::{get_api_key, keys},
+    ModelConfig,
+};
 use std::time::Instant;
 
 pub struct LlmClient {
@@ -113,7 +118,10 @@ impl LlmClient {
             let response = match self
                 .http
                 .post(&url)
-                .header("Authorization", format!("{} {}", http::AUTHORIZATION_BEARER, self.api_key))
+                .header(
+                    "Authorization",
+                    format!("{} {}", http::AUTHORIZATION_BEARER, self.api_key),
+                )
                 .header("Content-Type", http::CONTENT_TYPE_JSON)
                 .json(&request)
                 .send()
@@ -127,7 +135,10 @@ impl LlmClient {
             };
 
             let status = response.status();
-            if status.is_server_error() || status.as_u16() == http::STATUS_TOO_MANY_REQUESTS || status.as_u16() == http::STATUS_REQUEST_TIMEOUT {
+            if status.is_server_error()
+                || status.as_u16() == http::STATUS_TOO_MANY_REQUESTS
+                || status.as_u16() == http::STATUS_REQUEST_TIMEOUT
+            {
                 last_error = format!("Server error {}", status);
                 continue;
             }
@@ -137,10 +148,8 @@ impl LlmClient {
                 bail!("{} {}: {}", http::ERROR_LLM_PROVIDER, status, body);
             }
 
-            let chat_response: ChatResponse = response
-                .json()
-                .await
-                .context(http::ERROR_PARSE_RESPONSE)?;
+            let chat_response: ChatResponse =
+                response.json().await.context(http::ERROR_PARSE_RESPONSE)?;
 
             return chat_response
                 .choices

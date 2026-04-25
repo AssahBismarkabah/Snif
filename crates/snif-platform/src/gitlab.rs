@@ -1,7 +1,7 @@
 use crate::{extract_fingerprints, PlatformAdapter, BOT_MARKER};
 use anyhow::{bail, Context, Result};
 use snif_config::constants::timeouts;
-use snif_config::env::{ci, keys, get_api_key};
+use snif_config::env::{ci, get_api_key, keys};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
 const GITLAB_DEFAULT_API_BASE: &str = "https://gitlab.com/api/v4";

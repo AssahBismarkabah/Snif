@@ -1,5 +1,5 @@
-use snif_config::constants::{eval_output, output_filter};
 use sha2::{Digest, Sha256};
+use snif_config::constants::{eval_output, output_filter};
 use snif_types::{Finding, Fingerprint};
 use std::collections::HashMap;
 
@@ -11,13 +11,17 @@ pub fn compute_fingerprints(findings: &mut [Finding]) {
         let line_hash = compute_line_hash(finding);
 
         // Disambiguate when the same content hash appears multiple times
-        let count = content_counts.entry(content_hash.clone()).or_insert(eval_output::DEFAULT_COUNTER);
+        let count = content_counts
+            .entry(content_hash.clone())
+            .or_insert(eval_output::DEFAULT_COUNTER);
         let id = if *count == eval_output::DEFAULT_COUNTER {
             content_hash.clone()
         } else {
             format!(
                 "{}{}{}",
-                content_hash, output_filter::FINGERPRINT_DISAMBIGUATION_SEPARATOR, count
+                content_hash,
+                output_filter::FINGERPRINT_DISAMBIGUATION_SEPARATOR,
+                count
             )
         };
         *count += 1;

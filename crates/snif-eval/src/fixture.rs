@@ -139,10 +139,12 @@ mod tests {
             "description": TEST_FIXTURE_DESCRIPTION,
             "expected_findings": []
         });
-        let mut meta_file = std::fs::File::create(fixture_dir.join(eval_output::FIXTURE_META_FILE)).unwrap();
+        let mut meta_file =
+            std::fs::File::create(fixture_dir.join(eval_output::FIXTURE_META_FILE)).unwrap();
         meta_file.write_all(meta.to_string().as_bytes()).unwrap();
 
-        let mut patch_file = std::fs::File::create(fixture_dir.join(eval_output::PATCH_FILE)).unwrap();
+        let mut patch_file =
+            std::fs::File::create(fixture_dir.join(eval_output::PATCH_FILE)).unwrap();
         patch_file.write_all(b"diff content").unwrap();
 
         let fixtures = load_fixtures(temp_dir.path()).unwrap();

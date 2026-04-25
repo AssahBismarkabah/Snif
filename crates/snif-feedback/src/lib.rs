@@ -115,15 +115,13 @@ impl FeedbackStore {
         use std::collections::HashMap;
 
         // KNN search against all embeddings
-        let mut knn_stmt = self.conn.prepare(
-            &format!(
-                "SELECT {}, distance FROM {}
+        let mut knn_stmt = self.conn.prepare(&format!(
+            "SELECT {}, distance FROM {}
                   WHERE embedding MATCH ?1 AND k = ?2
                   ORDER BY distance",
-                feedback_schema::COLUMN_SIGNAL_ID,
-                feedback_schema::TABLE_EMBEDDINGS
-            ),
-        )?;
+            feedback_schema::COLUMN_SIGNAL_ID,
+            feedback_schema::TABLE_EMBEDDINGS
+        ))?;
 
         let knn_results: Vec<(i64, f64)> = knn_stmt
             .query_map(

@@ -285,17 +285,20 @@ fn insert_fixture_events<S: Fn(std::time::Duration)>(
         .iter()
         .enumerate()
         .map(|(i, fr)| {
-            let fixture_precision = if fr.true_positives + fr.false_positives > eval_output::DEFAULT_COUNTER {
-                fr.true_positives as f64 / (fr.true_positives + fr.false_positives) as f64
-            } else {
-                braintrust::DEFAULT_PRECISION_WHEN_NO_DATA
-            };
-            let fixture_recall = if fr.true_positives + fr.false_negatives > eval_output::DEFAULT_COUNTER {
-                fr.true_positives as f64 / (fr.true_positives + fr.false_negatives) as f64
-            } else {
-                braintrust::DEFAULT_RECALL_WHEN_NO_DATA
-            };
-            let fixture_f1 = if fixture_precision + fixture_recall > eval_output::DEFAULT_NOISE_RATE {
+            let fixture_precision =
+                if fr.true_positives + fr.false_positives > eval_output::DEFAULT_COUNTER {
+                    fr.true_positives as f64 / (fr.true_positives + fr.false_positives) as f64
+                } else {
+                    braintrust::DEFAULT_PRECISION_WHEN_NO_DATA
+                };
+            let fixture_recall =
+                if fr.true_positives + fr.false_negatives > eval_output::DEFAULT_COUNTER {
+                    fr.true_positives as f64 / (fr.true_positives + fr.false_negatives) as f64
+                } else {
+                    braintrust::DEFAULT_RECALL_WHEN_NO_DATA
+                };
+            let fixture_f1 = if fixture_precision + fixture_recall > eval_output::DEFAULT_NOISE_RATE
+            {
                 braintrust::F1_COEFFICIENT * fixture_precision * fixture_recall
                     / (fixture_precision + fixture_recall)
             } else {

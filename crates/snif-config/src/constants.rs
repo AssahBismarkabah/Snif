@@ -434,10 +434,7 @@ pub mod output_filter {
     /// Impact patterns indicating dismissal
     pub const IMPACT_NONE_PATTERNS: &[&str] = &["impact: none", "impact:none"];
     /// Minimal impact dismissal patterns
-    pub const MINIMAL_IMPACT_PATTERNS: &[&str] = &[
-        "minimal security impact",
-        "minimal impact",
-    ];
+    pub const MINIMAL_IMPACT_PATTERNS: &[&str] = &["minimal security impact", "minimal impact"];
     /// Fingerprint hash length (number of hex characters)
     pub const FINGERPRINT_HASH_LENGTH: usize = 16;
     /// Disambiguation separator for duplicate fingerprints

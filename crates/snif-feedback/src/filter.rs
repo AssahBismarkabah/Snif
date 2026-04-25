@@ -42,7 +42,8 @@ pub fn apply_feedback_filter(
             }
         };
 
-        let similar = store.query_similar_signals(&embedding, team_id, retrieval::FEEDBACK_KNN_K)?;
+        let similar =
+            store.query_similar_signals(&embedding, team_id, retrieval::FEEDBACK_KNN_K)?;
 
         let mut dismissed_count = 0;
         let mut accepted_count = 0;
@@ -68,7 +69,8 @@ pub fn apply_feedback_filter(
         }
 
         if accepted_count >= retrieval::ACCEPTED_BOOST_THRESHOLD {
-            finding.confidence = (finding.confidence + retrieval::ACCEPTED_CONFIDENCE_BOOST).min(thresholds::MAX_CONFIDENCE);
+            finding.confidence = (finding.confidence + retrieval::ACCEPTED_CONFIDENCE_BOOST)
+                .min(thresholds::MAX_CONFIDENCE);
         }
 
         if finding.confidence >= config.min_confidence {
