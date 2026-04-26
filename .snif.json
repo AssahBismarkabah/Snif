@@ -1,7 +1,7 @@
 {
   "model": {
-    "review_model": "qwen3p6-plus",
-    "summary_model": "qwen3p6-plus",
+    "review_model": "glm-5p1",
+    "summary_model": "glm-5p1",
     "endpoint": "https://services.api.ai.camer.digital/v1"
   },
   "eval_fixtures_path": "./fixtures"

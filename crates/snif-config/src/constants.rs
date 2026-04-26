@@ -10,9 +10,9 @@
 // ============================================================================
 pub mod timeouts {
     /// Timeout for LLM HTTP requests (seconds)
-    pub const LLM_REQUEST_TIMEOUT_SECS: u64 = 120;
+    pub const LLM_REQUEST_TIMEOUT_SECS: u64 = 300;
     /// Maximum retry attempts for LLM requests
-    pub const LLM_MAX_RETRIES: u32 = 3;
+    pub const LLM_MAX_RETRIES: u32 = 5;
     /// Base delay for retry backoff (seconds)
     pub const LLM_RETRY_BASE_DELAY_SECS: u64 = 2;
     /// HTTP request timeout (seconds)
@@ -625,4 +625,15 @@ pub mod feedback_schema {
     pub const SIGNAL_DISMISSED: &str = "dismissed";
     /// Signal type: ignored
     pub const SIGNAL_IGNORED: &str = "ignored";
+}
+
+#[cfg(test)]
+mod tests {
+    use super::timeouts;
+
+    #[test]
+    fn llm_retry_constants_preserve_eval_resilience() {
+        assert_eq!(timeouts::LLM_REQUEST_TIMEOUT_SECS, 300);
+        assert_eq!(timeouts::LLM_MAX_RETRIES, 5);
+    }
 }
