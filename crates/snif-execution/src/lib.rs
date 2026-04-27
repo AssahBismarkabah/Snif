@@ -159,22 +159,33 @@ impl LlmClient {
             let chat_response: ChatResponse =
                 response.json().await.context(http::ERROR_PARSE_RESPONSE)?;
 
-            return chat_response
+            let first_choice = chat_response
                 .choices
                 .into_iter()
                 .next()
-                .and_then(|c| {
-                    // Some models (e.g. GLM) return JSON in reasoning_content
-                    // instead of the standard content field
-                    let text = c.message.content.or(c.message.reasoning_content)?;
-                    let trimmed = text.trim();
-                    if trimmed.is_empty() {
-                        None
-                    } else {
-                        Some(trimmed.to_string())
-                    }
-                })
-                .context(http::ERROR_NO_CHOICES);
+                .context("LLM provider returned empty choices array")?;
+
+            let content = first_choice.message.content.clone();
+            let reasoning = first_choice.message.reasoning_content.clone();
+
+            // Some models (e.g. GLM) return JSON in reasoning_content
+            // instead of the standard content field. Need to check for
+            // empty strings, not just None.
+            let text = content
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| reasoning.filter(|s| !s.trim().is_empty()));
+
+            match text {
+                Some(t) => return Ok(t.trim().to_string()),
+                None => {
+                    tracing::warn!(
+                        content = ?first_choice.message.content,
+                        reasoning_content_len = first_choice.message.reasoning_content.as_ref().map(|s| s.len()),
+                        "LLM returned empty response"
+                    );
+                    bail!("LLM provider returned empty response (both content and reasoning_content are empty)")
+                }
+            }
         }
 
         bail!(
