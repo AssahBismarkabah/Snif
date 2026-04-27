@@ -14,12 +14,30 @@ pub trait LanguageAdapter: Send + Sync {
         -> Vec<Import>;
     fn extract_symbols(&self, source: &[u8], query: &Query, root: tree_sitter::Node)
         -> Vec<Symbol>;
+
+    /// Default reference extraction — matches `ref_name` captures from the query.
+    /// Override only if the language adapter needs custom reference logic.
     fn extract_references(
         &self,
         source: &[u8],
         query: &Query,
         root: tree_sitter::Node,
-    ) -> Vec<Reference>;
+    ) -> Vec<Reference> {
+        let matches = run_query_captures(query, root, source);
+        let mut refs = Vec::new();
+        for captures in &matches {
+            for (cap_name, range, text) in captures {
+                if cap_name == "ref_name" {
+                    refs.push(Reference {
+                        name: text.clone(),
+                        line: range.start_point.row + 1,
+                        context: String::new(),
+                    });
+                }
+            }
+        }
+        refs
+    }
 }
 
 pub fn parse_file(

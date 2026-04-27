@@ -126,28 +126,4 @@ impl LanguageAdapter for PythonAdapter {
 
         symbols
     }
-
-    fn extract_references(
-        &self,
-        source: &[u8],
-        query: &Query,
-        root: tree_sitter::Node,
-    ) -> Vec<Reference> {
-        let matches = adapter::run_query_captures(query, root, source);
-        let mut refs = Vec::new();
-
-        for captures in &matches {
-            for (cap_name, range, text) in captures {
-                if cap_name == "ref_name" {
-                    refs.push(Reference {
-                        name: text.clone(),
-                        line: range.start_point.row + 1,
-                        context: String::new(),
-                    });
-                }
-            }
-        }
-
-        refs
-    }
 }
