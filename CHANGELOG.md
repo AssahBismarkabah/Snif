@@ -2,6 +2,23 @@
 
 ## unreleased
 
+## 3.2.5
+
+- Rename package to `snif-cli` and add `[[bin]]` section to produce `snif` binary
+- Optimize SQL query execution by chunking paths and signal IDs to avoid SQLite variable limits
+- Handle multiple diff formats in platform adapters
+- Centralize constants across output filter, timeout, HTTP, feedback schema, and evaluation modules
+- Introduce context module for non-reviewable files and token estimation
+- Add embedding model configuration and improve error handling in Embedder
+- Refactor evaluation guidance logic with new thresholds
+- Simplify GraphStats initialization using Default trait
+- Add `repository.workspace = true` to all crate Cargo.toml files for cargo-dist compatibility
+- Pin Rust version to 1.93.0 in CI
+- Fix camera digital timeout
+- Fix clippy warnings across modules (unnecessary_sort_by, useless_conversion)
+- Apply rustfmt formatting for consistency
+- Enhance output formatting and modularize print functions in clean, eval, and review modules
+
 3.2.4
 
 - Connect eval harness to Braintrust monitoring dashboard  experiment results reported automatically with unique per-run experiment names
