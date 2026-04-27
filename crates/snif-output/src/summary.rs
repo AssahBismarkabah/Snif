@@ -1,3 +1,4 @@
+use snif_config::constants::summary;
 use snif_types::{Finding, RetrievalResults};
 
 pub struct ReviewSummaryInput<'a> {
@@ -11,74 +12,92 @@ pub struct ReviewSummaryInput<'a> {
 }
 
 pub fn format_pr_summary(input: &ReviewSummaryInput) -> String {
-    let mut summary = String::from("## Snif Review\n\n");
+    let mut summary_text = String::from(summary::PR_SUMMARY_HEADER);
 
     // Walkthrough
     if !input.change_summary.is_empty() {
-        summary.push_str(&format!("{}\n\n", input.change_summary));
+        summary_text.push_str(&format!("{}\n\n", input.change_summary));
     }
 
     // Outcome
     if input.findings.is_empty() {
-        summary.push_str("**No issues found.** Change looks clean.\n\n");
+        summary_text.push_str(summary::NO_FINDINGS);
     } else {
-        summary.push_str(&format!(
-            "**Found {} issue{}.** See inline comments for details.\n\n",
+        let suffix = if input.findings.len() == 1 {
+            summary::FINDINGS_FOUND_SUFFIX_SINGULAR
+        } else {
+            summary::FINDINGS_FOUND_SUFFIX_PLURAL
+        };
+        summary_text.push_str(&format!(
+            "{}{}{}",
+            summary::FINDINGS_FOUND_PREFIX,
             input.findings.len(),
-            if input.findings.len() == 1 { "" } else { "s" }
+            suffix
         ));
     }
 
     // Collapsible details
-    summary.push_str("<details>\n<summary>Review details</summary>\n\n");
+    summary_text.push_str(summary::COLLAPSIBLE_DETAILS_OPENER);
 
     // Changed files
-    summary.push_str("**Changed files:**\n");
+    summary_text.push_str(summary::CHANGED_FILES_HEADER);
     for path in input.changed_paths {
-        summary.push_str(&format!("- `{}`\n", path));
+        summary_text.push_str(&format!("- `{}`\n", path));
     }
 
     // Context analyzed
     let related_count = input.retrieval_results.results.len();
     if related_count > 0 {
-        summary.push_str(&format!(
-            "\n**Context analyzed:** {} related file{}",
+        let file_suffix = if related_count == 1 {
+            summary::CONTEXT_ANALYZED_FILE_SUFFIX_SINGULAR
+        } else {
+            summary::CONTEXT_ANALYZED_FILES_SUFFIX_PLURAL
+        };
+        summary_text.push_str(&format!(
+            "{}{}{}",
+            summary::CONTEXT_ANALYZED_HEADER,
             related_count,
-            if related_count == 1 { "" } else { "s" }
+            file_suffix
         ));
 
         let mut methods = Vec::new();
         if input.retrieval_results.structural_count > 0 {
             methods.push(format!(
-                "{} via imports/dependencies",
-                input.retrieval_results.structural_count
+                "{}{}",
+                input.retrieval_results.structural_count,
+                summary::STRUCTURAL_RETRIEVAL_LABEL
             ));
         }
         if input.retrieval_results.semantic_count > 0 {
             methods.push(format!(
-                "{} via semantic similarity",
-                input.retrieval_results.semantic_count
+                "{}{}",
+                input.retrieval_results.semantic_count,
+                summary::SEMANTIC_RETRIEVAL_LABEL
             ));
         }
         if input.retrieval_results.keyword_count > 0 {
             methods.push(format!(
-                "{} via symbol matching",
-                input.retrieval_results.keyword_count
+                "{}{}",
+                input.retrieval_results.keyword_count,
+                summary::KEYWORD_RETRIEVAL_LABEL
             ));
         }
         if !methods.is_empty() {
-            summary.push_str(&format!(" ({})", methods.join(", ")));
+            summary_text.push_str(&format!(" ({})", methods.join(summary::METHODS_SEPARATOR)));
         }
-        summary.push_str(".\n");
+        summary_text.push_str(".\n");
     }
 
     // Stats
-    summary.push_str(&format!(
-        "\n**Stats:** {} lines | `{}` | {}s\n",
-        input.diff_lines, input.model_name, input.duration_secs,
-    ));
+    summary_text.push_str(summary::STATS_LINE_PREFIX);
+    summary_text.push_str(&input.diff_lines.to_string());
+    summary_text.push_str(summary::STATS_LINE_SUFFIX);
+    summary_text.push_str(input.model_name);
+    summary_text.push_str(summary::STATS_LINE_MODEL_SUFFIX);
+    summary_text.push_str(&input.duration_secs.to_string());
+    summary_text.push_str(summary::STATS_LINE_SECONDS_SUFFIX);
 
-    summary.push_str("\n</details>\n");
+    summary_text.push_str(summary::COLLAPSIBLE_DETAILS_CLOSER);
 
-    summary
+    summary_text
 }

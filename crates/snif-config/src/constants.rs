@@ -627,6 +627,67 @@ pub mod feedback_schema {
     pub const SIGNAL_IGNORED: &str = "ignored";
 }
 
+// ============================================================================
+// SARIF Output Constants
+// ============================================================================
+pub mod sarif {
+    /// SARIF schema URI
+    pub const SCHEMA_URI: &str =
+        "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json";
+    /// SARIF version
+    pub const VERSION: &str = "2.1.0";
+    /// Tool name for SARIF output
+    pub const TOOL_NAME: &str = "snif";
+    /// Tool information URI
+    pub const TOOL_INFO_URI: &str = "https://github.com/snif-project/snif";
+}
+
+// ============================================================================
+// Summary Output Constants
+// ============================================================================
+pub mod summary {
+    /// PR summary header
+    pub const PR_SUMMARY_HEADER: &str = "## Snif Review\n\n";
+    /// No findings message
+    pub const NO_FINDINGS: &str = "**No issues found.** Change looks clean.\n\n";
+    /// Findings found prefix
+    pub const FINDINGS_FOUND_PREFIX: &str = "**Found ";
+    /// Findings found suffix (singular)
+    pub const FINDINGS_FOUND_SUFFIX_SINGULAR: &str =
+        " issue.** See inline comments for details.\n\n";
+    /// Findings found suffix (plural)
+    pub const FINDINGS_FOUND_SUFFIX_PLURAL: &str =
+        " issues.** See inline comments for details.\n\n";
+    /// Collapsible details opener
+    pub const COLLAPSIBLE_DETAILS_OPENER: &str = "<details>\n<summary>Review details</summary>\n\n";
+    /// Collapsible details closer
+    pub const COLLAPSIBLE_DETAILS_CLOSER: &str = "\n</details>\n";
+    /// Changed files header
+    pub const CHANGED_FILES_HEADER: &str = "**Changed files:**\n";
+    /// Context analyzed header
+    pub const CONTEXT_ANALYZED_HEADER: &str = "\n**Context analyzed:** ";
+    /// Context analyzed file suffix (singular)
+    pub const CONTEXT_ANALYZED_FILE_SUFFIX_SINGULAR: &str = " related file";
+    /// Context analyzed file suffix (plural)
+    pub const CONTEXT_ANALYZED_FILES_SUFFIX_PLURAL: &str = " related files";
+    /// Structural retrieval label
+    pub const STRUCTURAL_RETRIEVAL_LABEL: &str = " via structural analysis";
+    /// Semantic retrieval label
+    pub const SEMANTIC_RETRIEVAL_LABEL: &str = " via semantic similarity";
+    /// Keyword retrieval label
+    pub const KEYWORD_RETRIEVAL_LABEL: &str = " via keyword matching";
+    /// Methods separator
+    pub const METHODS_SEPARATOR: &str = ", ";
+    /// Stats line prefix
+    pub const STATS_LINE_PREFIX: &str = "\n**Stats:** ";
+    /// Stats line lines suffix
+    pub const STATS_LINE_SUFFIX: &str = " lines | `";
+    /// Stats line model suffix
+    pub const STATS_LINE_MODEL_SUFFIX: &str = "` | ";
+    /// Stats line seconds suffix
+    pub const STATS_LINE_SECONDS_SUFFIX: &str = "s\n";
+}
+
 #[cfg(test)]
 mod tests {
     use super::timeouts;
