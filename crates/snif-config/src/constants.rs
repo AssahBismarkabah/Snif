@@ -3,6 +3,7 @@
 //
 // Centralized constants for magic numbers, thresholds, limits, timeouts,
 // prompt templates, CLI defaults, and output formatting.
+// Last reviewed: 2026-04-27
 // ============================================================================
 
 // ============================================================================
