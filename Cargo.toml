@@ -25,6 +25,8 @@ resolver = "2"
 version = "3.2.5"
 edition = "2021"
 repository = "https://github.com/AssahBismarkabah/Snif"
+description = "AI-powered code review tool with full codebase context"
+homepage = "https://github.com/AssahBismarkabah/Snif"
 
 [workspace.dependencies]
 anyhow = "1"
