@@ -1,6 +1,13 @@
 {
   "name": "style-py-mixed-quotes",
-  "description": "Python code with mixed single and double quote strings. Functionally correct, no bugs.",
+  "description": "Python code with mixed single and double quote strings. Note: format_timestamp lacks error handling for invalid timestamps.",
   "conventions": null,
-  "expected_findings": []
+  "expected_findings": [
+    {
+      "file": "src/messages.py",
+      "start_line": 22,
+      "category": "logic",
+      "acceptable_categories": ["security", "other"]
+    }
+  ]
 }
