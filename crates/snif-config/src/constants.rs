@@ -180,6 +180,8 @@ pub mod thresholds {
     pub const NOISE_REGRESSION_THRESHOLD: f64 = 0.05;
     /// Eval quality gate: minimum acceptable precision
     pub const EVAL_MIN_PRECISION: f64 = 0.70;
+    /// Eval quality gate: minimum acceptable recall
+    pub const EVAL_MIN_RECALL: f64 = 0.50;
     /// Eval quality gate: maximum acceptable noise rate
     pub const EVAL_MAX_NOISE_RATE: f64 = 0.20;
     /// Line number tolerance for fixture matching in eval

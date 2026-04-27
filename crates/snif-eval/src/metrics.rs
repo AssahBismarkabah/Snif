@@ -126,6 +126,7 @@ pub fn aggregate(results: &[FixtureResult]) -> AggregateMetrics {
 
 pub fn check_quality_gates(metrics: &AggregateMetrics) -> bool {
     let precision_ok = metrics.precision >= thresholds::EVAL_MIN_PRECISION;
+    let recall_ok = metrics.recall >= thresholds::EVAL_MIN_RECALL;
     let noise_ok = metrics.noise_rate <= thresholds::EVAL_MAX_NOISE_RATE;
 
     if !precision_ok {
@@ -134,6 +135,16 @@ pub fn check_quality_gates(metrics: &AggregateMetrics) -> bool {
         tracing::error!(
             precision = format!("{:.1}%", pct_precision),
             "Quality gate FAILED: precision below {:.0}%",
+            threshold_pct
+        );
+    }
+
+    if !recall_ok {
+        let pct_recall = metrics.recall * eval_output::PERCENTAGE_MULTIPLIER;
+        let threshold_pct = thresholds::EVAL_MIN_RECALL * eval_output::PERCENTAGE_MULTIPLIER;
+        tracing::error!(
+            recall = format!("{:.1}%", pct_recall),
+            "Quality gate FAILED: recall below {:.0}%",
             threshold_pct
         );
     }
@@ -148,7 +159,7 @@ pub fn check_quality_gates(metrics: &AggregateMetrics) -> bool {
         );
     }
 
-    precision_ok && noise_ok
+    precision_ok && recall_ok && noise_ok
 }
 
 #[cfg(test)]
