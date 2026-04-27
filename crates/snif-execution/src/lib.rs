@@ -47,7 +47,15 @@ struct ChatResponse {
 
 #[derive(Deserialize)]
 struct Choice {
-    message: Message,
+    message: ChoiceMessage,
+}
+
+#[derive(Deserialize)]
+struct ChoiceMessage {
+    #[serde(default)]
+    content: Option<String>,
+    #[serde(default)]
+    reasoning_content: Option<String>,
 }
 
 impl LlmClient {
@@ -155,7 +163,17 @@ impl LlmClient {
                 .choices
                 .into_iter()
                 .next()
-                .map(|c| c.message.content.trim().to_string())
+                .and_then(|c| {
+                    // Some models (e.g. GLM) return JSON in reasoning_content
+                    // instead of the standard content field
+                    let text = c.message.content.or(c.message.reasoning_content)?;
+                    let trimmed = text.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed.to_string())
+                    }
+                })
                 .context(http::ERROR_NO_CHOICES);
         }
 
