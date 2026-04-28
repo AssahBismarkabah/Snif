@@ -70,8 +70,20 @@ pub mod platform {
     pub const FINGERPRINT_MARKER: &str = "<!-- snif:fingerprint:";
     /// HTML comment marker for line-based finding fingerprints
     pub const LINE_FINGERPRINT_MARKER: &str = "<!-- snif:line-fingerprint:";
+    /// Fingerprint marker end suffix
+    pub const FINGERPRINT_END: &str = " -->";
     /// Bearer auth header prefix
     pub const BEARER_PREFIX: &str = "Bearer";
+
+    // Diff parsing constants
+    /// Diff header prefix for old file path
+    pub const DIFF_OLD_PREFIX: &str = "--- a/";
+    /// Diff header prefix for new file path
+    pub const DIFF_NEW_PREFIX: &str = "+++ b/";
+    /// Diff hunk header prefix (for parsing)
+    pub const DIFF_HUNK_PREFIX: &str = "+++";
+    /// Null device path (file deleted or not present)
+    pub const NULL_PATH: &str = "/dev/null";
 }
 
 pub mod github_api {
@@ -416,6 +428,16 @@ Do not include markdown fences, analysis, or any extra text. Your first characte
 must be '{' and your last character must be '}'. If you are unsure, return \
 {\"summary\":\"\",\"findings\":[]} exactly.
 ";
+
+    // Code fence markers for file content
+    pub const CODE_FENCE_OPEN: &str = "```\n";
+    pub const CODE_FENCE_CLOSE: &str = "```\n\n";
+    pub const CODE_FENCE_WRAPPER: &str = "```\n{}\n```\n\n";
+
+    // Structural separators for prompt assembly
+    pub const NEWLINE: &str = "\n";
+    pub const SECTION_SEPARATOR: &str = "\n\n";
+    pub const RULES_HEADER: &str = "\n\nRules:\n";
 
     // Metadata labels
     pub const METADATA_CHANGE_LABEL: &str = "Change: {}\n";

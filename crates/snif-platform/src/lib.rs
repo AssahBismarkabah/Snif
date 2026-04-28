@@ -2,7 +2,10 @@ pub mod github;
 pub mod gitlab;
 
 use anyhow::Result;
-use snif_config::constants::platform::{BOT_MARKER, FINGERPRINT_MARKER, LINE_FINGERPRINT_MARKER};
+use snif_config::constants::platform::{
+    BOT_MARKER, DIFF_HUNK_PREFIX, DIFF_NEW_PREFIX, DIFF_OLD_PREFIX, FINGERPRINT_END,
+    FINGERPRINT_MARKER, LINE_FINGERPRINT_MARKER, NULL_PATH,
+};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
 /// Formats a summary body with the bot marker prepended.
@@ -20,7 +23,10 @@ pub(crate) fn format_resolved_body() -> String {
 
 /// Formats a unified diff header from old/new paths and content.
 pub(crate) fn format_diff_header(old_path: &str, new_path: &str, diff: &str) -> String {
-    format!("--- a/{}\n+++ b/{}\n{}\n", old_path, new_path, diff)
+    format!(
+        "{}{}\n{}{}\n{}\n",
+        DIFF_OLD_PREFIX, old_path, DIFF_NEW_PREFIX, new_path, diff
+    )
 }
 
 // Shared comment formatting used by all adapters
@@ -30,8 +36,13 @@ pub(crate) fn format_finding_body(finding: &Finding) -> String {
         .as_ref()
         .map(|fp| {
             format!(
-                "{}{} -->\n{}{} -->",
-                FINGERPRINT_MARKER, fp.id, LINE_FINGERPRINT_MARKER, fp.line_id
+                "{}{}{}\n{}{}{}",
+                FINGERPRINT_MARKER,
+                fp.id,
+                FINGERPRINT_END,
+                LINE_FINGERPRINT_MARKER,
+                fp.line_id,
+                FINGERPRINT_END
             )
         })
         .unwrap_or_default();
@@ -68,7 +79,7 @@ pub(crate) fn extract_fingerprints(body: &str) -> (Option<String>, Option<String
 fn extract_marker_value(body: &str, marker: &str) -> Option<String> {
     body.find(marker).and_then(|start| {
         let after = &body[start + marker.len()..];
-        after.find(" -->").map(|end| {
+        after.find(FINGERPRINT_END).map(|end| {
             let value = after[..end].trim().to_string();
             if value.is_empty() {
                 return None;
@@ -91,8 +102,8 @@ pub trait PlatformAdapter {
 pub fn parse_changed_paths_from_diff(diff: &str) -> Vec<String> {
     let mut paths = Vec::new();
     for line in diff.lines() {
-        if let Some(path) = line.strip_prefix("+++ b/") {
-            if path != "/dev/null" {
+        if let Some(path) = line.strip_prefix(DIFF_NEW_PREFIX) {
+            if path != NULL_PATH {
                 paths.push(path.to_string());
             }
         }
@@ -105,7 +116,7 @@ pub fn parse_changed_paths_from_diff(diff: &str) -> Vec<String> {
 pub fn extract_identifiers_from_diff(diff: &str) -> Vec<String> {
     let mut identifiers = Vec::new();
     for line in diff.lines() {
-        if line.starts_with('+') && !line.starts_with("+++") {
+        if line.starts_with('+') && !line.starts_with(DIFF_HUNK_PREFIX) {
             let content = &line[1..];
             for word in content.split(|c: char| !c.is_alphanumeric() && c != '_') {
                 let word = word.trim();
