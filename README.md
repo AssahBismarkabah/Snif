@@ -24,7 +24,7 @@ aggressive filtering.
 
 
 <p align="left">
-  <img src="./docs/assets/context-depth-vs-quality.png" width="680" alt="Review quality vs context depth">
+  <img src="./docs/assets/eval-trajectory.png" width="680" alt="Review quality vs context depth">
 </p>
 
 # Getting Started
