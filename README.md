@@ -22,11 +22,6 @@ aggressive filtering.
 
 <hr>
 
-
-<p align="left">
-  <img src="./docs/assets/eval-trajectory.png" width="900" alt="Review quality vs context depth">
-</p>
-
 # Getting Started
 
 ## Prerequisites
