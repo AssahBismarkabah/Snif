@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use snif_config::constants::retrieval;
+use snif_config::constants::{git, retrieval};
 use snif_store::Store;
 use std::collections::HashMap;
 use std::path::Path;
@@ -115,7 +115,7 @@ fn parse_git_log(repo_root: &Path) -> Result<Vec<Vec<String>>> {
                 commits.push(std::mem::take(&mut current_files));
             }
             in_files = false;
-        } else if line.len() == 40 && line.chars().all(|c| c.is_ascii_hexdigit()) {
+        } else if line.len() == git::SHA_LENGTH && line.chars().all(|c| c.is_ascii_hexdigit()) {
             if !current_files.is_empty() {
                 commits.push(std::mem::take(&mut current_files));
             }

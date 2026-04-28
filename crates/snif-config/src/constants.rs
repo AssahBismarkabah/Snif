@@ -105,6 +105,14 @@ pub mod gitlab_api {
 }
 
 // ============================================================================
+// Git Constants
+// ============================================================================
+pub mod git {
+    /// SHA-1 hash length in hex characters
+    pub const SHA_LENGTH: usize = 40;
+}
+
+// ============================================================================
 // LLM Model Configuration
 // ============================================================================
 pub mod embeddings {
@@ -745,6 +753,25 @@ pub mod summary {
     pub const STATS_LINE_MODEL_SUFFIX: &str = "` | ";
     /// Stats line seconds suffix
     pub const STATS_LINE_SECONDS_SUFFIX: &str = "s\n";
+}
+
+// ============================================================================
+// Summarizer Constants
+// ============================================================================
+pub mod summarizer {
+    /// Symbol kind: function
+    pub const KIND_FUNCTION: &str = "function";
+    /// Symbol kind: method
+    pub const KIND_METHOD: &str = "method";
+    /// Symbol level: file
+    pub const LEVEL_FILE: &str = "file";
+    /// Token estimation divisor for summary length
+    pub const TOKEN_ESTIMATION_DIVISOR: usize = 4;
+    /// System prompt for summarization
+    pub const SYSTEM_PROMPT: &str = "\
+You are a code documentation expert. You describe what code does and its role \
+in the system. You focus on purpose and dependencies, not implementation details. \
+You respond with only the summary, no preamble or formatting.";
 }
 
 #[cfg(test)]

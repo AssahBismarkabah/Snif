@@ -1,5 +1,6 @@
 use crate::Store;
 use anyhow::Result;
+use snif_config::constants::limits::SQLITE_MAX_VARIABLE_NUMBER;
 
 impl Store {
     pub fn upsert_file(&self, path: &str, hash: &str, language: &str) -> Result<i64> {
@@ -43,9 +44,7 @@ impl Store {
         }
 
         // SQLite has a default limit of 999 variables per query.
-        // Chunk to stay well under that limit.
-        const SQLITE_MAX_VARIABLE_NUMBER: usize = 900;
-
+        // Chunk to stay well under that limit using the centralized constant.
         let mut results = Vec::new();
         for chunk in paths.chunks(SQLITE_MAX_VARIABLE_NUMBER) {
             let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");

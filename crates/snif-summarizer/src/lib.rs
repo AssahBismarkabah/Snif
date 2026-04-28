@@ -1,7 +1,11 @@
 mod prompt;
 
 use anyhow::{bail, Result};
-use snif_config::{constants::model, env::keys, ModelConfig};
+use snif_config::{
+    constants::{model, summarizer},
+    env::keys,
+    ModelConfig,
+};
 use snif_execution::LlmClient;
 use snif_store::Store;
 use std::collections::HashMap;
@@ -76,7 +80,7 @@ async fn summarize_all_async(
     // Batch 1: Functions and methods
     let functions: Vec<_> = symbols
         .iter()
-        .filter(|s| s.kind == "function" || s.kind == "method")
+        .filter(|s| s.kind == summarizer::KIND_FUNCTION || s.kind == summarizer::KIND_METHOD)
         .collect();
 
     tracing::info!(count = functions.len(), "Summarizing functions");
@@ -117,11 +121,11 @@ async fn summarize_all_async(
     for task in tasks {
         match task.await {
             Ok((sym_id, name, Ok(summary))) => {
-                let token_count = (summary.len() / 4) as i32;
+                let token_count = (summary.len() / summarizer::TOKEN_ESTIMATION_DIVISOR) as i32;
                 store.insert_summary(
                     Some(sym_id),
                     None,
-                    "function",
+                    summarizer::KIND_FUNCTION,
                     &summary,
                     Some(token_count),
                 )?;
@@ -207,8 +211,14 @@ async fn summarize_all_async(
     for task in file_tasks {
         match task.await {
             Ok((file_id, Ok(summary))) => {
-                let token_count = (summary.len() / 4) as i32;
-                store.insert_summary(None, Some(file_id), "file", &summary, Some(token_count))?;
+                let token_count = (summary.len() / summarizer::TOKEN_ESTIMATION_DIVISOR) as i32;
+                store.insert_summary(
+                    None,
+                    Some(file_id),
+                    summarizer::LEVEL_FILE,
+                    &summary,
+                    Some(token_count),
+                )?;
                 files_summarized += 1;
             }
             Ok((file_id, Err(e))) => {
