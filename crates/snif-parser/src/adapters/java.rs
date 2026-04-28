@@ -1,5 +1,5 @@
-use crate::adapter::{self, LanguageAdapter};
-use snif_types::*;
+use crate::adapter::{self, to_line, LanguageAdapter};
+use snif_types::{Import, Language, Symbol, SymbolKind};
 use tree_sitter::Query;
 
 pub struct JavaAdapter;
@@ -67,14 +67,14 @@ impl LanguageAdapter for JavaAdapter {
                         import_path = text.clone();
                     }
                     "import" => {
-                        line = range.start_point.row + 1;
+                        line = to_line(range.start_point.row);
                         is_import = true;
                     }
                     "package_name" => {
                         import_path = text.clone();
                     }
                     "package" => {
-                        line = range.start_point.row + 1;
+                        line = to_line(range.start_point.row);
                     }
                     _ => {}
                 }
@@ -117,26 +117,26 @@ impl LanguageAdapter for JavaAdapter {
                     }
                     "class" | "record" => {
                         kind = SymbolKind::Class;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "interface" => {
                         kind = SymbolKind::Interface;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "enum" => {
                         kind = SymbolKind::Enum;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "method" | "constructor" => {
                         kind = SymbolKind::Method;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     _ => {}

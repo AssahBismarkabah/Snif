@@ -1,5 +1,5 @@
-use crate::adapter::{self, LanguageAdapter};
-use snif_types::*;
+use crate::adapter::{self, to_line, LanguageAdapter};
+use snif_types::{Import, Language, Symbol, SymbolKind};
 use tree_sitter::Query;
 
 pub struct TypeScriptAdapter {
@@ -82,7 +82,7 @@ impl LanguageAdapter for TypeScriptAdapter {
                     "source" => {
                         source_path = text.trim_matches(|c| c == '\'' || c == '"').to_string()
                     }
-                    "import" => line = range.start_point.row + 1,
+                    "import" => line = to_line(range.start_point.row),
                     _ => {}
                 }
             }
@@ -121,32 +121,32 @@ impl LanguageAdapter for TypeScriptAdapter {
                     "name" | "arrow_name" => name = text.clone(),
                     "function" | "arrow_fn" => {
                         kind = SymbolKind::Function;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "class" => {
                         kind = SymbolKind::Class;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "interface" => {
                         kind = SymbolKind::Interface;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "type_alias" => {
                         kind = SymbolKind::TypeAlias;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "enum" => {
                         kind = SymbolKind::Enum;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     _ => {}

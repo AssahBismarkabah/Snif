@@ -1,5 +1,5 @@
-use crate::adapter::{self, LanguageAdapter};
-use snif_types::*;
+use crate::adapter::{self, to_line, LanguageAdapter};
+use snif_types::{Import, Language, Symbol, SymbolKind};
 use tree_sitter::Query;
 
 pub struct RustAdapter;
@@ -61,7 +61,7 @@ impl LanguageAdapter for RustAdapter {
             for (name, range, text) in captures {
                 match name.as_str() {
                     "path" => path = text.clone(),
-                    "import" => line = range.start_point.row + 1,
+                    "import" => line = to_line(range.start_point.row),
                     _ => {}
                 }
             }
@@ -103,44 +103,44 @@ impl LanguageAdapter for RustAdapter {
                     }
                     "function" => {
                         kind = SymbolKind::Function;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "struct" => {
                         kind = SymbolKind::Struct;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "enum" => {
                         kind = SymbolKind::Enum;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "trait" => {
                         kind = SymbolKind::Trait;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "type_alias" => {
                         kind = SymbolKind::TypeAlias;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "module" => {
                         kind = SymbolKind::Module;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "constant" | "static_item" => {
                         kind = SymbolKind::Constant;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     _ => {}

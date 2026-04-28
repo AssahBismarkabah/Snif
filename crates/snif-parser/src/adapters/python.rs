@@ -1,5 +1,5 @@
-use crate::adapter::{self, LanguageAdapter};
-use snif_types::*;
+use crate::adapter::{self, to_line, LanguageAdapter};
+use snif_types::{Import, Language, Symbol, SymbolKind};
 use tree_sitter::Query;
 
 pub struct PythonAdapter;
@@ -58,7 +58,7 @@ impl LanguageAdapter for PythonAdapter {
             for (name, range, text) in captures {
                 match name.as_str() {
                     "module" => module = text.clone(),
-                    "import" | "from_import" => line = range.start_point.row + 1,
+                    "import" | "from_import" => line = to_line(range.start_point.row),
                     _ => {}
                 }
             }
@@ -97,14 +97,14 @@ impl LanguageAdapter for PythonAdapter {
                     "name" => name = text.clone(),
                     "function" => {
                         kind = SymbolKind::Function;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     "class" => {
                         kind = SymbolKind::Class;
-                        start_line = range.start_point.row + 1;
-                        end_line = range.end_point.row + 1;
+                        start_line = to_line(range.start_point.row);
+                        end_line = to_line(range.end_point.row);
                         body_text = text.clone();
                     }
                     _ => {}

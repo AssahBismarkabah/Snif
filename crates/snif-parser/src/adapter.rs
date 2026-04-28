@@ -30,7 +30,7 @@ pub trait LanguageAdapter: Send + Sync {
                 if cap_name == "ref_name" {
                     refs.push(Reference {
                         name: text.clone(),
-                        line: range.start_point.row + 1,
+                        line: to_line(range.start_point.row),
                         context: String::new(),
                     });
                 }
@@ -90,7 +90,7 @@ fn collect_errors_recursive(cursor: &mut tree_sitter::TreeCursor, errors: &mut V
     if node.is_error() || node.is_missing() {
         let start = node.start_position();
         errors.push(ParseError {
-            line: start.row + 1,
+            line: to_line(start.row),
             column: start.column,
             message: if node.is_missing() {
                 format!("missing {}", node.kind())
@@ -109,6 +109,11 @@ fn collect_errors_recursive(cursor: &mut tree_sitter::TreeCursor, errors: &mut V
         }
         cursor.goto_parent();
     }
+}
+
+/// Converts a 0-based tree-sitter row to a 1-based line number.
+pub const fn to_line(row: usize) -> usize {
+    row + 1
 }
 
 pub fn node_text<'a>(source: &'a [u8], node: tree_sitter::Node) -> &'a str {
