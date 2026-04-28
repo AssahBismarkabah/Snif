@@ -1,12 +1,12 @@
-use crate::{extract_fingerprints, PlatformAdapter, BOT_MARKER};
+use crate::{extract_fingerprints, format_resolved_body, format_summary_body, PlatformAdapter};
 use anyhow::{bail, Context, Result};
+use snif_config::constants::github_api::{ACCEPT_DIFF, ACCEPT_JSON};
+use snif_config::constants::platform::{BEARER_PREFIX, BOT_MARKER, USER_AGENT};
 use snif_config::constants::timeouts;
 use snif_config::env::{app, ci, keys};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
 const GITHUB_API_BASE: &str = "https://api.github.com";
-const GITHUB_API_VERSION_HEADER: &str = "application/vnd.github.v3+json";
-const GITHUB_USER_AGENT: &str = "snif-review-agent";
 
 pub struct GitHubAdapter {
     token: String,
@@ -60,7 +60,7 @@ impl GitHubAdapter {
     }
 
     fn auth_header(&self) -> String {
-        format!("Bearer {}", self.token)
+        format!("{} {}", BEARER_PREFIX, self.token)
     }
 
     fn get(&self, path: &str) -> Result<reqwest::blocking::Response> {
@@ -69,8 +69,8 @@ impl GitHubAdapter {
             .http
             .get(&url)
             .header("Authorization", self.auth_header())
-            .header("Accept", GITHUB_API_VERSION_HEADER)
-            .header("User-Agent", GITHUB_USER_AGENT)
+            .header("Accept", ACCEPT_JSON)
+            .header("User-Agent", USER_AGENT)
             .send()
             .context("Failed to call GitHub API")?;
 
@@ -88,8 +88,8 @@ impl GitHubAdapter {
         self.http
             .post(&url)
             .header("Authorization", self.auth_header())
-            .header("Accept", GITHUB_API_VERSION_HEADER)
-            .header("User-Agent", GITHUB_USER_AGENT)
+            .header("Accept", ACCEPT_JSON)
+            .header("User-Agent", USER_AGENT)
             .json(body)
             .send()
             .context("Failed to call GitHub API")
@@ -133,9 +133,9 @@ fn get_installation_token(
     let client = reqwest::blocking::Client::new();
     let response = client
         .post(&url)
-        .header("Authorization", format!("Bearer {}", jwt))
-        .header("Accept", "application/vnd.github.v3+json")
-        .header("User-Agent", "snif-review-agent")
+        .header("Authorization", format!("{} {}", BEARER_PREFIX, jwt))
+        .header("Accept", ACCEPT_JSON)
+        .header("User-Agent", USER_AGENT)
         .send()
         .context("Failed to get installation token")?;
 
@@ -187,8 +187,8 @@ impl PlatformAdapter for GitHubAdapter {
             .http
             .get(&url)
             .header("Authorization", self.auth_header())
-            .header("Accept", "application/vnd.github.v3.diff")
-            .header("User-Agent", "snif-review-agent")
+            .header("Accept", ACCEPT_DIFF)
+            .header("User-Agent", USER_AGENT)
             .send()
             .context("Failed to fetch PR diff")?;
 
@@ -329,7 +329,7 @@ impl PlatformAdapter for GitHubAdapter {
 
     fn post_summary(&self, summary: &str) -> Result<()> {
         let body = serde_json::json!({
-            "body": format!("{}\n\n{}", BOT_MARKER, summary),
+            "body": format_summary_body(summary),
         });
 
         let path = format!("issues/{}/comments", self.pr_number);
@@ -416,10 +416,7 @@ impl PlatformAdapter for GitHubAdapter {
             if is_stale {
                 if let Some(comment_id) = comment.get("id").and_then(serde_json::Value::as_i64) {
                     let reply_body = serde_json::json!({
-                        "body": format!(
-                            "{}\n\n**Resolved** — this issue is no longer present in the current change.",
-                            BOT_MARKER
-                        ),
+                        "body": format_resolved_body(),
                     });
 
                     let path = format!("pulls/{}/comments/{}/replies", self.pr_number, comment_id);

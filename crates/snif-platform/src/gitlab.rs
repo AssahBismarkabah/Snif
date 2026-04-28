@@ -1,11 +1,10 @@
-use crate::{extract_fingerprints, PlatformAdapter, BOT_MARKER};
+use crate::{extract_fingerprints, format_diff_header, format_summary_body, PlatformAdapter};
 use anyhow::{bail, Context, Result};
+use snif_config::constants::gitlab_api::{DEFAULT_API_BASE, PRIVATE_TOKEN_HEADER};
+use snif_config::constants::platform::{BOT_MARKER, USER_AGENT};
 use snif_config::constants::timeouts;
 use snif_config::env::{ci, get_api_key, keys};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
-
-const GITLAB_DEFAULT_API_BASE: &str = "https://gitlab.com/api/v4";
-const GITLAB_USER_AGENT: &str = "snif-review-agent";
 
 pub struct GitLabAdapter {
     token: String,
@@ -20,7 +19,7 @@ impl GitLabAdapter {
         let token = get_api_key(keys::GITLAB_TOKEN, keys::CI_JOB_TOKEN)?;
 
         let encoded_path = project_path.replace('/', "%2F");
-        let base = api_base.unwrap_or(GITLAB_DEFAULT_API_BASE).to_string();
+        let base = api_base.unwrap_or(DEFAULT_API_BASE).to_string();
 
         Ok(Self {
             token,
@@ -57,8 +56,8 @@ impl GitLabAdapter {
         let response = self
             .http
             .get(&url)
-            .header("PRIVATE-TOKEN", &self.token)
-            .header("User-Agent", GITLAB_USER_AGENT)
+            .header(PRIVATE_TOKEN_HEADER, &self.token)
+            .header("User-Agent", USER_AGENT)
             .send()
             .context("Failed to call GitLab API")?;
 
@@ -75,8 +74,8 @@ impl GitLabAdapter {
         let url = self.api_url(path);
         self.http
             .post(&url)
-            .header("PRIVATE-TOKEN", &self.token)
-            .header("User-Agent", GITLAB_USER_AGENT)
+            .header(PRIVATE_TOKEN_HEADER, &self.token)
+            .header("User-Agent", USER_AGENT)
             .json(body)
             .send()
             .context("Failed to call GitLab API")
@@ -86,8 +85,8 @@ impl GitLabAdapter {
         let url = self.api_url(path);
         self.http
             .put(&url)
-            .header("PRIVATE-TOKEN", &self.token)
-            .header("User-Agent", GITLAB_USER_AGENT)
+            .header(PRIVATE_TOKEN_HEADER, &self.token)
+            .header("User-Agent", USER_AGENT)
             .json(body)
             .send()
             .context("Failed to call GitLab API")
@@ -161,10 +160,7 @@ impl PlatformAdapter for GitLabAdapter {
                 unified_diff.push_str(diff);
                 unified_diff.push('\n');
             } else {
-                unified_diff.push_str(&format!(
-                    "--- a/{}\n+++ b/{}\n{}\n",
-                    old_path, new_path, diff
-                ));
+                unified_diff.push_str(&format_diff_header(old_path, new_path, diff));
             }
         }
 
@@ -328,7 +324,7 @@ impl PlatformAdapter for GitLabAdapter {
 
     fn post_summary(&self, summary: &str) -> Result<()> {
         let body = serde_json::json!({
-            "body": format!("{}\n\n{}", BOT_MARKER, summary),
+            "body": format_summary_body(summary),
         });
 
         let path = format!("merge_requests/{}/notes", self.mr_iid);

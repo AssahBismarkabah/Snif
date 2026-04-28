@@ -59,6 +59,40 @@ pub mod http {
 }
 
 // ============================================================================
+// Platform Adapter Constants
+// ============================================================================
+pub mod platform {
+    /// User agent string for all HTTP requests to Git providers
+    pub const USER_AGENT: &str = "snif-review-agent";
+    /// HTML comment marker for Snif bot messages
+    pub const BOT_MARKER: &str = "<!-- snif:review -->";
+    /// HTML comment marker for content-based finding fingerprints
+    pub const FINGERPRINT_MARKER: &str = "<!-- snif:fingerprint:";
+    /// HTML comment marker for line-based finding fingerprints
+    pub const LINE_FINGERPRINT_MARKER: &str = "<!-- snif:line-fingerprint:";
+    /// Bearer auth header prefix
+    pub const BEARER_PREFIX: &str = "Bearer";
+}
+
+pub mod github_api {
+    /// GitHub API v3 media type for JSON responses
+    pub const ACCEPT_JSON: &str = "application/vnd.github.v3+json";
+    /// GitHub API v3 media type for diff responses
+    pub const ACCEPT_DIFF: &str = "application/vnd.github.v3.diff";
+    /// GitHub API base URL
+    pub const API_BASE: &str = "https://api.github.com";
+    /// GitHub App JWT algorithm
+    pub const JWT_ALGORITHM: &str = "RS256";
+}
+
+pub mod gitlab_api {
+    /// GitLab API v4 base URL (gitlab.com)
+    pub const DEFAULT_API_BASE: &str = "https://gitlab.com/api/v4";
+    /// GitLab private token header name
+    pub const PRIVATE_TOKEN_HEADER: &str = "PRIVATE-TOKEN";
+}
+
+// ============================================================================
 // LLM Model Configuration
 // ============================================================================
 pub mod embeddings {

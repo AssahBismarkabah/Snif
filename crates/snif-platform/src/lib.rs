@@ -2,12 +2,26 @@ pub mod github;
 pub mod gitlab;
 
 use anyhow::Result;
+use snif_config::constants::platform::{BOT_MARKER, FINGERPRINT_MARKER, LINE_FINGERPRINT_MARKER};
 use snif_types::{ChangeMetadata, Finding, Fingerprint};
 
-// Shared constants used by all platform adapters
-pub(crate) const FINGERPRINT_MARKER: &str = "<!-- snif:fingerprint:";
-pub(crate) const LINE_FINGERPRINT_MARKER: &str = "<!-- snif:line-fingerprint:";
-pub(crate) const BOT_MARKER: &str = "<!-- snif:review -->";
+/// Formats a summary body with the bot marker prepended.
+pub(crate) fn format_summary_body(summary: &str) -> String {
+    format!("{}\n\n{}", BOT_MARKER, summary)
+}
+
+/// Formats a resolved finding body with the bot marker.
+pub(crate) fn format_resolved_body() -> String {
+    format!(
+        "{}\n\n**Resolved** — this issue is no longer present in the current change.",
+        BOT_MARKER
+    )
+}
+
+/// Formats a unified diff header from old/new paths and content.
+pub(crate) fn format_diff_header(old_path: &str, new_path: &str, diff: &str) -> String {
+    format!("--- a/{}\n+++ b/{}\n{}\n", old_path, new_path, diff)
+}
 
 // Shared comment formatting used by all adapters
 pub(crate) fn format_finding_body(finding: &Finding) -> String {
