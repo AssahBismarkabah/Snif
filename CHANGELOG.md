@@ -2,6 +2,19 @@
 
 ## unreleased
 
+## 3.2.6
+
+- Handle open-weight models that return responses in `reasoning_content` field instead of `content`
+- Fix GLM model returning JSON in `reasoning_content` field
+- Update Camera API endpoint to accommodate provider changes
+- Implement default reference extraction in platform adapter
+- Rename mislabeled fixtures to accurately reflect actual bugs
+- Centralize magic constants into config module across the crate
+- Refactor output module for improved maintainability
+- Refactor platform adapter line parsing logic
+- Update eval trajectory images to 900px width
+- Fix README image width for better display
+
 ## 3.2.5
 
 - Rename package to `snif-cli` and add `[[bin]]` section to produce `snif` binary
