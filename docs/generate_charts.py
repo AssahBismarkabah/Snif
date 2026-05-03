@@ -7,10 +7,11 @@ Style reference:
   - Small gray italic footnote at bottom
 
 Data notes:
-  - Fig 1: Modeled progression. Final point (82% precision, 0 findings
-    on clean fixtures) is measured from 50-fixture eval harness.
+  - Fig 1: Modeled progression. Final point (100% precision, 0 findings
+    on clean fixtures) is measured from v4.0 on 50-fixture eval harness.
   - Fig 2: Development milestones. Baseline 25% precision is measured
-    (fixtures contained real bugs). Current 82/90/18 is measured.
+    (fixtures contained real bugs). Latest (v4.0) is 100/86/0 on
+    50-fixture harness.
 """
 
 import matplotlib.pyplot as plt
@@ -105,10 +106,10 @@ def fig1_context_vs_quality():
     Two metrics plotted against five cumulative retrieval stages.
     Precision (measured: TP / (TP+FP) across all fixtures) rises
     as more context is added. Noise on clean code (findings on the
-    10 clean fixtures, all of which are false positives by definition)
+    22 clean fixtures, all of which are false positives by definition)
     drops to zero at the filtering stage.
 
-    Only the final data point is measured. Intermediate values are
+    Only the final data point (v4.0) is measured. Intermediate values are
     modeled estimates based on architecture layers.
     """
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -123,7 +124,7 @@ def fig1_context_vs_quality():
     ]
     x = np.arange(len(labels))
 
-    precision = [32, 48, 62, 74, 82]
+    precision = [32, 48, 62, 74, 100]
     noise_clean = [68, 45, 28, 14, 0]
 
     ax.plot(
@@ -164,7 +165,7 @@ def fig1_context_vs_quality():
 
     _footnote(
         fig,
-        "Final point (82% precision, 0 findings on clean fixtures) measured on "
+        "Final point (v4.0: 100% precision, 0 findings on clean fixtures) measured on "
         "50-fixture evaluation harness.\nEarlier points are modeled from "
         "architecture layers.",
     )
@@ -187,10 +188,10 @@ def fig2_eval_trajectory():
     Noise is shown separately because the quality gate thresholds
     (precision ≥ 70%, noise ≤ 20%) apply independently.
 
-    Recall is shown subtly to confirm it stays high (90%) even as
+    Recall is shown subtly to confirm it stays high even as
     precision improves — we did not sacrifice coverage for accuracy.
 
-    All four data points are measured from the eval harness.
+    All five data points are measured from the eval harness.
     """
     fig, ax = plt.subplots(figsize=(8, 5))
     fig.subplots_adjust(top=0.84, bottom=0.18, left=0.10, right=0.92)
@@ -199,13 +200,14 @@ def fig2_eval_trajectory():
         "v1.0\nbaseline",
         "v1.0\nfixed fixtures",
         "v2.0\nfiltering",
-        "v3.1\ncurrent",
+        "v3.1\n(category aliasing)",
+        "v4.0\n(current)",
     ]
     x = np.arange(len(milestones))
 
-    precision = [25, 72, 78, 82]
-    recall = [95, 92, 90, 90]
-    noise = [75, 28, 22, 18]
+    precision = [25, 72, 78, 82, 100]
+    recall = [95, 92, 90, 90, 86]
+    noise = [75, 28, 22, 18, 0]
 
     ax.plot(
         x,
@@ -276,12 +278,12 @@ def fig2_eval_trajectory():
     ax.set_ylim(-5, 105)
     ax.set_xlim(-0.3, x[-1] + 0.7)
 
-    ax.legend(loc="upper right", fontsize=10, handlelength=1.5, handletextpad=0.6)
+    ax.legend(loc="center right", fontsize=10, handlelength=1.5, handletextpad=0.6)
 
     _footnote(
         fig,
         "v1.0 baseline: test fixtures contained real bugs the model correctly "
-        "caught.\nCurrent: 82% precision, 90% recall, 18% noise rate.",
+        "caught.\nLatest: 100% precision, 86% recall, 0% noise rate.",
     )
 
     plt.savefig(
