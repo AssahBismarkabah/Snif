@@ -330,11 +330,7 @@ def fig3_metric_breakdown():
     )
 
     _setup(ax)
-    _title(
-        fig,
-        "Precision, recall, and noise across milestones",
-        "Grouped bar chart of evaluation metrics per release",
-    )
+    _title(fig, "", "Grouped bar chart of evaluation metrics per release")
 
     ax.set_xticks(x)
     ax.set_xticklabels(milestones)
