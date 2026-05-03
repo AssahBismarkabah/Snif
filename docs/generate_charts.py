@@ -171,13 +171,13 @@ def fig1_context_vs_quality():
     )
 
     plt.savefig(
-        "assets/context-depth-vs-quality.png",
+        "docs/assets/context-depth-vs-quality.png",
         bbox_inches="tight",
         facecolor="white",
         edgecolor="none",
     )
     plt.close()
-    print("  saved: assets/context-depth-vs-quality.png")
+    print("  saved: docs/assets/context-depth-vs-quality.png")
 
 
 def fig2_eval_trajectory():
@@ -287,13 +287,13 @@ def fig2_eval_trajectory():
     )
 
     plt.savefig(
-        "assets/eval-trajectory.png",
+        "docs/assets/eval-trajectory.png",
         bbox_inches="tight",
         facecolor="white",
         edgecolor="none",
     )
     plt.close()
-    print("  saved: assets/eval-trajectory.png")
+    print("  saved: docs/assets/eval-trajectory.png")
 
 
 if __name__ == "__main__":
