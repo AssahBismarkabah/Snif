@@ -8,9 +8,7 @@
   <a href="./docs"><img src="https://img.shields.io/badge/Documentation-000?logo=googledocs&logoColor=FFE165&style=for-the-badge" alt="Documentation"></a>
 </div>
 
-<p align="left">
-  <img src="./docs/assets/metric-breakdown.png" width="680" alt="Review quality vs context depth">
-</p>
+<img src="./docs/assets/metric-breakdown.png" width="680" alt="Review quality vs context depth">
 
 # Context-Aware AI Code Review Agent
 
