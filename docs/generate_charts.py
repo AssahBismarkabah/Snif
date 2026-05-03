@@ -296,8 +296,75 @@ def fig2_eval_trajectory():
     print("  saved: docs/assets/eval-trajectory.png")
 
 
+def fig3_metric_breakdown():
+    """
+    Metric breakdown across milestones — grouped bar chart.
+
+    Three metrics side-by-side at each development milestone.
+    Shows precision climbing from 25% to 100%, noise dropping from
+    75% to 0%, and recall remaining high throughout.
+    """
+    fig, ax = plt.subplots(figsize=(8, 5))
+    fig.subplots_adjust(top=0.84, bottom=0.18, left=0.10, right=0.92)
+
+    milestones = [
+        "v1.0\nbaseline",
+        "v1.0\nfixed fixtures",
+        "v2.0\nfiltering",
+        "v3.1\n(category\naliasing)",
+        "v4.0\n(current)",
+    ]
+    x = np.arange(len(milestones))
+    width = 0.22
+
+    precision = [25, 72, 78, 82, 100]
+    recall = [95, 92, 90, 90, 86]
+    noise = [75, 28, 22, 18, 0]
+
+    bars_p = ax.bar(
+        x - width, precision, width, color=BLUE_DARK, label="Precision", zorder=5
+    )
+    bars_r = ax.bar(x, recall, width, color=BLUE_MED, label="Recall", zorder=5)
+    bars_n = ax.bar(
+        x + width, noise, width, color=BLUE_SOFT, label="Noise rate", zorder=5
+    )
+
+    _setup(ax)
+    _title(
+        fig,
+        "Precision, recall, and noise across milestones",
+        "Grouped bar chart of evaluation metrics per release",
+    )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(milestones)
+    ax.set_ylabel("Rate (%)")
+    ax.yaxis.set_major_formatter(mticker.PercentFormatter(decimals=0))
+    ax.set_ylim(0, 105)
+
+    ax.set_xlim(-0.5, len(milestones) + 0.4)
+
+    ax.legend(loc="center right", fontsize=10, handlelength=1.5, handletextpad=0.6)
+
+    _footnote(
+        fig,
+        "All data points measured from the eval harness. "
+        "v4.0: 100% precision, 86% recall, 0% noise rate.",
+    )
+
+    plt.savefig(
+        "docs/assets/metric-breakdown.png",
+        bbox_inches="tight",
+        facecolor="white",
+        edgecolor="none",
+    )
+    plt.close()
+    print("  saved: docs/assets/metric-breakdown.png")
+
+
 if __name__ == "__main__":
     print("Generating figures...")
     fig1_context_vs_quality()
     fig2_eval_trajectory()
+    fig3_metric_breakdown()
     print("Done.")
