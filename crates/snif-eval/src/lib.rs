@@ -3,11 +3,12 @@ pub mod fixture;
 pub mod history;
 pub mod metrics;
 pub mod reporter;
+pub mod retry;
 
 use anyhow::Result;
 use snif_config::constants::{eval, eval_output, model, thresholds};
 use snif_config::SnifConfig;
-use snif_types::{BudgetReport, ChangeMetadata, ContentTier, ContextFile, ContextPackage};
+use snif_types::{BudgetReport, ChangeMetadata, ContentTier, ContextFile, ContextPackage, Finding};
 use std::path::Path;
 
 pub struct EvalResult {
@@ -84,39 +85,34 @@ pub fn run_evaluation(
         );
         let user_prompt = snif_prompts::render_user_prompt(&context);
 
-        let result = snif_execution::execute_review(&system_prompt, &user_prompt, &config.model)?;
-
-        let mut parsed = snif_output::parser::parse_response(&result.response)?;
-
-        // Run repair if findings are empty OR if chain-of-thought leakage is detected
-        let needs_repair = parsed.findings.is_empty()
-            || snif_output::parser::has_chain_of_thought(&result.response);
-
-        if needs_repair {
-            tracing::warn!(fixture = %fix.name, "Repairing review response");
-            let repaired = snif_execution::repair_review_response(&result.response, &config.model)?;
-            parsed = snif_output::parser::parse_response(&repaired.response)?;
-        }
-        let mut findings = parsed.findings;
-        findings = snif_output::filter::apply_filters(findings, &config.filter);
-
-        for f in &findings {
+        let mut all_runs = Vec::new();
+        for attempt in 1..=fix.retry_count {
             tracing::info!(
                 fixture = %fix.name,
-                file = %f.location.file,
-                line = f.location.start_line,
-                category = %f.category,
-                confidence = f.confidence,
-                explanation = %f.explanation,
-                "Finding"
+                attempt,
+                total = fix.retry_count,
+                "Running fixture attempt"
             );
+            let findings =
+                execute_fixture_attempt(&system_prompt, &user_prompt, config, &fix.name)?;
+            log_findings(&fix.name, &findings);
+            all_runs.push(findings);
         }
+
+        let findings = if fix.retry_count == 1 {
+            all_runs.pop().unwrap_or_default()
+        } else {
+            let retry_count = fix.retry_count as usize;
+            let threshold = retry_count.div_ceil(2);
+            retry::aggregate_findings(&all_runs, threshold, thresholds::EVAL_LINE_TOLERANCE)
+        };
 
         let fixture_result = metrics::compute_fixture_result(
             &fix.name,
             &fix.expected_findings,
             &findings,
             thresholds::EVAL_LINE_TOLERANCE,
+            fix.retry_count,
         );
 
         tracing::info!(
@@ -125,6 +121,7 @@ pub fn run_evaluation(
             actual = fixture_result.actual,
             tp = fixture_result.true_positives,
             fp = fixture_result.false_positives,
+            retry_count = fix.retry_count,
             "Fixture complete"
         );
 
@@ -147,4 +144,43 @@ pub fn run_evaluation(
         aggregate,
         gates_passed,
     })
+}
+
+fn execute_fixture_attempt(
+    system_prompt: &str,
+    user_prompt: &str,
+    config: &SnifConfig,
+    fixture_name: &str,
+) -> Result<Vec<Finding>> {
+    let result = snif_execution::execute_review(system_prompt, user_prompt, &config.model)?;
+
+    let mut parsed = snif_output::parser::parse_response(&result.response)?;
+
+    let needs_repair =
+        parsed.findings.is_empty() || snif_output::parser::has_chain_of_thought(&result.response);
+
+    if needs_repair {
+        tracing::warn!(fixture = %fixture_name, "Repairing review response");
+        let repaired = snif_execution::repair_review_response(&result.response, &config.model)?;
+        parsed = snif_output::parser::parse_response(&repaired.response)?;
+    }
+
+    Ok(snif_output::filter::apply_filters(
+        parsed.findings,
+        &config.filter,
+    ))
+}
+
+fn log_findings(fixture_name: &str, findings: &[Finding]) {
+    for f in findings {
+        tracing::info!(
+            fixture = %fixture_name,
+            file = %f.location.file,
+            line = f.location.start_line,
+            category = %f.category,
+            confidence = f.confidence,
+            explanation = %f.explanation,
+            "Finding"
+        );
+    }
 }

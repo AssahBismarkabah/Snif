@@ -483,6 +483,7 @@ mod tests {
             per_fixture: vec![
                 crate::history::FixtureRecord {
                     name: TEST_FIXTURE_SECURITY.to_string(),
+                    retry_count: 1,
                     expected: TEST_EXPECTED_HIGH,
                     actual: TEST_ACTUAL,
                     tp: TEST_TP_HIGH,
@@ -491,6 +492,7 @@ mod tests {
                 },
                 crate::history::FixtureRecord {
                     name: TEST_FIXTURE_ERROR.to_string(),
+                    retry_count: 1,
                     expected: TEST_EXPECTED_LOW,
                     actual: TEST_ACTUAL,
                     tp: TEST_TP_MID,
@@ -505,6 +507,7 @@ mod tests {
         vec![
             FixtureResult {
                 fixture_name: TEST_FIXTURE_SECURITY.to_string(),
+                retry_count: 1,
                 expected: TEST_EXPECTED_HIGH,
                 actual: TEST_ACTUAL,
                 true_positives: TEST_TP_HIGH,
@@ -513,6 +516,7 @@ mod tests {
             },
             FixtureResult {
                 fixture_name: TEST_FIXTURE_ERROR.to_string(),
+                retry_count: 1,
                 expected: TEST_EXPECTED_LOW,
                 actual: TEST_ACTUAL,
                 true_positives: TEST_TP_MID,

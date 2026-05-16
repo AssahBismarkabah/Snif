@@ -273,6 +273,7 @@ mod tests {
                 .into_iter()
                 .map(|(name, expected, actual, tp, fp)| FixtureRecord {
                     name: name.to_string(),
+                    retry_count: 1,
                     expected,
                     actual,
                     tp,

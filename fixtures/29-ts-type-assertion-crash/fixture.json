@@ -1,7 +1,8 @@
 {
   "name": "ts-type-assertion-crash",
-  "description": "Unsafe type assertion masking a runtime type mismatch",
+  "description": "Unsafe type assertion on unknown input without runtime validation, crashing if data or items is absent",
   "conventions": null,
+  "retry_count": 3,
   "expected_findings": [
     {
       "file": "src/parser.ts",

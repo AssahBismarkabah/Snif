@@ -22,6 +22,8 @@ pub struct EvalRecord {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FixtureRecord {
     pub name: String,
+    #[serde(default = "default_retry_count")]
+    pub retry_count: u32,
     pub expected: usize,
     pub actual: usize,
     pub tp: usize,
@@ -45,6 +47,7 @@ pub fn build_record(
         .iter()
         .map(|fr| FixtureRecord {
             name: fr.fixture_name.clone(),
+            retry_count: fr.retry_count,
             expected: fr.expected,
             actual: fr.actual,
             tp: fr.true_positives,
@@ -63,6 +66,10 @@ pub fn build_record(
         gates_passed,
         per_fixture,
     }
+}
+
+fn default_retry_count() -> u32 {
+    1
 }
 
 pub fn save_record(path: &Path, record: &EvalRecord) -> Result<()> {
@@ -303,6 +310,7 @@ mod tests {
             gates_passed: true,
             per_fixture: vec![FixtureRecord {
                 name: TEST_FIXTURE_NAME.to_string(),
+                retry_count: 1,
                 expected: TEST_FIXTURE_EXPECTED,
                 actual: tp + fp,
                 tp,
