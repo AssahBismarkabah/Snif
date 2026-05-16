@@ -5,6 +5,7 @@ use crate::fixture::ExpectedFinding;
 
 pub struct FixtureResult {
     pub fixture_name: String,
+    pub retry_count: u32,
     pub expected: usize,
     pub actual: usize,
     pub true_positives: usize,
@@ -43,6 +44,7 @@ pub fn compute_fixture_result(
     expected: &[ExpectedFinding],
     actual: &[Finding],
     line_tolerance: usize,
+    retry_count: u32,
 ) -> FixtureResult {
     let mut matched_expected = vec![false; expected.len()];
     let mut matched_actual = vec![false; actual.len()];
@@ -78,6 +80,7 @@ pub fn compute_fixture_result(
 
     FixtureResult {
         fixture_name: fixture_name.to_string(),
+        retry_count,
         expected: expected.len(),
         actual: actual.len(),
         true_positives,
@@ -228,8 +231,13 @@ mod tests {
             TEST_CONFIDENCE_HIGH,
         )];
 
-        let result =
-            compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
+        let result = compute_fixture_result(
+            TEST_FIXTURE_NAME,
+            &expected,
+            &actual,
+            TEST_LINE_TOLERANCE,
+            1,
+        );
         assert_eq!(result.true_positives, TEST_EXPECTED_COUNT);
         assert_eq!(result.false_positives, TEST_ZERO_COUNT);
         assert_eq!(result.false_negatives, TEST_ZERO_COUNT);
@@ -250,8 +258,13 @@ mod tests {
             TEST_CONFIDENCE_HIGH,
         )];
 
-        let result =
-            compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
+        let result = compute_fixture_result(
+            TEST_FIXTURE_NAME,
+            &expected,
+            &actual,
+            TEST_LINE_TOLERANCE,
+            1,
+        );
         assert_eq!(result.true_positives, TEST_EXPECTED_COUNT);
         assert_eq!(result.false_positives, TEST_ZERO_COUNT);
     }
@@ -274,8 +287,13 @@ mod tests {
             TEST_CONFIDENCE_HIGH,
         )];
 
-        let result =
-            compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
+        let result = compute_fixture_result(
+            TEST_FIXTURE_NAME,
+            &expected,
+            &actual,
+            TEST_LINE_TOLERANCE,
+            1,
+        );
         assert_eq!(result.true_positives, TEST_EXPECTED_COUNT);
         assert_eq!(result.false_positives, TEST_ZERO_COUNT);
     }
@@ -295,8 +313,13 @@ mod tests {
             TEST_CONFIDENCE_HIGH,
         )];
 
-        let result =
-            compute_fixture_result(TEST_FIXTURE_NAME, &expected, &actual, TEST_LINE_TOLERANCE);
+        let result = compute_fixture_result(
+            TEST_FIXTURE_NAME,
+            &expected,
+            &actual,
+            TEST_LINE_TOLERANCE,
+            1,
+        );
         assert_eq!(result.true_positives, TEST_ZERO_COUNT);
         assert_eq!(result.false_positives, TEST_EXPECTED_COUNT);
         assert_eq!(result.false_negatives, TEST_EXPECTED_COUNT);

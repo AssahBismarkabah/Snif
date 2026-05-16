@@ -12,6 +12,7 @@ pub struct Fixture {
     pub diff: String,
     pub files: HashMap<String, String>,
     pub conventions: Option<String>,
+    pub retry_count: u32,
     pub expected_findings: Vec<ExpectedFinding>,
 }
 
@@ -33,6 +34,8 @@ struct FixtureMeta {
     name: String,
     description: String,
     conventions: Option<String>,
+    #[serde(default)]
+    retry_count: Option<u32>,
     expected_findings: Vec<ExpectedFinding>,
 }
 
@@ -108,6 +111,7 @@ fn load_single_fixture(fixture_dir: &Path) -> Result<Fixture> {
         diff,
         files,
         conventions: meta.conventions,
+        retry_count: meta.retry_count.unwrap_or(1).max(1),
         expected_findings: meta.expected_findings,
     })
 }
@@ -150,6 +154,32 @@ mod tests {
         let fixtures = load_fixtures(temp_dir.path()).unwrap();
         assert_eq!(fixtures.len(), 1);
         assert_eq!(fixtures[0].name, TEST_FIXTURE_NAME);
+        assert_eq!(fixtures[0].retry_count, 1);
+    }
+
+    #[test]
+    fn load_fixtures_loads_retry_count() {
+        let temp_dir = TempDir::new().unwrap();
+        let fixture_dir = temp_dir.path().join(TEST_FIXTURE_NAME);
+        std::fs::create_dir_all(&fixture_dir).unwrap();
+
+        let meta = serde_json::json!({
+            "name": TEST_FIXTURE_NAME,
+            "description": TEST_FIXTURE_DESCRIPTION,
+            "retry_count": 3,
+            "expected_findings": []
+        });
+        let mut meta_file =
+            std::fs::File::create(fixture_dir.join(eval_output::FIXTURE_META_FILE)).unwrap();
+        meta_file.write_all(meta.to_string().as_bytes()).unwrap();
+
+        let mut patch_file =
+            std::fs::File::create(fixture_dir.join(eval_output::PATCH_FILE)).unwrap();
+        patch_file.write_all(b"diff content").unwrap();
+
+        let fixtures = load_fixtures(temp_dir.path()).unwrap();
+        assert_eq!(fixtures.len(), 1);
+        assert_eq!(fixtures[0].retry_count, 3);
     }
 
     #[test]

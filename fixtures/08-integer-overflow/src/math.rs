@@ -5,7 +5,3 @@ pub fn factorial(n: u32) -> u64 {
     }
     result
 }
-
-pub fn safe_add(a: u64, b: u64) -> Option<u64> {
-    a.checked_add(b)
-}

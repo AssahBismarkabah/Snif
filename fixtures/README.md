@@ -94,6 +94,7 @@ Create a new directory under `fixtures/` with:
   "name": "descriptive-name",
   "description": "What this fixture tests",
   "conventions": null,
+  "retry_count": 1,
   "expected_findings": [
     {
       "file": "src/example.rs",
@@ -107,6 +108,9 @@ Create a new directory under `fixtures/` with:
 The `conventions` field is optional. Set it to a string describing project
 conventions when testing convention enforcement (category "convention"). Set
 it to `null` for all other fixture types.
+
+The `retry_count` field is optional and defaults to 1. Set it above 1 only for
+known unstable fixtures where repeated LLM runs should be aggregated.
 
 Source files can be in any language. The eval harness reads all files in the
 fixture directory (excluding `fixture.json` and `change.patch`) regardless
