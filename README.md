@@ -10,7 +10,7 @@
 
 <img src="./docs/assets/metric-breakdown.png" alt="Review quality vs context depth">
 
-# Context-Aware AI Code Review Agent
+# Context-Aware Code Review Agent
 
 Snif is a code review agent that understands your codebase. It indexes the
 repository structure, generates semantic summaries, and uses that context to
