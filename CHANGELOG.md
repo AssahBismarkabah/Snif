@@ -2,6 +2,7 @@
 
 ## unreleased
 
+- Enable debug logging and backtraces in the Snif review workflow
 - Update review endpoint to `https://api.ai.camer.digital/v1`
 
 ## 3.2.6
