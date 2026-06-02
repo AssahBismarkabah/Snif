@@ -15,6 +15,7 @@ export class ScrollTrackerSafe {
   private handler: (() => void) | null = null;
 
   start(): void {
+    if (this.handler) return;
     this.handler = this.onScroll.bind(this);
     window.addEventListener("scroll", this.handler);
   }
