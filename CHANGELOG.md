@@ -7,9 +7,6 @@
 - Send explicit LLM `max_tokens` caps so providers do not reserve unbounded completion tokens
 - Enable debug logging and backtraces in the Snif review workflow
 - Update review endpoint to `https://api.ai.camer.digital/v1`
-
-## 3.2.6
-
 - Handle open-weight models that return responses in `reasoning_content` field instead of `content`
 - Fix GLM model returning JSON in `reasoning_content` field
 - Update Camera API endpoint to accommodate provider changes
