@@ -35,7 +35,7 @@ jobs:
         env:
           SNIF_API_KEY: ${{ secrets.SNIF_API_KEY }}
           RUST_BACKTRACE: 1
-          RUST_LOG: debug
+          RUST_LOG: info,snif=debug,snif_context=debug,snif_summarizer=debug,snif_execution=debug,reqwest=warn,hyper_util=warn,rustls=warn
 
       - name: Review pull request
         run: |
@@ -53,4 +53,4 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SNIF_PR_NUMBER: ${{ github.event.pull_request.number }}
           RUST_BACKTRACE: 1
-          RUST_LOG: debug
+          RUST_LOG: info,snif=debug,snif_context=debug,snif_summarizer=debug,snif_execution=debug,reqwest=warn,hyper_util=warn,rustls=warn

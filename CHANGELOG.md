@@ -2,6 +2,7 @@
 
 ## unreleased
 
+- Limit review prompt size in repo config to reduce provider rate-limit failures
 - Enable debug logging and backtraces in the Snif review workflow
 - Update review endpoint to `https://api.ai.camer.digital/v1`
 
