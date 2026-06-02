@@ -1,7 +1,7 @@
 {
   "model": {
-    "review_model": "glm-5",
-    "summary_model": "glm-5",
+    "review_model": "glm-5p1",
+    "summary_model": "glm-5p1",
     "endpoint": "https://api.ai.camer.digital/v1"
   },
   "context": {
