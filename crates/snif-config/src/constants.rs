@@ -147,6 +147,8 @@ pub mod model {
     pub const DEFAULT_MAX_TOKENS: usize = 128_000;
     /// Reserved tokens for LLM output generation
     pub const DEFAULT_OUTPUT_RESERVE_TOKENS: usize = 32_000;
+    /// Maximum completion tokens for summary generation requests
+    pub const SUMMARY_OUTPUT_MAX_TOKENS: usize = 1_024;
     /// Maximum number of files to include in review context
     pub const DEFAULT_MAX_FILES: usize = 50;
     /// Default max concurrent summarization tasks.

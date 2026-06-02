@@ -149,6 +149,8 @@ struct ChatRequest {
     messages: Vec<Message>,
     temperature: f64,
     response_format: ResponseFormat,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_tokens: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -208,6 +210,16 @@ impl LlmClient {
     }
 
     pub async fn chat_completion(&self, system_prompt: &str, user_prompt: &str) -> Result<String> {
+        self.chat_completion_with_max_tokens(system_prompt, user_prompt, None)
+            .await
+    }
+
+    pub async fn chat_completion_with_max_tokens(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        max_tokens: Option<usize>,
+    ) -> Result<String> {
         use snif_config::constants::http;
 
         let url = format!("{}{}", self.endpoint, http::OPENAI_CHAT_COMPLETIONS);
@@ -228,6 +240,7 @@ impl LlmClient {
             response_format: ResponseFormat {
                 kind: constants::model::RESPONSE_FORMAT_JSON,
             },
+            max_tokens,
         };
 
         let max_retries = timeouts::LLM_MAX_RETRIES;
@@ -343,6 +356,15 @@ pub fn execute_review(
     user_prompt: &str,
     config: &ModelConfig,
 ) -> Result<ExecutionResult> {
+    execute_review_with_max_tokens(system_prompt, user_prompt, config, None)
+}
+
+pub fn execute_review_with_max_tokens(
+    system_prompt: &str,
+    user_prompt: &str,
+    config: &ModelConfig,
+    max_tokens: Option<usize>,
+) -> Result<ExecutionResult> {
     let api_key = get_api_key(keys::SNIF_API_KEY, keys::OPENAI_API_KEY)?;
 
     let client = LlmClient::from_config(config, &api_key, true);
@@ -350,7 +372,11 @@ pub fn execute_review(
     let rt = tokio::runtime::Runtime::new()?;
     let start = Instant::now();
 
-    let response = rt.block_on(client.chat_completion(system_prompt, user_prompt))?;
+    let response = rt.block_on(client.chat_completion_with_max_tokens(
+        system_prompt,
+        user_prompt,
+        max_tokens,
+    ))?;
     let duration = start.elapsed();
 
     tracing::info!(
@@ -364,6 +390,14 @@ pub fn execute_review(
 }
 
 pub fn repair_review_response(raw_response: &str, config: &ModelConfig) -> Result<ExecutionResult> {
+    repair_review_response_with_max_tokens(raw_response, config, None)
+}
+
+pub fn repair_review_response_with_max_tokens(
+    raw_response: &str,
+    config: &ModelConfig,
+    max_tokens: Option<usize>,
+) -> Result<ExecutionResult> {
     let repair_system_prompt = constants::prompts::REPAIR_SYSTEM_PROMPT;
     let repair_user_prompt = format!(
         "{}{}",
@@ -371,7 +405,12 @@ pub fn repair_review_response(raw_response: &str, config: &ModelConfig) -> Resul
         raw_response
     );
 
-    execute_review(repair_system_prompt, &repair_user_prompt, config)
+    execute_review_with_max_tokens(
+        repair_system_prompt,
+        &repair_user_prompt,
+        config,
+        max_tokens,
+    )
 }
 
 #[cfg(test)]
@@ -404,5 +443,39 @@ mod tests {
 
         assert!(!error.is_rate_limited());
         assert!(!is_rate_limit_error(&anyhow_error));
+    }
+
+    #[test]
+    fn chat_request_serializes_max_tokens_when_present() {
+        let request = ChatRequest {
+            model: "test-model".to_string(),
+            messages: Vec::new(),
+            temperature: 0.0,
+            response_format: ResponseFormat {
+                kind: constants::model::RESPONSE_FORMAT_JSON,
+            },
+            max_tokens: Some(4096),
+        };
+
+        let value = serde_json::to_value(request).unwrap();
+
+        assert_eq!(value["max_tokens"], 4096);
+    }
+
+    #[test]
+    fn chat_request_omits_max_tokens_when_absent() {
+        let request = ChatRequest {
+            model: "test-model".to_string(),
+            messages: Vec::new(),
+            temperature: 0.0,
+            response_format: ResponseFormat {
+                kind: constants::model::RESPONSE_FORMAT_JSON,
+            },
+            max_tokens: None,
+        };
+
+        let value = serde_json::to_value(request).unwrap();
+
+        assert!(value.get("max_tokens").is_none());
     }
 }

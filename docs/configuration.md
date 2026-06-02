@@ -122,7 +122,9 @@ Default: 50.
 
 `output_reserve_tokens` is the number of tokens reserved for the model's
 response output. The prompt budget is `max_tokens - output_reserve_tokens`.
-Default: 4096.
+Snif also sends this value as the review request's provider-side `max_tokens`
+completion cap so gateways do not reserve unbounded output tokens. Default:
+32000.
 
 `summarizer_concurrency` is the maximum number of LLM summarization requests
 Snif runs in parallel during `snif index`. Default: 3. Lower this for providers

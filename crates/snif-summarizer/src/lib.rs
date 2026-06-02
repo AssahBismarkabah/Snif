@@ -1,7 +1,11 @@
 mod prompt;
 
 use anyhow::{bail, Result};
-use snif_config::{constants::summarizer, env::keys, ModelConfig};
+use snif_config::{
+    constants::{model, summarizer},
+    env::keys,
+    ModelConfig,
+};
 use snif_execution::{is_rate_limit_error, LlmClient};
 use snif_store::Store;
 use std::collections::HashMap;
@@ -146,7 +150,11 @@ async fn summarize_all_async(
                     .await
                     .expect("semaphore should not be closed during summarization");
                 let result = client
-                    .chat_completion(prompt::SYSTEM_PROMPT, &pending.user_prompt)
+                    .chat_completion_with_max_tokens(
+                        prompt::SYSTEM_PROMPT,
+                        &pending.user_prompt,
+                        Some(model::SUMMARY_OUTPUT_MAX_TOKENS),
+                    )
                     .await;
                 (pending.symbol_id, pending.symbol_name, result)
             }));
@@ -272,7 +280,11 @@ async fn summarize_all_async(
                     .await
                     .expect("semaphore should not be closed during file summarization");
                 let result = client
-                    .chat_completion(prompt::SYSTEM_PROMPT, &pending.user_prompt)
+                    .chat_completion_with_max_tokens(
+                        prompt::SYSTEM_PROMPT,
+                        &pending.user_prompt,
+                        Some(model::SUMMARY_OUTPUT_MAX_TOKENS),
+                    )
                     .await;
                 (pending.file_id, result)
             }));

@@ -134,18 +134,22 @@ pub fn run(
     // Execute review via LLM
     let original_prompt_tokens = rendered.prompt_tokens;
     let mut review_context_note = None;
-    let result = match snif_execution::execute_review(
+    let initial_output_max_tokens = review_output_max_tokens(&config, initial_prompt_budget);
+    let result = match snif_execution::execute_review_with_max_tokens(
         &rendered.system_prompt,
         &rendered.user_prompt,
         &config.model,
+        Some(initial_output_max_tokens),
     ) {
         Ok(result) => result,
         Err(error) if snif_execution::is_rate_limit_error(&error) => {
             let mut last_error = error;
             let mut result = None;
+            let mut last_output_max_tokens = initial_output_max_tokens;
 
             for target in fallback_prompt_targets(original_prompt_tokens) {
                 let previous_tokens = rendered.prompt_tokens;
+                let output_max_tokens = review_output_max_tokens(&config, target);
                 let fallback = render_prompts_for_prompt_budget(
                     &config,
                     &mut context,
@@ -153,7 +157,12 @@ pub fn run(
                     "Provider rate-limited review request, trimming context for retry",
                 );
 
-                if fallback.prompt_tokens >= previous_tokens {
+                if !fallback_reduces_request(
+                    previous_tokens,
+                    last_output_max_tokens,
+                    fallback.prompt_tokens,
+                    output_max_tokens,
+                ) {
                     rendered = fallback;
                     continue;
                 }
@@ -162,16 +171,18 @@ pub fn run(
                     original_prompt_tokens,
                     target_prompt_tokens = target,
                     prompt_tokens = fallback.prompt_tokens,
+                    output_max_tokens,
                     related_files = fallback.related_files,
                     related_files_removed = fallback.trim_stats.related_files_removed,
                     changed_files_degraded = fallback.trim_stats.changed_files_degraded,
                     "Retrying review with reduced context after provider rate limit"
                 );
 
-                match snif_execution::execute_review(
+                match snif_execution::execute_review_with_max_tokens(
                     &fallback.system_prompt,
                     &fallback.user_prompt,
                     &config.model,
+                    Some(output_max_tokens),
                 ) {
                     Ok(ok) => {
                         review_context_note = Some(format!(
@@ -183,6 +194,7 @@ pub fn run(
                     }
                     Err(error) if snif_execution::is_rate_limit_error(&error) => {
                         last_error = error;
+                        last_output_max_tokens = output_max_tokens;
                         rendered = fallback;
                     }
                     Err(error) => return Err(error),
@@ -215,7 +227,11 @@ pub fn run(
 
     if needs_repair {
         tracing::warn!("Repairing review response");
-        let repaired = snif_execution::repair_review_response(&result.response, &config.model)?;
+        let repaired = snif_execution::repair_review_response_with_max_tokens(
+            &result.response,
+            &config.model,
+            Some(initial_output_max_tokens),
+        )?;
         parsed = snif_output::parser::parse_response(&repaired.response)?;
     }
 
@@ -393,6 +409,24 @@ fn fallback_prompt_targets(current_prompt_tokens: usize) -> impl Iterator<Item =
         .filter(move |target| *target < current_prompt_tokens)
 }
 
+fn review_output_max_tokens(config: &snif_config::SnifConfig, prompt_budget: usize) -> usize {
+    config
+        .context
+        .output_reserve_tokens
+        .max(1)
+        .min(prompt_budget.max(1))
+}
+
+fn fallback_reduces_request(
+    previous_prompt_tokens: usize,
+    previous_output_max_tokens: usize,
+    next_prompt_tokens: usize,
+    next_output_max_tokens: usize,
+) -> bool {
+    next_prompt_tokens < previous_prompt_tokens
+        || next_output_max_tokens < previous_output_max_tokens
+}
+
 fn detect_platform(explicit: Option<&str>, config_default: &str) -> String {
     if let Some(p) = explicit {
         return p.to_string();
@@ -533,5 +567,29 @@ mod tests {
         assert!(rendered.trim_stats.related_files_removed > 0);
         assert_eq!(rendered.trim_stats.changed_files_degraded, 0);
         assert_eq!(context.changed_files[0].content_tier, ContentTier::Full);
+    }
+
+    #[test]
+    fn review_output_cap_uses_reserve_but_shrinks_for_fallback_targets() {
+        let config = snif_config::SnifConfig::default();
+
+        assert_eq!(review_output_max_tokens(&config, 96_000), 32_000);
+        assert_eq!(review_output_max_tokens(&config, 16_000), 16_000);
+        assert_eq!(review_output_max_tokens(&config, 8_000), 8_000);
+    }
+
+    #[test]
+    fn review_output_cap_clamps_zero_reserve() {
+        let mut config = snif_config::SnifConfig::default();
+        config.context.output_reserve_tokens = 0;
+
+        assert_eq!(review_output_max_tokens(&config, 8_000), 1);
+    }
+
+    #[test]
+    fn fallback_retry_can_reduce_output_cap_even_when_prompt_cannot_shrink() {
+        assert!(fallback_reduces_request(15_596, 16_000, 15_596, 8_000));
+        assert!(fallback_reduces_request(27_562, 32_000, 15_596, 16_000));
+        assert!(!fallback_reduces_request(15_596, 8_000, 15_596, 8_000));
     }
 }
