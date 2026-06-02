@@ -2,6 +2,7 @@
 
 ## unreleased
 
+- Add configurable index summarization concurrency and rate-limit-aware review retries
 - Enable debug logging and backtraces in the Snif review workflow
 - Update review endpoint to `https://api.ai.camer.digital/v1`
 

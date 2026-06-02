@@ -50,6 +50,7 @@ pub struct ContextConfig {
     pub max_tokens: usize,
     pub max_files: usize,
     pub output_reserve_tokens: usize,
+    pub summarizer_concurrency: usize,
     pub retrieval_weights: RetrievalWeights,
 }
 
@@ -108,6 +109,7 @@ impl Default for ContextConfig {
             max_tokens: model::DEFAULT_MAX_TOKENS,
             max_files: model::DEFAULT_MAX_FILES,
             output_reserve_tokens: model::DEFAULT_OUTPUT_RESERVE_TOKENS,
+            summarizer_concurrency: model::DEFAULT_SUMMARIZER_CONCURRENCY,
             retrieval_weights: RetrievalWeights::default(),
         }
     }
@@ -156,5 +158,46 @@ impl SnifConfig {
         if let Ok(val) = std::env::var(env::app::SNIF_DB_PATH) {
             self.index.db_path = val;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_context_sets_summarizer_concurrency_to_current_behavior() {
+        let config = SnifConfig::default();
+
+        assert_eq!(config.context.summarizer_concurrency, 3);
+    }
+
+    #[test]
+    fn missing_summarizer_concurrency_uses_default() {
+        let config: SnifConfig = serde_json::from_str(
+            r#"{
+                "context": {
+                    "max_tokens": 64000
+                }
+            }"#,
+        )
+        .expect("config should parse");
+
+        assert_eq!(config.context.max_tokens, 64000);
+        assert_eq!(config.context.summarizer_concurrency, 3);
+    }
+
+    #[test]
+    fn explicit_summarizer_concurrency_is_honored() {
+        let config: SnifConfig = serde_json::from_str(
+            r#"{
+                "context": {
+                    "summarizer_concurrency": 1
+                }
+            }"#,
+        )
+        .expect("config should parse");
+
+        assert_eq!(config.context.summarizer_concurrency, 1);
     }
 }

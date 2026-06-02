@@ -149,8 +149,8 @@ pub mod model {
     pub const DEFAULT_OUTPUT_RESERVE_TOKENS: usize = 32_000;
     /// Maximum number of files to include in review context
     pub const DEFAULT_MAX_FILES: usize = 50;
-    /// Max concurrent summarization tasks
-    pub const MAX_CONCURRENT_SUMMARIZATION: usize = 3;
+    /// Default max concurrent summarization tasks.
+    pub const DEFAULT_SUMMARIZER_CONCURRENCY: usize = 3;
     /// Default temperature for LLM requests (deterministic output)
     pub const DEFAULT_TEMPERATURE: f64 = 0.0;
     /// Response format type for JSON output

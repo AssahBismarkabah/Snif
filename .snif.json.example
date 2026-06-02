@@ -45,6 +45,7 @@
     "max_tokens": 128000,
     "max_files": 50,
     "output_reserve_tokens": 4096,
+    "summarizer_concurrency": 3,
     "retrieval_weights": {
       "structural": 1.0,
       "semantic": 0.7,

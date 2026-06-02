@@ -9,6 +9,7 @@ pub struct ReviewSummaryInput<'a> {
     pub diff_lines: usize,
     pub model_name: &'a str,
     pub duration_secs: u64,
+    pub context_note: Option<&'a str>,
 }
 
 pub fn format_pr_summary(input: &ReviewSummaryInput) -> String {
@@ -86,6 +87,12 @@ pub fn format_pr_summary(input: &ReviewSummaryInput) -> String {
             summary_text.push_str(&format!(" ({})", methods.join(summary::METHODS_SEPARATOR)));
         }
         summary_text.push_str(".\n");
+    }
+
+    if let Some(note) = input.context_note {
+        summary_text.push_str("\n**Context note:** ");
+        summary_text.push_str(note);
+        summary_text.push('\n');
     }
 
     // Stats

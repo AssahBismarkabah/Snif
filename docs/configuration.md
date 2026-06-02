@@ -124,6 +124,10 @@ Default: 50.
 response output. The prompt budget is `max_tokens - output_reserve_tokens`.
 Default: 4096.
 
+`summarizer_concurrency` is the maximum number of LLM summarization requests
+Snif runs in parallel during `snif index`. Default: 3. Lower this for providers
+with stricter request-per-minute or token-per-minute limits.
+
 `retrieval_weights` controls how structural, semantic, and keyword retrieval
 results are weighted when ranking related files. Default: structural 1.0,
 semantic 0.7, keyword 0.3. Higher weight means that retrieval method's results
