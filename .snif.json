@@ -7,7 +7,7 @@
   "context": {
     "max_tokens": 64000,
     "output_reserve_tokens": 16000,
-    "summarizer_concurrency": 3
+    "summarizer_concurrency": 8
   },
   "eval_fixtures_path": "./fixtures"
 }
