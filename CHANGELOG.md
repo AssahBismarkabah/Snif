@@ -3,6 +3,7 @@
 ## unreleased
 
 - Add configurable index summarization concurrency and rate-limit-aware review retries
+- Extend rate-limit fallback review prompts below 32k for providers with stricter request token limits
 - Enable debug logging and backtraces in the Snif review workflow
 - Update review endpoint to `https://api.ai.camer.digital/v1`
 

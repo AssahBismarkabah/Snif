@@ -5,7 +5,7 @@ use snif_platform::PlatformAdapter;
 use snif_types::{ContentTier, ContextPackage};
 use std::path::Path;
 
-const REVIEW_RATE_LIMIT_PROMPT_TARGETS: [usize; 3] = [64_000, 48_000, 32_000];
+const REVIEW_RATE_LIMIT_PROMPT_TARGETS: [usize; 5] = [64_000, 48_000, 32_000, 16_000, 8_000];
 
 fn print_sarif_output(json: &str) {
     println!("{}", json);
@@ -471,15 +471,15 @@ mod tests {
     fn fallback_targets_only_include_smaller_prompt_budgets() {
         assert_eq!(
             fallback_prompt_targets(91_184).collect::<Vec<_>>(),
-            vec![64_000, 48_000, 32_000]
+            vec![64_000, 48_000, 32_000, 16_000, 8_000]
         );
         assert_eq!(
             fallback_prompt_targets(50_000).collect::<Vec<_>>(),
-            vec![48_000, 32_000]
+            vec![48_000, 32_000, 16_000, 8_000]
         );
         assert_eq!(
             fallback_prompt_targets(32_000).collect::<Vec<_>>(),
-            Vec::<usize>::new()
+            vec![16_000, 8_000]
         );
     }
 
