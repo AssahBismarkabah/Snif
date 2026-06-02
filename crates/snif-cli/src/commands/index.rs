@@ -40,12 +40,18 @@ pub fn run(path: &str, full: bool) -> Result<()> {
     );
 
     // Step 5: LLM summary generation
-    let summary_stats = snif_summarizer::summarize_all(&store, repo_path, &config.model)?;
+    let summary_stats = snif_summarizer::summarize_all(
+        &store,
+        repo_path,
+        &config.model,
+        config.context.summarizer_concurrency,
+    )?;
 
     tracing::info!(
         symbols = summary_stats.symbols_summarized,
         files = summary_stats.files_summarized,
         errors = summary_stats.errors,
+        rate_limited = summary_stats.rate_limited,
         duration = ?summary_stats.total_duration,
         "Summarization complete"
     );

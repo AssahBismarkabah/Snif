@@ -1,9 +1,11 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use snif_config::constants::cli;
 use snif_config::env::{app, ci};
 use snif_platform::PlatformAdapter;
-use snif_types::ContentTier;
+use snif_types::{ContentTier, ContextPackage};
 use std::path::Path;
+
+const REVIEW_RATE_LIMIT_PROMPT_TARGETS: [usize; 5] = [64_000, 48_000, 32_000, 16_000, 8_000];
 
 fn print_sarif_output(json: &str) {
     println!("{}", json);
@@ -13,6 +15,20 @@ fn print_findings_output(json: &str) {
     if !json.is_empty() {
         println!("{}", json);
     }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct PromptTrimStats {
+    related_files_removed: usize,
+    changed_files_degraded: usize,
+}
+
+struct RenderedReviewPrompts {
+    system_prompt: String,
+    user_prompt: String,
+    prompt_tokens: usize,
+    related_files: usize,
+    trim_stats: PromptTrimStats,
 }
 
 pub fn run(
@@ -97,68 +113,104 @@ pub fn run(
         metadata,
     )?;
 
-    // Render prompts and enforce budget on the rendered output
-    let output_reserve = config.context.output_reserve_tokens;
-    let (system_prompt, user_prompt) = loop {
-        let sys = snif_prompts::render_system_prompt(&config);
-        let usr = snif_prompts::render_user_prompt(&context);
-        let total_tokens = snif_context::budget::estimate_tokens(&sys)
-            + snif_context::budget::estimate_tokens(&usr);
-
-        if total_tokens + output_reserve <= config.context.max_tokens {
-            break (sys, usr);
-        }
-
-        // Try removing related files first
-        if context.related_files.pop().is_some() {
-            tracing::warn!(
-                tokens = total_tokens,
-                budget = config.context.max_tokens,
-                remaining_files = context.related_files.len(),
-                "Prompt exceeds budget, trimming related file"
-            );
-            continue;
-        }
-
-        // Then degrade the largest Full-tier changed file to DiffOnly
-        let largest_full = context
-            .changed_files
-            .iter()
-            .enumerate()
-            .filter(|(_, f)| f.content_tier == ContentTier::Full)
-            .max_by_key(|(_, f)| f.content.len());
-
-        if let Some((idx, _)) = largest_full {
-            let file = &mut context.changed_files[idx];
-            tracing::warn!(
-                path = %file.path,
-                content_bytes = file.content.len(),
-                "Degrading changed file to diff-only to fit budget"
-            );
-            file.content = cli::CONTENT_DIFF_ONLY_PLACEHOLDER.to_string();
-            file.content_tier = ContentTier::DiffOnly;
-            file.summary = None;
-            continue;
-        }
-
-        // Nothing left to trim
-        tracing::warn!(
-            tokens = total_tokens,
-            budget = config.context.max_tokens,
-            "Prompt still exceeds budget after all degradation"
-        );
-        break (sys, usr);
-    };
+    let initial_prompt_budget = config
+        .context
+        .max_tokens
+        .saturating_sub(config.context.output_reserve_tokens);
+    let mut rendered = render_prompts_for_prompt_budget(
+        &config,
+        &mut context,
+        initial_prompt_budget,
+        "Prompt exceeds budget",
+    );
 
     tracing::info!(
-        system_tokens = snif_context::budget::estimate_tokens(&system_prompt),
-        user_tokens = snif_context::budget::estimate_tokens(&user_prompt),
-        related_files = context.related_files.len(),
+        system_tokens = snif_context::budget::estimate_tokens(&rendered.system_prompt),
+        user_tokens = snif_context::budget::estimate_tokens(&rendered.user_prompt),
+        related_files = rendered.related_files,
         "Prompts rendered"
     );
 
     // Execute review via LLM
-    let result = snif_execution::execute_review(&system_prompt, &user_prompt, &config.model)?;
+    let original_prompt_tokens = rendered.prompt_tokens;
+    let mut review_context_note = None;
+    let initial_output_max_tokens = review_output_max_tokens(&config, initial_prompt_budget);
+    let result = match snif_execution::execute_review_with_max_tokens(
+        &rendered.system_prompt,
+        &rendered.user_prompt,
+        &config.model,
+        Some(initial_output_max_tokens),
+    ) {
+        Ok(result) => result,
+        Err(error) if snif_execution::is_rate_limit_error(&error) => {
+            let mut last_error = error;
+            let mut result = None;
+            let mut last_output_max_tokens = initial_output_max_tokens;
+
+            for target in fallback_prompt_targets(original_prompt_tokens) {
+                let previous_tokens = rendered.prompt_tokens;
+                let output_max_tokens = review_output_max_tokens(&config, target);
+                let fallback = render_prompts_for_prompt_budget(
+                    &config,
+                    &mut context,
+                    target,
+                    "Provider rate-limited review request, trimming context for retry",
+                );
+
+                if !fallback_reduces_request(
+                    previous_tokens,
+                    last_output_max_tokens,
+                    fallback.prompt_tokens,
+                    output_max_tokens,
+                ) {
+                    rendered = fallback;
+                    continue;
+                }
+
+                tracing::warn!(
+                    original_prompt_tokens,
+                    target_prompt_tokens = target,
+                    prompt_tokens = fallback.prompt_tokens,
+                    output_max_tokens,
+                    related_files = fallback.related_files,
+                    related_files_removed = fallback.trim_stats.related_files_removed,
+                    changed_files_degraded = fallback.trim_stats.changed_files_degraded,
+                    "Retrying review with reduced context after provider rate limit"
+                );
+
+                match snif_execution::execute_review_with_max_tokens(
+                    &fallback.system_prompt,
+                    &fallback.user_prompt,
+                    &config.model,
+                    Some(output_max_tokens),
+                ) {
+                    Ok(ok) => {
+                        review_context_note = Some(format!(
+                            "Context was reduced after provider rate limiting (prompt tokens {} -> {}).",
+                            original_prompt_tokens, fallback.prompt_tokens
+                        ));
+                        result = Some(ok);
+                        break;
+                    }
+                    Err(error) if snif_execution::is_rate_limit_error(&error) => {
+                        last_error = error;
+                        last_output_max_tokens = output_max_tokens;
+                        rendered = fallback;
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+
+            match result {
+                Some(result) => result,
+                None => bail!(
+                    "Review request was rate-limited even after reduced-context retries. Last error: {}. Try lowering context.max_tokens and/or context.summarizer_concurrency.",
+                    last_error
+                ),
+            }
+        }
+        Err(error) => return Err(error),
+    };
 
     tracing::info!(
         duration = ?result.duration,
@@ -175,7 +227,11 @@ pub fn run(
 
     if needs_repair {
         tracing::warn!("Repairing review response");
-        let repaired = snif_execution::repair_review_response(&result.response, &config.model)?;
+        let repaired = snif_execution::repair_review_response_with_max_tokens(
+            &result.response,
+            &config.model,
+            Some(initial_output_max_tokens),
+        )?;
         parsed = snif_output::parser::parse_response(&repaired.response)?;
     }
 
@@ -225,6 +281,7 @@ pub fn run(
                 diff_lines: diff.lines().count(),
                 model_name: &config.model.review_model,
                 duration_secs: result.duration.as_secs(),
+                context_note: review_context_note.as_deref(),
             });
         adapter.post_summary(&summary)?;
 
@@ -270,6 +327,104 @@ pub fn run(
     }
 
     Ok(())
+}
+
+fn render_prompts_for_prompt_budget(
+    config: &snif_config::SnifConfig,
+    context: &mut ContextPackage,
+    prompt_budget: usize,
+    reason: &str,
+) -> RenderedReviewPrompts {
+    let mut trim_stats = PromptTrimStats::default();
+
+    loop {
+        let system_prompt = snif_prompts::render_system_prompt(config);
+        let user_prompt = snif_prompts::render_user_prompt(context);
+        let prompt_tokens = snif_context::budget::estimate_tokens(&system_prompt)
+            + snif_context::budget::estimate_tokens(&user_prompt);
+
+        if prompt_tokens <= prompt_budget {
+            return RenderedReviewPrompts {
+                system_prompt,
+                user_prompt,
+                prompt_tokens,
+                related_files: context.related_files.len(),
+                trim_stats,
+            };
+        }
+
+        if context.related_files.pop().is_some() {
+            trim_stats.related_files_removed += 1;
+            tracing::warn!(
+                tokens = prompt_tokens,
+                prompt_budget,
+                remaining_files = context.related_files.len(),
+                reason,
+                "Trimming related file from review prompt"
+            );
+            continue;
+        }
+
+        let largest_full = context
+            .changed_files
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| f.content_tier == ContentTier::Full)
+            .max_by_key(|(_, f)| f.content.len());
+
+        if let Some((idx, _)) = largest_full {
+            let file = &mut context.changed_files[idx];
+            trim_stats.changed_files_degraded += 1;
+            tracing::warn!(
+                path = %file.path,
+                content_bytes = file.content.len(),
+                reason,
+                "Degrading changed file to diff-only to fit review prompt budget"
+            );
+            file.content = cli::CONTENT_DIFF_ONLY_PLACEHOLDER.to_string();
+            file.content_tier = ContentTier::DiffOnly;
+            file.summary = None;
+            continue;
+        }
+
+        tracing::warn!(
+            tokens = prompt_tokens,
+            prompt_budget,
+            reason,
+            "Prompt still exceeds budget after all degradation"
+        );
+        return RenderedReviewPrompts {
+            system_prompt,
+            user_prompt,
+            prompt_tokens,
+            related_files: context.related_files.len(),
+            trim_stats,
+        };
+    }
+}
+
+fn fallback_prompt_targets(current_prompt_tokens: usize) -> impl Iterator<Item = usize> {
+    REVIEW_RATE_LIMIT_PROMPT_TARGETS
+        .into_iter()
+        .filter(move |target| *target < current_prompt_tokens)
+}
+
+fn review_output_max_tokens(config: &snif_config::SnifConfig, prompt_budget: usize) -> usize {
+    config
+        .context
+        .output_reserve_tokens
+        .max(1)
+        .min(prompt_budget.max(1))
+}
+
+fn fallback_reduces_request(
+    previous_prompt_tokens: usize,
+    previous_output_max_tokens: usize,
+    next_prompt_tokens: usize,
+    next_output_max_tokens: usize,
+) -> bool {
+    next_prompt_tokens < previous_prompt_tokens
+        || next_output_max_tokens < previous_output_max_tokens
 }
 
 fn detect_platform(explicit: Option<&str>, config_default: &str) -> String {
@@ -338,5 +493,103 @@ fn create_adapter(
                 parts[0], parts[1], pr_num,
             )?))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snif_types::{BudgetReport, ChangeMetadata, ContextFile};
+
+    #[test]
+    fn fallback_targets_only_include_smaller_prompt_budgets() {
+        assert_eq!(
+            fallback_prompt_targets(91_184).collect::<Vec<_>>(),
+            vec![64_000, 48_000, 32_000, 16_000, 8_000]
+        );
+        assert_eq!(
+            fallback_prompt_targets(50_000).collect::<Vec<_>>(),
+            vec![48_000, 32_000, 16_000, 8_000]
+        );
+        assert_eq!(
+            fallback_prompt_targets(32_000).collect::<Vec<_>>(),
+            vec![16_000, 8_000]
+        );
+    }
+
+    #[test]
+    fn prompt_trimming_removes_related_files_before_degrading_changed_files() {
+        let config = snif_config::SnifConfig::default();
+        let mut context = ContextPackage {
+            metadata: ChangeMetadata::default(),
+            diff: "diff --git a/src/main.rs b/src/main.rs\n".to_string(),
+            changed_files: vec![ContextFile {
+                path: "src/main.rs".to_string(),
+                content: "fn main() {}".to_string(),
+                summary: None,
+                retrieval_score: None,
+                content_tier: ContentTier::Full,
+            }],
+            related_files: vec![
+                ContextFile {
+                    path: "src/a.rs".to_string(),
+                    content: "a".repeat(12_000),
+                    summary: None,
+                    retrieval_score: Some(1.0),
+                    content_tier: ContentTier::Full,
+                },
+                ContextFile {
+                    path: "src/b.rs".to_string(),
+                    content: "b".repeat(12_000),
+                    summary: None,
+                    retrieval_score: Some(0.9),
+                    content_tier: ContentTier::Full,
+                },
+            ],
+            omissions: Vec::new(),
+            budget: BudgetReport {
+                total_budget: 0,
+                diff_tokens: 0,
+                changed_files_tokens: 0,
+                related_files_tokens: 0,
+                remaining_tokens: 0,
+                files_included: 0,
+                files_omitted: 0,
+                files_full: 0,
+                files_summary_only: 0,
+                files_diff_only: 0,
+            },
+        };
+
+        let rendered =
+            render_prompts_for_prompt_budget(&config, &mut context, 8_000, "test trimming");
+
+        assert!(rendered.trim_stats.related_files_removed > 0);
+        assert_eq!(rendered.trim_stats.changed_files_degraded, 0);
+        assert_eq!(context.changed_files[0].content_tier, ContentTier::Full);
+    }
+
+    #[test]
+    fn review_output_cap_uses_reserve_but_shrinks_for_fallback_targets() {
+        let config = snif_config::SnifConfig::default();
+
+        assert_eq!(review_output_max_tokens(&config, 96_000), 32_000);
+        assert_eq!(review_output_max_tokens(&config, 16_000), 16_000);
+        assert_eq!(review_output_max_tokens(&config, 8_000), 8_000);
+    }
+
+    #[test]
+    fn review_output_cap_clamps_zero_reserve() {
+        let mut config = snif_config::SnifConfig::default();
+        config.context.output_reserve_tokens = 0;
+
+        assert_eq!(review_output_max_tokens(&config, 8_000), 1);
+    }
+
+    #[test]
+    fn fallback_retry_can_reduce_output_cap_even_when_prompt_cannot_shrink() {
+        assert!(fallback_reduces_request(15_596, 16_000, 15_596, 8_000));
+        assert!(fallback_reduces_request(27_562, 32_000, 15_596, 16_000));
+        assert!(!fallback_reduces_request(15_596, 8_000, 15_596, 8_000));
     }
 }
