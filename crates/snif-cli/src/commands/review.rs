@@ -393,6 +393,75 @@ fn fallback_prompt_targets(current_prompt_tokens: usize) -> impl Iterator<Item =
         .filter(move |target| *target < current_prompt_tokens)
 }
 
+fn detect_platform(explicit: Option<&str>, config_default: &str) -> String {
+    if let Some(p) = explicit {
+        return p.to_string();
+    }
+    if let Ok(p) = std::env::var(app::SNIF_PLATFORM) {
+        return p;
+    }
+    if std::env::var(ci::CI_PROJECT_PATH).is_ok() {
+        return cli::PLATFORM_GITLAB.to_string();
+    }
+    if std::env::var(ci::GITHUB_REPOSITORY).is_ok() {
+        return cli::PLATFORM_GITHUB.to_string();
+    }
+    config_default.to_string()
+}
+
+fn create_adapter(
+    platform: &str,
+    repo: Option<&str>,
+    pr: Option<u64>,
+    project: Option<&str>,
+    config_api_base: Option<&str>,
+) -> Result<Box<dyn PlatformAdapter>> {
+    match platform {
+        cli::PLATFORM_GITLAB => {
+            let project_path = project
+                .or(repo)
+                .map(String::from)
+                .or_else(|| std::env::var(ci::CI_PROJECT_PATH).ok())
+                .context(cli::GITLAB_PROJECT_PATH_REQUIRED)?;
+            let mr_iid = pr
+                .or_else(|| {
+                    std::env::var(ci::CI_MERGE_REQUEST_IID)
+                        .ok()
+                        .and_then(|s| s.parse().ok())
+                })
+                .context(cli::GITLAB_MR_IID_REQUIRED)?;
+            let api_base = config_api_base
+                .map(String::from)
+                .or_else(|| std::env::var(ci::CI_API_V4_URL).ok());
+            Ok(Box::new(snif_platform::gitlab::GitLabAdapter::new(
+                &project_path,
+                mr_iid,
+                api_base.as_deref(),
+            )?))
+        }
+        _ => {
+            let repo_str = repo
+                .map(String::from)
+                .or_else(|| std::env::var(ci::GITHUB_REPOSITORY).ok())
+                .context(cli::GITHUB_REPOSITORY_REQUIRED)?;
+            let pr_num = pr
+                .or_else(|| {
+                    std::env::var(app::SNIF_PR_NUMBER)
+                        .ok()
+                        .and_then(|s| s.parse().ok())
+                })
+                .context(cli::SNIF_PR_NUMBER_REQUIRED)?;
+            let parts: Vec<&str> = repo_str.splitn(2, '/').collect();
+            if parts.len() != 2 {
+                anyhow::bail!(cli::REPO_FORMAT_ERROR);
+            }
+            Ok(Box::new(snif_platform::github::GitHubAdapter::new(
+                parts[0], parts[1], pr_num,
+            )?))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -464,74 +533,5 @@ mod tests {
         assert!(rendered.trim_stats.related_files_removed > 0);
         assert_eq!(rendered.trim_stats.changed_files_degraded, 0);
         assert_eq!(context.changed_files[0].content_tier, ContentTier::Full);
-    }
-}
-
-fn detect_platform(explicit: Option<&str>, config_default: &str) -> String {
-    if let Some(p) = explicit {
-        return p.to_string();
-    }
-    if let Ok(p) = std::env::var(app::SNIF_PLATFORM) {
-        return p;
-    }
-    if std::env::var(ci::CI_PROJECT_PATH).is_ok() {
-        return cli::PLATFORM_GITLAB.to_string();
-    }
-    if std::env::var(ci::GITHUB_REPOSITORY).is_ok() {
-        return cli::PLATFORM_GITHUB.to_string();
-    }
-    config_default.to_string()
-}
-
-fn create_adapter(
-    platform: &str,
-    repo: Option<&str>,
-    pr: Option<u64>,
-    project: Option<&str>,
-    config_api_base: Option<&str>,
-) -> Result<Box<dyn PlatformAdapter>> {
-    match platform {
-        cli::PLATFORM_GITLAB => {
-            let project_path = project
-                .or(repo)
-                .map(String::from)
-                .or_else(|| std::env::var(ci::CI_PROJECT_PATH).ok())
-                .context(cli::GITLAB_PROJECT_PATH_REQUIRED)?;
-            let mr_iid = pr
-                .or_else(|| {
-                    std::env::var(ci::CI_MERGE_REQUEST_IID)
-                        .ok()
-                        .and_then(|s| s.parse().ok())
-                })
-                .context(cli::GITLAB_MR_IID_REQUIRED)?;
-            let api_base = config_api_base
-                .map(String::from)
-                .or_else(|| std::env::var(ci::CI_API_V4_URL).ok());
-            Ok(Box::new(snif_platform::gitlab::GitLabAdapter::new(
-                &project_path,
-                mr_iid,
-                api_base.as_deref(),
-            )?))
-        }
-        _ => {
-            let repo_str = repo
-                .map(String::from)
-                .or_else(|| std::env::var(ci::GITHUB_REPOSITORY).ok())
-                .context(cli::GITHUB_REPOSITORY_REQUIRED)?;
-            let pr_num = pr
-                .or_else(|| {
-                    std::env::var(app::SNIF_PR_NUMBER)
-                        .ok()
-                        .and_then(|s| s.parse().ok())
-                })
-                .context(cli::SNIF_PR_NUMBER_REQUIRED)?;
-            let parts: Vec<&str> = repo_str.splitn(2, '/').collect();
-            if parts.len() != 2 {
-                anyhow::bail!(cli::REPO_FORMAT_ERROR);
-            }
-            Ok(Box::new(snif_platform::github::GitHubAdapter::new(
-                parts[0], parts[1], pr_num,
-            )?))
-        }
     }
 }

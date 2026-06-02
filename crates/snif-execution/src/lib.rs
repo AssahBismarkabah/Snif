@@ -338,39 +338,6 @@ impl LlmClient {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn retry_exhausted_429_is_classified_as_rate_limited() {
-        let error = LlmRetryFailure::retryable_response(
-            5,
-            429,
-            Some("60".to_string()),
-            "{\"error\":\"quota exceeded\"}".to_string(),
-        );
-        let anyhow_error = anyhow::Error::new(error.clone());
-
-        assert!(error.is_rate_limited());
-        assert!(is_rate_limit_error(&anyhow_error));
-        assert_eq!(error.retry_after.as_deref(), Some("60"));
-        assert_eq!(
-            error.body.as_deref(),
-            Some("{\"error\":\"quota exceeded\"}")
-        );
-    }
-
-    #[test]
-    fn retry_exhausted_server_error_is_not_rate_limited() {
-        let error = LlmRetryFailure::retryable_response(5, 500, None, "oops".to_string());
-        let anyhow_error = anyhow::Error::new(error.clone());
-
-        assert!(!error.is_rate_limited());
-        assert!(!is_rate_limit_error(&anyhow_error));
-    }
-}
-
 pub fn execute_review(
     system_prompt: &str,
     user_prompt: &str,
@@ -405,4 +372,37 @@ pub fn repair_review_response(raw_response: &str, config: &ModelConfig) -> Resul
     );
 
     execute_review(repair_system_prompt, &repair_user_prompt, config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retry_exhausted_429_is_classified_as_rate_limited() {
+        let error = LlmRetryFailure::retryable_response(
+            5,
+            429,
+            Some("60".to_string()),
+            "{\"error\":\"quota exceeded\"}".to_string(),
+        );
+        let anyhow_error = anyhow::Error::new(error.clone());
+
+        assert!(error.is_rate_limited());
+        assert!(is_rate_limit_error(&anyhow_error));
+        assert_eq!(error.retry_after.as_deref(), Some("60"));
+        assert_eq!(
+            error.body.as_deref(),
+            Some("{\"error\":\"quota exceeded\"}")
+        );
+    }
+
+    #[test]
+    fn retry_exhausted_server_error_is_not_rate_limited() {
+        let error = LlmRetryFailure::retryable_response(5, 500, None, "oops".to_string());
+        let anyhow_error = anyhow::Error::new(error.clone());
+
+        assert!(!error.is_rate_limited());
+        assert!(!is_rate_limit_error(&anyhow_error));
+    }
 }
