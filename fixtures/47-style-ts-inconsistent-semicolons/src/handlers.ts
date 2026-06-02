@@ -20,5 +20,5 @@ export function capitalizeWords(input: string): string {
 
 export function truncate(str: string, maxLen: number): string {
   if (maxLen <= 0) return "";
-  return str.length > maxLen ? str.slice(0, maxLen) + "..." : str
+  return str.length > maxLen ? str.slice(0, maxLen) : str
 }
