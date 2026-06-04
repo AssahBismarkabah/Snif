@@ -3,6 +3,10 @@ use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use snif_config::constants::{embeddings, model};
 use snif_store::Store;
 use std::collections::HashSet;
+use std::error::Error;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 /// Runtime embedding model selection.
@@ -12,6 +16,57 @@ const RUNTIME_MODEL: EmbeddingModel = EmbeddingModel::AllMiniLML6V2;
 
 pub struct Embedder {
     model: TextEmbedding,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmbedderLoadFailureKind {
+    RateLimited,
+    Other,
+}
+
+#[derive(Debug)]
+pub struct EmbedderLoadError {
+    kind: EmbedderLoadFailureKind,
+    source: anyhow::Error,
+}
+
+impl EmbedderLoadError {
+    fn new(source: anyhow::Error) -> Self {
+        let kind = classify_embedder_load_error(&source);
+        Self { kind, source }
+    }
+
+    pub fn kind(&self) -> EmbedderLoadFailureKind {
+        self.kind
+    }
+
+    pub fn is_rate_limited(&self) -> bool {
+        self.kind == EmbedderLoadFailureKind::RateLimited
+    }
+}
+
+impl std::fmt::Display for EmbedderLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.kind {
+            EmbedderLoadFailureKind::RateLimited => write!(
+                f,
+                "Embedding model download was rate-limited by Hugging Face/FastEmbed: {}. \
+                 This is model acquisition, not the review LLM provider. Restore or cache the \
+                 FastEmbed model cache, run `snif warm-embeddings`, or retry after the \
+                 Hugging Face resolver rate-limit window resets.",
+                self.source
+            ),
+            EmbedderLoadFailureKind::Other => {
+                write!(f, "Failed to load embedding model: {}", self.source)
+            }
+        }
+    }
+}
+
+impl Error for EmbedderLoadError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(self.source.as_ref())
+    }
 }
 
 pub struct EmbedStats {
@@ -25,12 +80,26 @@ impl Embedder {
     ///
     /// Model: all-MiniLM-L6-v2 (384 dimensions, ONNX via fastembed)
     /// See `RUNTIME_MODEL` constant - must match `embeddings::MODEL_NAME` in snif-config.
-    pub fn new() -> Result<Self> {
+    pub fn new() -> std::result::Result<Self, EmbedderLoadError> {
+        Self::new_with_cache_dir(PathBuf::from(embeddings::DEFAULT_CACHE_DIR))
+    }
+
+    pub fn new_with_cache_dir(
+        cache_dir: impl Into<PathBuf>,
+    ) -> std::result::Result<Self, EmbedderLoadError> {
+        let cache_dir = cache_dir.into();
         tracing::info!("Loading embedding model ({})...", embeddings::MODEL_NAME);
         let start = Instant::now();
+        let _env_lock = hf_home_lock()
+            .lock()
+            .expect("HF_HOME lock should not be poisoned");
+        let _hf_home = HfHomeGuard::set(&cache_dir);
         let model = TextEmbedding::try_new(
-            InitOptions::new(RUNTIME_MODEL).with_show_download_progress(true),
-        )?;
+            InitOptions::new(RUNTIME_MODEL)
+                .with_cache_dir(cache_dir.clone())
+                .with_show_download_progress(true),
+        )
+        .map_err(EmbedderLoadError::new)?;
         tracing::info!(elapsed = ?start.elapsed(), "Embedding model loaded");
         Ok(Self { model })
     }
@@ -46,6 +115,50 @@ impl Embedder {
     pub fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
         let embeddings = self.model.embed(texts.to_vec(), None)?;
         Ok(embeddings)
+    }
+}
+
+fn hf_home_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+struct HfHomeGuard {
+    previous: Option<OsString>,
+}
+
+impl HfHomeGuard {
+    fn set(cache_dir: &Path) -> Self {
+        let previous = std::env::var_os("HF_HOME");
+        std::env::set_var("HF_HOME", cache_dir);
+        Self { previous }
+    }
+}
+
+impl Drop for HfHomeGuard {
+    fn drop(&mut self) {
+        match &self.previous {
+            Some(value) => std::env::set_var("HF_HOME", value),
+            None => std::env::remove_var("HF_HOME"),
+        }
+    }
+}
+
+fn classify_embedder_load_error(error: &anyhow::Error) -> EmbedderLoadFailureKind {
+    let message = error
+        .chain()
+        .map(|cause| cause.to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
+        .to_ascii_lowercase();
+
+    if message.contains("status code 429")
+        || message.contains("429 too many requests")
+        || message.contains("too many requests")
+    {
+        EmbedderLoadFailureKind::RateLimited
+    } else {
+        EmbedderLoadFailureKind::Other
     }
 }
 
@@ -111,4 +224,66 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
         dimension,
         duration: start.elapsed(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn classifier_detects_status_code_429() {
+        let error =
+            anyhow::anyhow!("request error: https://huggingface.co/model.onnx: status code 429");
+
+        assert_eq!(
+            classify_embedder_load_error(&error),
+            EmbedderLoadFailureKind::RateLimited
+        );
+    }
+
+    #[test]
+    fn classifier_detects_too_many_requests() {
+        let error = anyhow::anyhow!("429 Too Many Requests for model.onnx");
+
+        assert_eq!(
+            classify_embedder_load_error(&error),
+            EmbedderLoadFailureKind::RateLimited
+        );
+    }
+
+    #[test]
+    fn classifier_keeps_non_429_failures_generic() {
+        let error = anyhow::anyhow!("failed to parse tokenizer.json");
+
+        assert_eq!(
+            classify_embedder_load_error(&error),
+            EmbedderLoadFailureKind::Other
+        );
+    }
+
+    #[test]
+    fn hf_home_guard_restores_previous_value() {
+        let _lock = hf_home_lock()
+            .lock()
+            .expect("HF_HOME lock should not be poisoned");
+        let original = std::env::var_os("HF_HOME");
+        std::env::set_var("HF_HOME", "/tmp/original-hf-home");
+
+        {
+            let _guard = HfHomeGuard::set(Path::new("/tmp/snif-fastembed-cache"));
+            assert_eq!(
+                std::env::var_os("HF_HOME"),
+                Some(OsString::from("/tmp/snif-fastembed-cache"))
+            );
+        }
+
+        assert_eq!(
+            std::env::var_os("HF_HOME"),
+            Some(OsString::from("/tmp/original-hf-home"))
+        );
+        match original {
+            Some(value) => std::env::set_var("HF_HOME", value),
+            None => std::env::remove_var("HF_HOME"),
+        }
+    }
 }

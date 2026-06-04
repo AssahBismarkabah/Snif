@@ -126,6 +126,8 @@ pub mod embeddings {
     ///
     /// Model: all-MiniLM-L6-v2 (ONNX via fastembed)
     pub const MODEL_NAME: &str = "all-MiniLM-L6-v2";
+    /// Default cache directory for FastEmbed model files
+    pub const DEFAULT_CACHE_DIR: &str = ".fastembed_cache";
 
     /// Error message for empty embedding results
     pub const ERROR_EMPTY_EMBEDDING_RESULT: &str = "Embedding model returned empty result for text";
@@ -617,7 +619,7 @@ pub mod cli {
 // ============================================================================
 pub mod clean {
     /// Directories targeted for removal during clean operation
-    pub const CLEAN_TARGETS: &[&str] = &[".snif", ".fastembed_cache"];
+    pub const CLEAN_TARGETS: &[&str] = &[".snif"];
     /// Message displayed after successful clean
     pub const CLEAN_COMPLETE_MESSAGE: &str =
         "\n  Clean complete. Configuration (.snif.json) was not touched.";

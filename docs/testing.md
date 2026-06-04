@@ -39,6 +39,17 @@ export SNIF_API_KEY=your-api-key
 
 ## Step 1: Index the Repository
 
+Optionally warm the local FastEmbed model cache before indexing:
+
+```
+RUST_LOG=info cargo run -- warm-embeddings --path /path/to/repo
+```
+
+This downloads the embedding model into the configured
+`index.embedding_cache_dir` path. If Hugging Face rate-limits the download,
+`snif index` can still build the structural index and summaries; semantic
+embeddings are skipped until the model cache is available.
+
 Build the repository index. This parses all source files, builds the structural
 graph, generates LLM summaries, and computes vector embeddings.
 
