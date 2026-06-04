@@ -36,6 +36,7 @@
 
   "index": {
     "db_path": ".snif/index.db",
+    "embedding_cache_dir": ".fastembed_cache",
     "embedding_dimension": 384,
     "languages": ["rust", "typescript", "python"],
     "exclude_patterns": ["target", "node_modules", "vendor", ".git", "dist", "build"]

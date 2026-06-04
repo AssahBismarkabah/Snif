@@ -98,6 +98,12 @@ CI, the `CI_API_V4_URL` variable is read automatically.
 Default: `.snif/index.db`. Can be overridden by the `SNIF_DB_PATH` environment
 variable.
 
+`embedding_cache_dir` is the path where FastEmbed stores the local embedding
+model files. Default: `.fastembed_cache`. Relative paths resolve from the
+repository root; absolute paths are allowed for shared CI caches. Environment
+precedence is `SNIF_EMBEDDING_CACHE_DIR`, then `FASTEMBED_CACHE_DIR`, then
+`.snif.json`, then the default.
+
 `embedding_dimension` is the vector dimension for the embedding model. Default:
 384 (matches the AllMiniLML6V2 model used by fastembed). Do not change this
 unless you change the embedding model.
@@ -168,6 +174,12 @@ applicable.
 `SNIF_API_KEY` or `OPENAI_API_KEY` is the API key for the configured LLM
 provider. Snif checks `SNIF_API_KEY` first, then falls back to `OPENAI_API_KEY`.
 Required for `snif index` (summarization) and `snif review`.
+
+`SNIF_EMBEDDING_CACHE_DIR` overrides the configured FastEmbed model cache path.
+Use this when CI restores a shared cache outside the repository workspace.
+
+`FASTEMBED_CACHE_DIR` is also honored for compatibility with FastEmbed. Snif's
+own `SNIF_EMBEDDING_CACHE_DIR` takes precedence when both are set.
 
 `SNIF_ENDPOINT` overrides `model.endpoint` from the config file. Useful for CI
 environments where the endpoint varies.

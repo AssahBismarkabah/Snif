@@ -29,6 +29,7 @@ Noise <= 20%) with 50 fixtures across Rust, TypeScript, Python, and Java.
   - Empty PRs: reviewed normally, produces zero findings when diff is clean.
 - [x] Rate limit handling: exponential backoff with 5 max retries for 429, 408, and 5xx errors
 - [x] [Make summarization concurrency configurable in .snif.json](https://github.com/AssahBismarkabah/Snif/issues/14) - added `context.summarizer_concurrency` for provider-specific indexing rate limits
+- [x] [Handle Hugging Face rate limits when loading embedding model](https://github.com/AssahBismarkabah/Snif/issues/27) - cache FastEmbed model files, add `snif warm-embeddings`, and degrade only semantic indexing/retrieval on model-download 429s
 - [ ] Add eval fixtures for TypeScript, Python, and Java - multi-language parsing is supported but only Rust fixtures exist in the eval harness
 
 

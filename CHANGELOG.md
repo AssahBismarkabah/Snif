@@ -3,6 +3,7 @@
 ## unreleased
 
 - Add configurable index summarization concurrency and rate-limit-aware review retries
+- Add configurable FastEmbed model cache, `snif warm-embeddings`, and graceful semantic fallback for Hugging Face model-download 429s
 - Extend rate-limit fallback review prompts below 32k for providers with stricter request token limits
 - Send explicit LLM `max_tokens` caps so providers do not reserve unbounded completion tokens
 - Enable debug logging and backtraces in the Snif review workflow

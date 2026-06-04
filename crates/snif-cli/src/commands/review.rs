@@ -85,12 +85,29 @@ pub fn run(
     let diff_identifiers = snif_platform::extract_identifiers_from_diff(&diff);
 
     // Retrieve related files from the index
-    let embedder = snif_embeddings::Embedder::new()?;
+    let mut review_context_note = None;
+    let embedding_cache_dir = config.resolved_embedding_cache_dir(repo_path);
+    let embedder = match snif_embeddings::Embedder::new_with_cache_dir(&embedding_cache_dir) {
+        Ok(embedder) => Some(embedder),
+        Err(error) if error.is_rate_limited() => {
+            tracing::warn!(
+                cache_dir = %embedding_cache_dir.display(),
+                error = %error,
+                "Continuing review without semantic retrieval because the embedding model download was rate-limited"
+            );
+            push_context_note(
+                &mut review_context_note,
+                "Semantic retrieval was skipped because Hugging Face rate-limited the embedding model download.",
+            );
+            None
+        }
+        Err(error) => return Err(error.into()),
+    };
     let retrieval_results = snif_retrieval::retrieve(
         &store,
         &changed_paths,
         &diff_identifiers,
-        &embedder,
+        embedder.as_ref(),
         &config.context.retrieval_weights,
     )?;
 
@@ -133,7 +150,6 @@ pub fn run(
 
     // Execute review via LLM
     let original_prompt_tokens = rendered.prompt_tokens;
-    let mut review_context_note = None;
     let initial_output_max_tokens = review_output_max_tokens(&config, initial_prompt_budget);
     let result = match snif_execution::execute_review_with_max_tokens(
         &rendered.system_prompt,
@@ -185,10 +201,13 @@ pub fn run(
                     Some(output_max_tokens),
                 ) {
                     Ok(ok) => {
-                        review_context_note = Some(format!(
-                            "Context was reduced after provider rate limiting (prompt tokens {} -> {}).",
-                            original_prompt_tokens, fallback.prompt_tokens
-                        ));
+                        push_context_note(
+                            &mut review_context_note,
+                            format!(
+                                "Context was reduced after provider rate limiting (prompt tokens {} -> {}).",
+                                original_prompt_tokens, fallback.prompt_tokens
+                            ),
+                        );
                         result = Some(ok);
                         break;
                     }
@@ -327,6 +346,17 @@ pub fn run(
     }
 
     Ok(())
+}
+
+fn push_context_note(note: &mut Option<String>, new_note: impl Into<String>) {
+    let new_note = new_note.into();
+    match note {
+        Some(existing) => {
+            existing.push(' ');
+            existing.push_str(&new_note);
+        }
+        None => *note = Some(new_note),
+    }
 }
 
 fn render_prompts_for_prompt_budget(
@@ -591,5 +621,18 @@ mod tests {
         assert!(fallback_reduces_request(15_596, 16_000, 15_596, 8_000));
         assert!(fallback_reduces_request(27_562, 32_000, 15_596, 16_000));
         assert!(!fallback_reduces_request(15_596, 8_000, 15_596, 8_000));
+    }
+
+    #[test]
+    fn context_notes_are_appended_in_order() {
+        let mut note = None;
+
+        push_context_note(&mut note, "Semantic retrieval was skipped.");
+        push_context_note(&mut note, "Context was reduced.");
+
+        assert_eq!(
+            note.as_deref(),
+            Some("Semantic retrieval was skipped. Context was reduced.")
+        );
     }
 }

@@ -25,6 +25,8 @@ pub mod app {
     pub const SNIF_APP_INSTALLATION_ID: &str = "SNIF_APP_INSTALLATION_ID";
     pub const SNIF_ENDPOINT: &str = "SNIF_ENDPOINT";
     pub const SNIF_DB_PATH: &str = "SNIF_DB_PATH";
+    pub const SNIF_EMBEDDING_CACHE_DIR: &str = "SNIF_EMBEDDING_CACHE_DIR";
+    pub const FASTEMBED_CACHE_DIR: &str = "FASTEMBED_CACHE_DIR";
     pub const SNIF_PLATFORM: &str = "SNIF_PLATFORM";
     pub const SNIF_PR_NUMBER: &str = "SNIF_PR_NUMBER";
     pub const SNIF_BRAINTRUST_PROJECT_ID: &str = "SNIF_BRAINTRUST_PROJECT_ID";

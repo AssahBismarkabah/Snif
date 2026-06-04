@@ -68,6 +68,13 @@ enum Commands {
         path: String,
     },
 
+    /// Download and cache the local embedding model
+    WarmEmbeddings {
+        /// Path to the repository root
+        #[arg(long, default_value = cli::DEFAULT_PATH)]
+        path: String,
+    },
+
     /// Run the evaluation harness against benchmark fixtures
     Eval {
         /// Path to fixtures directory
@@ -118,6 +125,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::Clean { path } => {
             commands::clean::run(&path)?;
+        }
+        Commands::WarmEmbeddings { path } => {
+            commands::warm_embeddings::run(&path)?;
         }
         Commands::Eval {
             fixtures,

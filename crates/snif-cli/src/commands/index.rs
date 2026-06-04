@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 
 use anyhow::Result;
@@ -57,18 +58,86 @@ pub fn run(path: &str, full: bool) -> Result<()> {
     );
 
     // Step 6: Vector embeddings
-    if summary_stats.symbols_summarized > 0 || summary_stats.files_summarized > 0 {
-        let embedder = snif_embeddings::Embedder::new()?;
-        let embed_stats = snif_embeddings::embed_all_summaries(&store, &embedder)?;
+    if has_summaries_missing_embeddings(&store)? {
+        let embedding_cache_dir = config.resolved_embedding_cache_dir(repo_path);
+        match snif_embeddings::Embedder::new_with_cache_dir(&embedding_cache_dir) {
+            Ok(embedder) => {
+                let embed_stats = snif_embeddings::embed_all_summaries(&store, &embedder)?;
 
-        tracing::info!(
-            embedded = embed_stats.summaries_embedded,
-            dimension = embed_stats.dimension,
-            duration = ?embed_stats.duration,
-            "Embedding complete"
-        );
+                tracing::info!(
+                    embedded = embed_stats.summaries_embedded,
+                    dimension = embed_stats.dimension,
+                    duration = ?embed_stats.duration,
+                    "Embedding complete"
+                );
+            }
+            Err(error) if error.is_rate_limited() => {
+                tracing::warn!(
+                    cache_dir = %embedding_cache_dir.display(),
+                    error = %error,
+                    "Skipping summary embeddings because the embedding model download was rate-limited"
+                );
+                tracing::warn!(
+                    "Semantic indexing is incomplete until the FastEmbed model cache is restored or warmed"
+                );
+            }
+            Err(error) => return Err(error.into()),
+        }
+    } else {
+        tracing::info!("No summaries need embedding, skipping embedding model load");
     }
 
     tracing::info!("Index complete");
     Ok(())
+}
+
+fn has_summaries_missing_embeddings(store: &snif_store::Store) -> Result<bool> {
+    let summaries = store.get_all_summaries()?;
+    if summaries.is_empty() {
+        return Ok(false);
+    }
+
+    let embedded_ids: HashSet<i64> = store.get_embedded_summary_ids()?.into_iter().collect();
+    Ok(summaries
+        .iter()
+        .any(|(summary_id, _)| !embedded_ids.contains(summary_id)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snif_config::constants::{model, summarizer};
+
+    #[test]
+    fn detects_cached_summary_missing_embedding() {
+        let store = snif_store::Store::open_in_memory().expect("store should open");
+        store
+            .insert_summary(None, None, summarizer::KIND_FUNCTION, "summary", Some(1))
+            .expect("summary should insert");
+
+        assert!(has_summaries_missing_embeddings(&store).expect("check should succeed"));
+    }
+
+    #[test]
+    fn skips_embedding_load_when_all_cached_summaries_are_embedded() {
+        let store = snif_store::Store::open_in_memory().expect("store should open");
+        let summary_id = store
+            .insert_summary(None, None, summarizer::KIND_FUNCTION, "summary", Some(1))
+            .expect("summary should insert");
+        store
+            .insert_summary_embeddings_batch(&[(
+                summary_id,
+                vec![0.0; model::DEFAULT_EMBEDDING_DIMENSION],
+            )])
+            .expect("embedding should insert");
+
+        assert!(!has_summaries_missing_embeddings(&store).expect("check should succeed"));
+    }
+
+    #[test]
+    fn skips_embedding_load_when_no_summaries_exist() {
+        let store = snif_store::Store::open_in_memory().expect("store should open");
+
+        assert!(!has_summaries_missing_embeddings(&store).expect("check should succeed"));
+    }
 }

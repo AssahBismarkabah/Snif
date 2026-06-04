@@ -14,7 +14,7 @@ pub fn retrieve(
     store: &Store,
     changed_paths: &[String],
     diff_identifiers: &[String],
-    embedder: &Embedder,
+    embedder: Option<&Embedder>,
     weights: &RetrievalWeights,
 ) -> Result<RetrievalResults> {
     // Batch query for file IDs instead of individual lookups
@@ -22,8 +22,12 @@ pub fn retrieve(
     let changed_ids: Vec<i64> = changed_file_ids.iter().map(|(id, _)| *id).collect();
 
     let struct_results = structural::structural_retrieval(store, &changed_file_ids)?;
-    let sem_results =
-        semantic::semantic_retrieval(store, &changed_ids, embedder, retrieval::SEMANTIC_KNN_K)?;
+    let sem_results = match embedder {
+        Some(embedder) => {
+            semantic::semantic_retrieval(store, &changed_ids, embedder, retrieval::SEMANTIC_KNN_K)?
+        }
+        None => HashMap::new(),
+    };
     let kw_results = keyword::keyword_retrieval(store, diff_identifiers, &changed_ids)?;
 
     let structural_count = struct_results.len();
@@ -101,4 +105,30 @@ fn compute_score(sources: &[RetrievalMethod], weights: &RetrievalWeights) -> f64
     }
 
     score
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retrieval_without_embedder_skips_semantic_results() {
+        let store = Store::open_in_memory().expect("store should open");
+        store
+            .upsert_file("src/lib.rs", "hash", "rust")
+            .expect("file should insert");
+        let changed_paths = vec!["src/lib.rs".to_string()];
+        let diff_identifiers = Vec::new();
+
+        let results = retrieve(
+            &store,
+            &changed_paths,
+            &diff_identifiers,
+            None,
+            &RetrievalWeights::default(),
+        )
+        .expect("retrieval should run without semantic embedder");
+
+        assert_eq!(results.semantic_count, 0);
+    }
 }

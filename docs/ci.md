@@ -36,13 +36,11 @@ jobs:
       - uses: sigstore/cosign-installer@v3
 
       - name: Install Snif
-        env:
-          SNIF_VERSION: "3.2.1"
         run: |
-          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz" -O
-          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256" -O
-          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig" -O
-          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem" -O
+          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/latest/download/snif-x86_64-unknown-linux-gnu.tar.xz" -O
+          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/latest/download/snif-x86_64-unknown-linux-gnu.tar.xz.sha256" -O
+          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/latest/download/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig" -O
+          curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/latest/download/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem" -O
           cosign verify-blob snif-x86_64-unknown-linux-gnu.tar.xz.sha256 \
             --signature snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig \
             --certificate snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem \
@@ -57,6 +55,18 @@ jobs:
         with:
           path: .snif/
           key: snif-index-${{ github.repository }}
+
+      - name: Cache FastEmbed model
+        uses: actions/cache@v4
+        with:
+          path: .fastembed_cache/
+          key: snif-fastembed-${{ runner.os }}-all-MiniLM-L6-v2
+          restore-keys: |
+            snif-fastembed-${{ runner.os }}-
+
+      - name: Warm embedding model cache
+        continue-on-error: true
+        run: snif warm-embeddings --path .
 
       - name: Index repository
         run: snif index --path .
@@ -99,6 +109,23 @@ settings under Settings > Secrets and variables > Actions.
 `GITHUB_TOKEN` — provided automatically by GitHub Actions. No configuration
 needed. Grants permission to post PR comments and fetch PR data.
 
+## FastEmbed model cache
+
+Snif uses FastEmbed locally for semantic indexing and retrieval. On cold CI
+runners, FastEmbed may download `all-MiniLM-L6-v2` from Hugging Face. Cache
+`.fastembed_cache/` or the configured `index.embedding_cache_dir` path before
+running `snif index` or `snif review`.
+
+Do not cache token files. The FastEmbed model cache contains public model
+assets and is safe to restore for pull request jobs, but Hugging Face tokens
+or other secrets should never be written into the cached path.
+
+`snif warm-embeddings --path .` is optional. Keeping it `continue-on-error`
+lets Snif degrade gracefully if Hugging Face rate-limits a cold cache: `snif
+index` skips new summary embeddings and `snif review` skips semantic retrieval
+for that run while still using structural, keyword, changed-file, and diff
+context.
+
 # GitLab CI
 
 Snif supports GitLab natively. It posts findings as inline merge request
@@ -115,16 +142,15 @@ snif-review:
   stage: review
   image: debian:bookworm-slim
   variables:
-    SNIF_VERSION: "3.2.1"
     SNIF_API_KEY: $SNIF_API_KEY
     GITLAB_TOKEN: $GITLAB_TOKEN
   before_script:
     - apt-get update && apt-get install -y curl git xz-utils ca-certificates
     - curl -sSLf "https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64" -o /usr/local/bin/cosign && chmod +x /usr/local/bin/cosign
-    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz" -O
-    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256" -O
-    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig" -O
-    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/download/v${SNIF_VERSION}/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem" -O
+    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/latest/download/snif-x86_64-unknown-linux-gnu.tar.xz" -O
+    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/latest/download/snif-x86_64-unknown-linux-gnu.tar.xz.sha256" -O
+    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/latest/download/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig" -O
+    - curl -sSLf "https://github.com/AssahBismarkabah/Snif/releases/latest/download/snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem" -O
     - cosign verify-blob snif-x86_64-unknown-linux-gnu.tar.xz.sha256
         --signature snif-x86_64-unknown-linux-gnu.tar.xz.sha256.sig
         --certificate snif-x86_64-unknown-linux-gnu.tar.xz.sha256.pem
@@ -136,7 +162,9 @@ snif-review:
   cache:
     paths:
       - .snif/
+      - .fastembed_cache/
   script:
+    - snif warm-embeddings --path . || true
     - snif index --path .
     - snif review --path .
   rules:
