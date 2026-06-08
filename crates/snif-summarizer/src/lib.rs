@@ -6,7 +6,7 @@ use snif_config::{
     env::keys,
     ModelConfig,
 };
-use snif_execution::{is_rate_limit_error, LlmClient};
+use snif_execution::{is_rate_limit_error, is_reducible_provider_error, LlmClient, LlmRetryPolicy};
 use snif_store::Store;
 use std::collections::HashMap;
 use std::path::Path;
@@ -19,6 +19,7 @@ pub struct SummarizeStats {
     pub files_summarized: usize,
     pub errors: usize,
     pub rate_limited: bool,
+    pub provider_limited: bool,
     pub total_duration: Duration,
 }
 
@@ -56,6 +57,7 @@ pub fn summarize_all(
             files_summarized: 0,
             errors: 0,
             rate_limited: false,
+            provider_limited: false,
             total_duration: Duration::ZERO,
         });
     }
@@ -67,6 +69,7 @@ pub fn summarize_all(
             files_summarized: 0,
             errors: 0,
             rate_limited: false,
+            provider_limited: false,
             total_duration: Duration::ZERO,
         });
     }
@@ -106,6 +109,8 @@ async fn summarize_all_async(
     let mut files_summarized = 0;
     let mut errors = 0;
     let mut rate_limited = false;
+    let mut provider_limited = false;
+    let mut pressure_tracker = ProviderPressureTracker::default();
 
     // Batch 1: Functions and methods
     let functions: Vec<_> = symbols
@@ -150,10 +155,11 @@ async fn summarize_all_async(
                     .await
                     .expect("semaphore should not be closed during summarization");
                 let result = client
-                    .chat_completion_with_max_tokens(
+                    .chat_completion_with_max_tokens_and_policy(
                         prompt::SYSTEM_PROMPT,
                         &pending.user_prompt,
                         Some(model::SUMMARY_OUTPUT_MAX_TOKENS),
+                        LlmRetryPolicy::SurfaceReducibleProviderErrors,
                     )
                     .await;
                 (pending.symbol_id, pending.symbol_name, result)
@@ -161,6 +167,7 @@ async fn summarize_all_async(
         }
 
         let mut batch_rate_limit_errors = 0;
+        let mut batch_provider_pressure_errors = 0;
         for task in tasks {
             match task.await {
                 Ok((sym_id, name, Ok(summary))) => {
@@ -176,6 +183,9 @@ async fn summarize_all_async(
                     tracing::debug!(symbol = %name, "Summarized");
                 }
                 Ok((_, name, Err(e))) => {
+                    if is_reducible_provider_error(&e) {
+                        batch_provider_pressure_errors += 1;
+                    }
                     if is_rate_limit_error(&e) {
                         batch_rate_limit_errors += 1;
                     }
@@ -189,12 +199,19 @@ async fn summarize_all_async(
             }
         }
 
-        if should_stop_after_rate_limit_batch(batch.len(), batch_rate_limit_errors) {
-            rate_limited = true;
+        if let Some(reason) = pressure_tracker.record_batch(
+            batch.len(),
+            batch_provider_pressure_errors,
+            start.elapsed(),
+        ) {
+            rate_limited |= batch_rate_limit_errors > 0;
+            provider_limited = true;
             tracing::warn!(
                 concurrency,
-                failed = batch_rate_limit_errors,
-                "Stopping function summarization because provider rate-limited a full batch"
+                provider_pressure_errors = batch_provider_pressure_errors,
+                total_provider_pressure_errors = pressure_tracker.total_errors,
+                reason = reason.as_str(),
+                "Stopping function summarization because provider pressure is sustained"
             );
             break;
         }
@@ -204,15 +221,16 @@ async fn summarize_all_async(
         tracing::info!(skipped, "Skipped already-summarized functions");
     }
 
-    if rate_limited {
+    if provider_limited {
         tracing::warn!(
-            "Skipping file summarization because function summarization was rate-limited"
+            "Skipping file summarization because function summarization hit provider pressure"
         );
         return Ok(SummarizeStats {
             symbols_summarized,
             files_summarized,
             errors,
             rate_limited,
+            provider_limited,
             total_duration: start.elapsed(),
         });
     }
@@ -280,10 +298,11 @@ async fn summarize_all_async(
                     .await
                     .expect("semaphore should not be closed during file summarization");
                 let result = client
-                    .chat_completion_with_max_tokens(
+                    .chat_completion_with_max_tokens_and_policy(
                         prompt::SYSTEM_PROMPT,
                         &pending.user_prompt,
                         Some(model::SUMMARY_OUTPUT_MAX_TOKENS),
+                        LlmRetryPolicy::SurfaceReducibleProviderErrors,
                     )
                     .await;
                 (pending.file_id, result)
@@ -291,6 +310,7 @@ async fn summarize_all_async(
         }
 
         let mut batch_rate_limit_errors = 0;
+        let mut batch_provider_pressure_errors = 0;
         for task in tasks {
             match task.await {
                 Ok((file_id, Ok(summary))) => {
@@ -305,6 +325,9 @@ async fn summarize_all_async(
                     files_summarized += 1;
                 }
                 Ok((file_id, Err(e))) => {
+                    if is_reducible_provider_error(&e) {
+                        batch_provider_pressure_errors += 1;
+                    }
                     if is_rate_limit_error(&e) {
                         batch_rate_limit_errors += 1;
                     }
@@ -318,12 +341,19 @@ async fn summarize_all_async(
             }
         }
 
-        if should_stop_after_rate_limit_batch(batch.len(), batch_rate_limit_errors) {
-            rate_limited = true;
+        if let Some(reason) = pressure_tracker.record_batch(
+            batch.len(),
+            batch_provider_pressure_errors,
+            start.elapsed(),
+        ) {
+            rate_limited |= batch_rate_limit_errors > 0;
+            provider_limited = true;
             tracing::warn!(
                 concurrency,
-                failed = batch_rate_limit_errors,
-                "Stopping file summarization because provider rate-limited a full batch"
+                provider_pressure_errors = batch_provider_pressure_errors,
+                total_provider_pressure_errors = pressure_tracker.total_errors,
+                reason = reason.as_str(),
+                "Stopping file summarization because provider pressure is sustained"
             );
             break;
         }
@@ -334,6 +364,7 @@ async fn summarize_all_async(
         files_summarized,
         errors,
         rate_limited,
+        provider_limited,
         total_duration: start.elapsed(),
     })
 }
@@ -342,8 +373,77 @@ fn normalize_concurrency(concurrency: usize) -> usize {
     concurrency.max(1)
 }
 
-fn should_stop_after_rate_limit_batch(batch_len: usize, rate_limit_errors: usize) -> bool {
-    batch_len > 0 && rate_limit_errors == batch_len
+const PROVIDER_PRESSURE_TOTAL_ERROR_LIMIT: usize = 10;
+const PROVIDER_PRESSURE_CONSECUTIVE_BATCH_LIMIT: usize = 2;
+const PROVIDER_PRESSURE_TIME_LIMIT: Duration = Duration::from_secs(600);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProviderPressureStopReason {
+    FullBatch,
+    RepeatedPartialBatches,
+    TotalErrors,
+    TimeBudget,
+}
+
+impl ProviderPressureStopReason {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::FullBatch => "full_batch",
+            Self::RepeatedPartialBatches => "repeated_partial_batches",
+            Self::TotalErrors => "total_errors",
+            Self::TimeBudget => "time_budget",
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct ProviderPressureTracker {
+    total_errors: usize,
+    consecutive_high_pressure_batches: usize,
+    saw_pressure: bool,
+}
+
+impl ProviderPressureTracker {
+    fn record_batch(
+        &mut self,
+        batch_len: usize,
+        provider_pressure_errors: usize,
+        elapsed: Duration,
+    ) -> Option<ProviderPressureStopReason> {
+        if provider_pressure_errors > 0 {
+            self.saw_pressure = true;
+            self.total_errors += provider_pressure_errors;
+        }
+
+        if self.saw_pressure && elapsed >= PROVIDER_PRESSURE_TIME_LIMIT {
+            return Some(ProviderPressureStopReason::TimeBudget);
+        }
+
+        if batch_len == 0 || provider_pressure_errors == 0 {
+            self.consecutive_high_pressure_batches = 0;
+            return None;
+        }
+
+        if provider_pressure_errors == batch_len {
+            return Some(ProviderPressureStopReason::FullBatch);
+        }
+
+        if provider_pressure_errors * 2 >= batch_len {
+            self.consecutive_high_pressure_batches += 1;
+        } else {
+            self.consecutive_high_pressure_batches = 0;
+        }
+
+        if self.consecutive_high_pressure_batches >= PROVIDER_PRESSURE_CONSECUTIVE_BATCH_LIMIT {
+            return Some(ProviderPressureStopReason::RepeatedPartialBatches);
+        }
+
+        if self.total_errors >= PROVIDER_PRESSURE_TOTAL_ERROR_LIMIT {
+            return Some(ProviderPressureStopReason::TotalErrors);
+        }
+
+        None
+    }
 }
 
 fn read_symbol_body(
@@ -377,15 +477,56 @@ mod tests {
     }
 
     #[test]
-    fn full_rate_limited_batch_stops_summarization() {
-        assert!(should_stop_after_rate_limit_batch(3, 3));
-        assert!(should_stop_after_rate_limit_batch(1, 1));
+    fn full_provider_pressure_batch_stops_summarization() {
+        let mut tracker = ProviderPressureTracker::default();
+
+        assert_eq!(
+            tracker.record_batch(3, 3, Duration::from_secs(1)),
+            Some(ProviderPressureStopReason::FullBatch)
+        );
     }
 
     #[test]
-    fn partial_or_empty_rate_limited_batch_does_not_stop_summarization() {
-        assert!(!should_stop_after_rate_limit_batch(3, 2));
-        assert!(!should_stop_after_rate_limit_batch(3, 0));
-        assert!(!should_stop_after_rate_limit_batch(0, 0));
+    fn single_partial_provider_pressure_batch_does_not_stop_summarization() {
+        let mut tracker = ProviderPressureTracker::default();
+
+        assert_eq!(tracker.record_batch(3, 1, Duration::from_secs(1)), None);
+        assert_eq!(tracker.record_batch(3, 0, Duration::from_secs(2)), None);
+        assert_eq!(tracker.record_batch(0, 0, Duration::from_secs(3)), None);
+    }
+
+    #[test]
+    fn repeated_partial_provider_pressure_batches_stop_summarization() {
+        let mut tracker = ProviderPressureTracker::default();
+
+        assert_eq!(tracker.record_batch(4, 2, Duration::from_secs(1)), None);
+        assert_eq!(
+            tracker.record_batch(4, 2, Duration::from_secs(2)),
+            Some(ProviderPressureStopReason::RepeatedPartialBatches)
+        );
+    }
+
+    #[test]
+    fn total_provider_pressure_errors_stop_summarization() {
+        let mut tracker = ProviderPressureTracker::default();
+
+        assert_eq!(tracker.record_batch(20, 4, Duration::from_secs(1)), None);
+        assert_eq!(tracker.record_batch(20, 4, Duration::from_secs(2)), None);
+        assert_eq!(
+            tracker.record_batch(20, 2, Duration::from_secs(3)),
+            Some(ProviderPressureStopReason::TotalErrors)
+        );
+    }
+
+    #[test]
+    fn provider_pressure_time_budget_only_applies_after_pressure() {
+        let mut tracker = ProviderPressureTracker::default();
+
+        assert_eq!(tracker.record_batch(4, 0, Duration::from_secs(600)), None);
+        assert_eq!(tracker.record_batch(4, 1, Duration::from_secs(10)), None);
+        assert_eq!(
+            tracker.record_batch(4, 0, Duration::from_secs(600)),
+            Some(ProviderPressureStopReason::TimeBudget)
+        );
     }
 }

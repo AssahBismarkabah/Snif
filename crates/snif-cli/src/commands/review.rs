@@ -5,7 +5,7 @@ use snif_platform::PlatformAdapter;
 use snif_types::{ContentTier, ContextPackage};
 use std::path::Path;
 
-const REVIEW_RATE_LIMIT_PROMPT_TARGETS: [usize; 5] = [64_000, 48_000, 32_000, 16_000, 8_000];
+const REVIEW_PROVIDER_PRESSURE_PROMPT_TARGETS: [usize; 5] = [64_000, 48_000, 32_000, 16_000, 8_000];
 
 fn print_sarif_output(json: &str) {
     println!("{}", json);
@@ -151,14 +151,16 @@ pub fn run(
     // Execute review via LLM
     let original_prompt_tokens = rendered.prompt_tokens;
     let initial_output_max_tokens = review_output_max_tokens(&config, initial_prompt_budget);
-    let result = match snif_execution::execute_review_with_max_tokens(
+    let mut successful_output_max_tokens = initial_output_max_tokens;
+    let result = match snif_execution::execute_review_with_max_tokens_and_policy(
         &rendered.system_prompt,
         &rendered.user_prompt,
         &config.model,
         Some(initial_output_max_tokens),
+        snif_execution::LlmRetryPolicy::SurfaceReducibleProviderErrors,
     ) {
         Ok(result) => result,
-        Err(error) if snif_execution::is_rate_limit_error(&error) => {
+        Err(error) if snif_execution::is_reducible_provider_error(&error) => {
             let mut last_error = error;
             let mut result = None;
             let mut last_output_max_tokens = initial_output_max_tokens;
@@ -170,7 +172,7 @@ pub fn run(
                     &config,
                     &mut context,
                     target,
-                    "Provider rate-limited review request, trimming context for retry",
+                    "Provider pressure on review request, trimming context for retry",
                 );
 
                 if !fallback_reduces_request(
@@ -191,27 +193,32 @@ pub fn run(
                     related_files = fallback.related_files,
                     related_files_removed = fallback.trim_stats.related_files_removed,
                     changed_files_degraded = fallback.trim_stats.changed_files_degraded,
-                    "Retrying review with reduced context after provider rate limit"
+                    provider_failure = provider_failure_reason(&last_error),
+                    "Retrying review with reduced context after provider pressure"
                 );
 
-                match snif_execution::execute_review_with_max_tokens(
+                match snif_execution::execute_review_with_max_tokens_and_policy(
                     &fallback.system_prompt,
                     &fallback.user_prompt,
                     &config.model,
                     Some(output_max_tokens),
+                    snif_execution::LlmRetryPolicy::SurfaceReducibleProviderErrors,
                 ) {
                     Ok(ok) => {
+                        successful_output_max_tokens = output_max_tokens;
                         push_context_note(
                             &mut review_context_note,
                             format!(
-                                "Context was reduced after provider rate limiting (prompt tokens {} -> {}).",
-                                original_prompt_tokens, fallback.prompt_tokens
+                                "Context was reduced after {} (prompt tokens {} -> {}).",
+                                provider_failure_reason(&last_error),
+                                original_prompt_tokens,
+                                fallback.prompt_tokens
                             ),
                         );
                         result = Some(ok);
                         break;
                     }
-                    Err(error) if snif_execution::is_rate_limit_error(&error) => {
+                    Err(error) if snif_execution::is_reducible_provider_error(&error) => {
                         last_error = error;
                         last_output_max_tokens = output_max_tokens;
                         rendered = fallback;
@@ -223,7 +230,8 @@ pub fn run(
             match result {
                 Some(result) => result,
                 None => bail!(
-                    "Review request was rate-limited even after reduced-context retries. Last error: {}. Try lowering context.max_tokens and/or context.summarizer_concurrency.",
+                    "Review request failed after reduced-context retries due to {}. Last error: {}. Try lowering context.max_tokens and/or context.summarizer_concurrency.",
+                    provider_failure_reason(&last_error),
                     last_error
                 ),
             }
@@ -249,7 +257,7 @@ pub fn run(
         let repaired = snif_execution::repair_review_response_with_max_tokens(
             &result.response,
             &config.model,
-            Some(initial_output_max_tokens),
+            Some(successful_output_max_tokens),
         )?;
         parsed = snif_output::parser::parse_response(&repaired.response)?;
     }
@@ -359,6 +367,16 @@ fn push_context_note(note: &mut Option<String>, new_note: impl Into<String>) {
     }
 }
 
+fn provider_failure_reason(error: &anyhow::Error) -> &'static str {
+    if snif_execution::is_rate_limit_error(error) {
+        "provider rate limiting"
+    } else if snif_execution::is_provider_pressure_error(error) {
+        "provider pressure"
+    } else {
+        "provider failure"
+    }
+}
+
 fn render_prompts_for_prompt_budget(
     config: &snif_config::SnifConfig,
     context: &mut ContextPackage,
@@ -434,7 +452,7 @@ fn render_prompts_for_prompt_budget(
 }
 
 fn fallback_prompt_targets(current_prompt_tokens: usize) -> impl Iterator<Item = usize> {
-    REVIEW_RATE_LIMIT_PROMPT_TARGETS
+    REVIEW_PROVIDER_PRESSURE_PROMPT_TARGETS
         .into_iter()
         .filter(move |target| *target < current_prompt_tokens)
 }
@@ -545,6 +563,38 @@ mod tests {
             fallback_prompt_targets(32_000).collect::<Vec<_>>(),
             vec![16_000, 8_000]
         );
+        assert_eq!(
+            fallback_prompt_targets(37_129).collect::<Vec<_>>(),
+            vec![32_000, 16_000, 8_000]
+        );
+    }
+
+    #[test]
+    fn provider_failure_reason_distinguishes_rate_limit_from_pressure() {
+        let rate_limit = anyhow::Error::new(snif_execution::LlmRetryFailure {
+            kind: snif_execution::LlmRetryFailureKind::RateLimited,
+            max_retries: 5,
+            status: Some(429),
+            retry_after: None,
+            body: None,
+            message: String::new(),
+        });
+        let pressure = anyhow::Error::new(snif_execution::LlmRetryFailure {
+            kind: snif_execution::LlmRetryFailureKind::ProviderPressure,
+            max_retries: 5,
+            status: Some(504),
+            retry_after: None,
+            body: None,
+            message: String::new(),
+        });
+
+        assert_eq!(
+            provider_failure_reason(&rate_limit),
+            "provider rate limiting"
+        );
+        assert_eq!(provider_failure_reason(&pressure), "provider pressure");
+        assert!(snif_execution::is_reducible_provider_error(&rate_limit));
+        assert!(snif_execution::is_reducible_provider_error(&pressure));
     }
 
     #[test]

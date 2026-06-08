@@ -21,9 +21,23 @@ pub struct ExecutionResult {
     pub duration: std::time::Duration,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LlmRetryPolicy {
+    ExhaustRetries,
+    SurfaceReducibleProviderErrors,
+}
+
+impl LlmRetryPolicy {
+    fn should_surface(self, failure: &LlmRetryFailure) -> bool {
+        matches!(self, Self::SurfaceReducibleProviderErrors)
+            && failure.is_reducible_provider_error()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LlmRetryFailureKind {
     RateLimited,
+    ProviderPressure,
     RetryableServerError,
     RequestFailed,
 }
@@ -40,8 +54,14 @@ pub struct LlmRetryFailure {
 
 impl LlmRetryFailure {
     fn request_failed(max_retries: u32, message: String) -> Self {
+        let kind = if is_provider_pressure_message(&message) {
+            LlmRetryFailureKind::ProviderPressure
+        } else {
+            LlmRetryFailureKind::RequestFailed
+        };
+
         Self {
-            kind: LlmRetryFailureKind::RequestFailed,
+            kind,
             max_retries,
             status: None,
             retry_after: None,
@@ -56,11 +76,7 @@ impl LlmRetryFailure {
         retry_after: Option<String>,
         body: String,
     ) -> Self {
-        let kind = if status == snif_config::constants::http::STATUS_TOO_MANY_REQUESTS {
-            LlmRetryFailureKind::RateLimited
-        } else {
-            LlmRetryFailureKind::RetryableServerError
-        };
+        let kind = retry_failure_kind_for_response(status, &body);
         let message = if body.trim().is_empty() {
             format!("Server error {}", status)
         } else {
@@ -80,6 +96,14 @@ impl LlmRetryFailure {
     pub fn is_rate_limited(&self) -> bool {
         self.kind == LlmRetryFailureKind::RateLimited
     }
+
+    pub fn is_provider_pressure(&self) -> bool {
+        self.kind == LlmRetryFailureKind::ProviderPressure
+    }
+
+    pub fn is_reducible_provider_error(&self) -> bool {
+        self.is_rate_limited() || self.is_provider_pressure()
+    }
 }
 
 impl fmt::Display for LlmRetryFailure {
@@ -88,6 +112,12 @@ impl fmt::Display for LlmRetryFailure {
             write!(
                 f,
                 "LLM request was rate-limited after {} retries",
+                self.max_retries
+            )?;
+        } else if self.is_provider_pressure() {
+            write!(
+                f,
+                "LLM request hit provider pressure after {} retries",
                 self.max_retries
             )?;
         } else {
@@ -110,10 +140,10 @@ impl fmt::Display for LlmRetryFailure {
             }
         }
 
-        if self.is_rate_limited() {
+        if self.is_reducible_provider_error() {
             write!(
                 f,
-                ". Reduce context.max_tokens, lower context.summarizer_concurrency, or retry after provider quota resets."
+                ". Reduce context.max_tokens, lower context.summarizer_concurrency, or retry after provider capacity recovers."
             )?;
         }
 
@@ -128,6 +158,49 @@ pub fn is_rate_limit_error(error: &anyhow::Error) -> bool {
         .downcast_ref::<LlmRetryFailure>()
         .map(LlmRetryFailure::is_rate_limited)
         .unwrap_or(false)
+}
+
+pub fn is_provider_pressure_error(error: &anyhow::Error) -> bool {
+    error
+        .downcast_ref::<LlmRetryFailure>()
+        .map(LlmRetryFailure::is_provider_pressure)
+        .unwrap_or(false)
+}
+
+pub fn is_reducible_provider_error(error: &anyhow::Error) -> bool {
+    error
+        .downcast_ref::<LlmRetryFailure>()
+        .map(LlmRetryFailure::is_reducible_provider_error)
+        .unwrap_or(false)
+}
+
+fn retry_failure_kind_for_response(status: u16, body: &str) -> LlmRetryFailureKind {
+    use snif_config::constants::http;
+
+    if status == http::STATUS_TOO_MANY_REQUESTS {
+        LlmRetryFailureKind::RateLimited
+    } else if is_provider_pressure_status(status) || is_provider_pressure_message(body) {
+        LlmRetryFailureKind::ProviderPressure
+    } else {
+        LlmRetryFailureKind::RetryableServerError
+    }
+}
+
+fn is_provider_pressure_status(status: u16) -> bool {
+    use snif_config::constants::http;
+
+    matches!(status, http::STATUS_REQUEST_TIMEOUT | 502 | 503 | 504)
+}
+
+fn is_provider_pressure_message(message: &str) -> bool {
+    let message = message.to_ascii_lowercase();
+    message.contains("upstream request timeout")
+        || message.contains("gateway timeout")
+        || message.contains("request timeout")
+        || message.contains("request timed out")
+        || message.contains("operation timed out")
+        || message.contains("provider capacity")
+        || message.contains("server overloaded")
 }
 
 fn truncate_for_log(text: &str) -> String {
@@ -220,6 +293,22 @@ impl LlmClient {
         user_prompt: &str,
         max_tokens: Option<usize>,
     ) -> Result<String> {
+        self.chat_completion_with_max_tokens_and_policy(
+            system_prompt,
+            user_prompt,
+            max_tokens,
+            LlmRetryPolicy::ExhaustRetries,
+        )
+        .await
+    }
+
+    pub async fn chat_completion_with_max_tokens_and_policy(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        max_tokens: Option<usize>,
+        retry_policy: LlmRetryPolicy,
+    ) -> Result<String> {
         use snif_config::constants::http;
 
         let url = format!("{}{}", self.endpoint, http::OPENAI_CHAT_COMPLETIONS);
@@ -273,10 +362,15 @@ impl LlmClient {
             {
                 Ok(r) => r,
                 Err(e) => {
-                    last_failure = Some(LlmRetryFailure::request_failed(
-                        max_retries,
-                        format!("Request failed: {}", e),
-                    ));
+                    let message = format!("Request failed: {}", e);
+                    let mut failure = LlmRetryFailure::request_failed(max_retries, message);
+                    if e.is_timeout() {
+                        failure.kind = LlmRetryFailureKind::ProviderPressure;
+                    }
+                    if retry_policy.should_surface(&failure) {
+                        return Err(anyhow::Error::new(failure));
+                    }
+                    last_failure = Some(failure);
                     continue;
                 }
             };
@@ -302,8 +396,12 @@ impl LlmClient {
                     status = status.as_u16(),
                     retry_after = ?failure.retry_after,
                     body = failure.body.as_deref().map(truncate_for_log),
+                    surface_now = retry_policy.should_surface(&failure),
                     "LLM provider returned retryable error"
                 );
+                if retry_policy.should_surface(&failure) {
+                    return Err(anyhow::Error::new(failure));
+                }
                 last_failure = Some(failure);
                 continue;
             }
@@ -365,6 +463,22 @@ pub fn execute_review_with_max_tokens(
     config: &ModelConfig,
     max_tokens: Option<usize>,
 ) -> Result<ExecutionResult> {
+    execute_review_with_max_tokens_and_policy(
+        system_prompt,
+        user_prompt,
+        config,
+        max_tokens,
+        LlmRetryPolicy::ExhaustRetries,
+    )
+}
+
+pub fn execute_review_with_max_tokens_and_policy(
+    system_prompt: &str,
+    user_prompt: &str,
+    config: &ModelConfig,
+    max_tokens: Option<usize>,
+    retry_policy: LlmRetryPolicy,
+) -> Result<ExecutionResult> {
     let api_key = get_api_key(keys::SNIF_API_KEY, keys::OPENAI_API_KEY)?;
 
     let client = LlmClient::from_config(config, &api_key, true);
@@ -372,10 +486,11 @@ pub fn execute_review_with_max_tokens(
     let rt = tokio::runtime::Runtime::new()?;
     let start = Instant::now();
 
-    let response = rt.block_on(client.chat_completion_with_max_tokens(
+    let response = rt.block_on(client.chat_completion_with_max_tokens_and_policy(
         system_prompt,
         user_prompt,
         max_tokens,
+        retry_policy,
     ))?;
     let duration = start.elapsed();
 
@@ -428,7 +543,11 @@ mod tests {
         let anyhow_error = anyhow::Error::new(error.clone());
 
         assert!(error.is_rate_limited());
+        assert!(!error.is_provider_pressure());
+        assert!(error.is_reducible_provider_error());
         assert!(is_rate_limit_error(&anyhow_error));
+        assert!(!is_provider_pressure_error(&anyhow_error));
+        assert!(is_reducible_provider_error(&anyhow_error));
         assert_eq!(error.retry_after.as_deref(), Some("60"));
         assert_eq!(
             error.body.as_deref(),
@@ -442,7 +561,77 @@ mod tests {
         let anyhow_error = anyhow::Error::new(error.clone());
 
         assert!(!error.is_rate_limited());
+        assert!(!error.is_provider_pressure());
+        assert!(!error.is_reducible_provider_error());
         assert!(!is_rate_limit_error(&anyhow_error));
+        assert!(!is_provider_pressure_error(&anyhow_error));
+        assert!(!is_reducible_provider_error(&anyhow_error));
+    }
+
+    #[test]
+    fn retry_exhausted_504_is_classified_as_provider_pressure() {
+        let error = LlmRetryFailure::retryable_response(
+            5,
+            504,
+            None,
+            "{\"message\":\"upstream request timeout\"}".to_string(),
+        );
+        let anyhow_error = anyhow::Error::new(error.clone());
+
+        assert!(!error.is_rate_limited());
+        assert!(error.is_provider_pressure());
+        assert!(error.is_reducible_provider_error());
+        assert!(!is_rate_limit_error(&anyhow_error));
+        assert!(is_provider_pressure_error(&anyhow_error));
+        assert!(is_reducible_provider_error(&anyhow_error));
+    }
+
+    #[test]
+    fn retry_exhausted_pressure_statuses_are_classified_as_provider_pressure() {
+        for status in [408_u16, 502, 503] {
+            let error = LlmRetryFailure::retryable_response(5, status, None, String::new());
+
+            assert!(
+                error.is_provider_pressure(),
+                "status {status} should be provider pressure"
+            );
+            assert!(error.is_reducible_provider_error());
+        }
+    }
+
+    #[test]
+    fn upstream_timeout_body_classifies_500_as_provider_pressure() {
+        let error = LlmRetryFailure::retryable_response(
+            5,
+            500,
+            None,
+            "{\"message\":\"upstream request timeout\"}".to_string(),
+        );
+
+        assert!(error.is_provider_pressure());
+        assert!(error.is_reducible_provider_error());
+    }
+
+    #[test]
+    fn timeout_request_failure_is_classified_as_provider_pressure() {
+        let error =
+            LlmRetryFailure::request_failed(5, "Request failed: operation timed out".to_string());
+
+        assert!(error.is_provider_pressure());
+        assert!(error.is_reducible_provider_error());
+    }
+
+    #[test]
+    fn surface_policy_only_surfaces_reducible_provider_errors() {
+        let rate_limit = LlmRetryFailure::retryable_response(5, 429, None, String::new());
+        let pressure = LlmRetryFailure::retryable_response(5, 504, None, String::new());
+        let generic = LlmRetryFailure::retryable_response(5, 500, None, String::new());
+
+        assert!(LlmRetryPolicy::SurfaceReducibleProviderErrors.should_surface(&rate_limit));
+        assert!(LlmRetryPolicy::SurfaceReducibleProviderErrors.should_surface(&pressure));
+        assert!(!LlmRetryPolicy::SurfaceReducibleProviderErrors.should_surface(&generic));
+        assert!(!LlmRetryPolicy::ExhaustRetries.should_surface(&rate_limit));
+        assert!(!LlmRetryPolicy::ExhaustRetries.should_surface(&pressure));
     }
 
     #[test]

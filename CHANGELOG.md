@@ -1,6 +1,12 @@
 # Changelog
 
 ## unreleased
+- Treat provider overload as a first-class retry failure so review can shrink
+  context after `504`/upstream timeout responses instead of retrying the same
+  large prompt.
+- Stop index summarization after sustained provider pressure while preserving
+  summaries already written and keeping Snif's full-quality path unchanged for
+  healthy providers.
 
 ## 3.2.8
 - Add configurable index summarization concurrency and rate-limit-aware review retries

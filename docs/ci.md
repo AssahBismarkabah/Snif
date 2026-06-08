@@ -126,6 +126,13 @@ index` skips new summary embeddings and `snif review` skips semantic retrieval
 for that run while still using structural, keyword, changed-file, and diff
 context.
 
+Snif also handles LLM provider pressure during review and indexing. The normal
+path still sends full available context first. If the provider returns rate
+limits or upstream timeouts, review retries with smaller context and index
+summarization stops after sustained pressure while preserving summaries already
+written. For strict providers, configure lower `context.max_tokens` and
+`context.summarizer_concurrency`.
+
 # GitLab CI
 
 Snif supports GitLab natively. It posts findings as inline merge request
