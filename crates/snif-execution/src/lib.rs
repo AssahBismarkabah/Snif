@@ -109,17 +109,9 @@ impl LlmRetryFailure {
 impl fmt::Display for LlmRetryFailure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_rate_limited() {
-            write!(
-                f,
-                "LLM request was rate-limited after {} retries",
-                self.max_retries
-            )?;
+            write!(f, "LLM request was rate-limited")?;
         } else if self.is_provider_pressure() {
-            write!(
-                f,
-                "LLM request hit provider pressure after {} retries",
-                self.max_retries
-            )?;
+            write!(f, "LLM request hit provider pressure")?;
         } else {
             write!(f, "LLM request failed after {} retries", self.max_retries)?;
         }

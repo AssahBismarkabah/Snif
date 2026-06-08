@@ -1,11 +1,15 @@
 use anyhow::{bail, Context, Result};
-use snif_config::constants::cli;
+use snif_config::constants::{cli, context as context_constants};
 use snif_config::env::{app, ci};
 use snif_platform::PlatformAdapter;
 use snif_types::{ContentTier, ContextPackage};
 use std::path::Path;
 
-const REVIEW_PROVIDER_PRESSURE_PROMPT_TARGETS: [usize; 5] = [64_000, 48_000, 32_000, 16_000, 8_000];
+const REVIEW_PROVIDER_PRESSURE_PROMPT_TARGETS: [usize; 6] =
+    [64_000, 48_000, 32_000, 16_000, 8_000, 4_000];
+const REVIEW_PROVIDER_PRESSURE_MIN_OUTPUT_TOKENS: usize = 1_024;
+const DIFF_TRUNCATION_NOTICE: &str =
+    "\n[Diff truncated after provider pressure to fit a reduced review budget.]\n";
 
 fn print_sarif_output(json: &str) {
     println!("{}", json);
@@ -21,6 +25,7 @@ fn print_findings_output(json: &str) {
 struct PromptTrimStats {
     related_files_removed: usize,
     changed_files_degraded: usize,
+    diff_truncated: bool,
 }
 
 struct RenderedReviewPrompts {
@@ -139,6 +144,7 @@ pub fn run(
         &mut context,
         initial_prompt_budget,
         "Prompt exceeds budget",
+        false,
     );
 
     tracing::info!(
@@ -167,12 +173,13 @@ pub fn run(
 
             for target in fallback_prompt_targets(original_prompt_tokens) {
                 let previous_tokens = rendered.prompt_tokens;
-                let output_max_tokens = review_output_max_tokens(&config, target);
+                let output_max_tokens = fallback_output_max_tokens(&config, target);
                 let fallback = render_prompts_for_prompt_budget(
                     &config,
                     &mut context,
                     target,
                     "Provider pressure on review request, trimming context for retry",
+                    true,
                 );
 
                 if !fallback_reduces_request(
@@ -193,6 +200,7 @@ pub fn run(
                     related_files = fallback.related_files,
                     related_files_removed = fallback.trim_stats.related_files_removed,
                     changed_files_degraded = fallback.trim_stats.changed_files_degraded,
+                    diff_truncated = fallback.trim_stats.diff_truncated,
                     provider_failure = provider_failure_reason(&last_error),
                     "Retrying review with reduced context after provider pressure"
                 );
@@ -206,15 +214,18 @@ pub fn run(
                 ) {
                     Ok(ok) => {
                         successful_output_max_tokens = output_max_tokens;
-                        push_context_note(
-                            &mut review_context_note,
-                            format!(
-                                "Context was reduced after {} (prompt tokens {} -> {}).",
-                                provider_failure_reason(&last_error),
-                                original_prompt_tokens,
-                                fallback.prompt_tokens
-                            ),
+                        let mut note = format!(
+                            "Context was reduced after {} (prompt tokens {} -> {}).",
+                            provider_failure_reason(&last_error),
+                            original_prompt_tokens,
+                            fallback.prompt_tokens
                         );
+                        if fallback.trim_stats.diff_truncated {
+                            note.push_str(
+                                " Diff was truncated to fit the reduced provider-pressure budget.",
+                            );
+                        }
+                        push_context_note(&mut review_context_note, note);
                         result = Some(ok);
                         break;
                     }
@@ -382,6 +393,7 @@ fn render_prompts_for_prompt_budget(
     context: &mut ContextPackage,
     prompt_budget: usize,
     reason: &str,
+    allow_diff_truncation: bool,
 ) -> RenderedReviewPrompts {
     let mut trim_stats = PromptTrimStats::default();
 
@@ -435,6 +447,28 @@ fn render_prompts_for_prompt_budget(
             continue;
         }
 
+        if allow_diff_truncation && !trim_stats.diff_truncated {
+            let overflow = prompt_tokens.saturating_sub(prompt_budget);
+            let current_diff_tokens = snif_context::budget::estimate_tokens(&context.diff);
+            let target_diff_tokens = current_diff_tokens.saturating_sub(overflow + 256);
+
+            if let Some(truncated_diff) =
+                truncate_diff_to_token_budget(&context.diff, target_diff_tokens)
+            {
+                tracing::warn!(
+                    tokens = prompt_tokens,
+                    prompt_budget,
+                    diff_tokens = current_diff_tokens,
+                    target_diff_tokens,
+                    reason,
+                    "Truncating diff to fit reduced provider-pressure review budget"
+                );
+                context.diff = truncated_diff;
+                trim_stats.diff_truncated = true;
+                continue;
+            }
+        }
+
         tracing::warn!(
             tokens = prompt_tokens,
             prompt_budget,
@@ -463,6 +497,42 @@ fn review_output_max_tokens(config: &snif_config::SnifConfig, prompt_budget: usi
         .output_reserve_tokens
         .max(1)
         .min(prompt_budget.max(1))
+}
+
+fn fallback_output_max_tokens(config: &snif_config::SnifConfig, prompt_budget: usize) -> usize {
+    let reduced_cap = (prompt_budget / 4).max(REVIEW_PROVIDER_PRESSURE_MIN_OUTPUT_TOKENS);
+    review_output_max_tokens(config, prompt_budget).min(reduced_cap)
+}
+
+fn truncate_diff_to_token_budget(diff: &str, token_budget: usize) -> Option<String> {
+    let current_tokens = snif_context::budget::estimate_tokens(diff);
+    if current_tokens <= token_budget {
+        return None;
+    }
+
+    let notice_tokens = snif_context::budget::estimate_tokens(DIFF_TRUNCATION_NOTICE);
+    let effective_budget = token_budget.saturating_sub(notice_tokens).max(1);
+    let effective_bytes = effective_budget * context_constants::TOKENS_PER_CHAR_RATIO;
+    let mut truncated = String::new();
+    let mut used_bytes = 0_usize;
+
+    for line in diff.lines() {
+        let line_bytes = line.len() + 1;
+        if used_bytes + line_bytes > effective_bytes {
+            break;
+        }
+        truncated.push_str(line);
+        truncated.push('\n');
+        used_bytes += line_bytes;
+    }
+
+    if truncated.trim().is_empty() {
+        truncated.push_str(diff.lines().next().unwrap_or_default());
+        truncated.push('\n');
+    }
+
+    truncated.push_str(DIFF_TRUNCATION_NOTICE);
+    Some(truncated)
 }
 
 fn fallback_reduces_request(
@@ -553,19 +623,19 @@ mod tests {
     fn fallback_targets_only_include_smaller_prompt_budgets() {
         assert_eq!(
             fallback_prompt_targets(91_184).collect::<Vec<_>>(),
-            vec![64_000, 48_000, 32_000, 16_000, 8_000]
+            vec![64_000, 48_000, 32_000, 16_000, 8_000, 4_000]
         );
         assert_eq!(
             fallback_prompt_targets(50_000).collect::<Vec<_>>(),
-            vec![48_000, 32_000, 16_000, 8_000]
+            vec![48_000, 32_000, 16_000, 8_000, 4_000]
         );
         assert_eq!(
             fallback_prompt_targets(32_000).collect::<Vec<_>>(),
-            vec![16_000, 8_000]
+            vec![16_000, 8_000, 4_000]
         );
         assert_eq!(
             fallback_prompt_targets(37_129).collect::<Vec<_>>(),
-            vec![32_000, 16_000, 8_000]
+            vec![32_000, 16_000, 8_000, 4_000]
         );
     }
 
@@ -642,7 +712,7 @@ mod tests {
         };
 
         let rendered =
-            render_prompts_for_prompt_budget(&config, &mut context, 8_000, "test trimming");
+            render_prompts_for_prompt_budget(&config, &mut context, 8_000, "test trimming", false);
 
         assert!(rendered.trim_stats.related_files_removed > 0);
         assert_eq!(rendered.trim_stats.changed_files_degraded, 0);
@@ -656,6 +726,11 @@ mod tests {
         assert_eq!(review_output_max_tokens(&config, 96_000), 32_000);
         assert_eq!(review_output_max_tokens(&config, 16_000), 16_000);
         assert_eq!(review_output_max_tokens(&config, 8_000), 8_000);
+        assert_eq!(fallback_output_max_tokens(&config, 64_000), 16_000);
+        assert_eq!(fallback_output_max_tokens(&config, 32_000), 8_000);
+        assert_eq!(fallback_output_max_tokens(&config, 16_000), 4_000);
+        assert_eq!(fallback_output_max_tokens(&config, 8_000), 2_000);
+        assert_eq!(fallback_output_max_tokens(&config, 4_000), 1_024);
     }
 
     #[test]
@@ -668,9 +743,49 @@ mod tests {
 
     #[test]
     fn fallback_retry_can_reduce_output_cap_even_when_prompt_cannot_shrink() {
-        assert!(fallback_reduces_request(15_596, 16_000, 15_596, 8_000));
-        assert!(fallback_reduces_request(27_562, 32_000, 15_596, 16_000));
-        assert!(!fallback_reduces_request(15_596, 8_000, 15_596, 8_000));
+        assert!(fallback_reduces_request(15_596, 4_000, 15_596, 2_000));
+        assert!(fallback_reduces_request(27_562, 8_000, 15_596, 4_000));
+        assert!(!fallback_reduces_request(15_596, 2_000, 15_596, 2_000));
+    }
+
+    #[test]
+    fn provider_pressure_fallback_can_truncate_irreducible_diff() {
+        let config = snif_config::SnifConfig::default();
+        let mut context = ContextPackage {
+            metadata: ChangeMetadata::default(),
+            diff: format!(
+                "diff --git a/src/main.rs b/src/main.rs\n{}",
+                "+let value = very_long_expression();\n".repeat(4_000)
+            ),
+            changed_files: Vec::new(),
+            related_files: Vec::new(),
+            omissions: Vec::new(),
+            budget: BudgetReport {
+                total_budget: 0,
+                diff_tokens: 0,
+                changed_files_tokens: 0,
+                related_files_tokens: 0,
+                remaining_tokens: 0,
+                files_included: 0,
+                files_omitted: 0,
+                files_full: 0,
+                files_summary_only: 0,
+                files_diff_only: 0,
+            },
+        };
+        let original_diff_len = context.diff.len();
+
+        let rendered = render_prompts_for_prompt_budget(
+            &config,
+            &mut context,
+            2_000,
+            "provider pressure trimming",
+            true,
+        );
+
+        assert!(rendered.trim_stats.diff_truncated);
+        assert!(context.diff.len() < original_diff_len);
+        assert!(context.diff.contains(DIFF_TRUNCATION_NOTICE.trim()));
     }
 
     #[test]

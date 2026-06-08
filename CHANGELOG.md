@@ -4,6 +4,9 @@
 - Treat provider overload as a first-class retry failure so review can shrink
   context after `504`/upstream timeout responses instead of retrying the same
   large prompt.
+- Further reduce provider-pressure fallback requests by shrinking completion
+  caps and truncating the diff only after related files and full changed-file
+  content have already been removed.
 - Stop index summarization after sustained provider pressure while preserving
   summaries already written and keeping Snif's full-quality path unchanged for
   healthy providers.

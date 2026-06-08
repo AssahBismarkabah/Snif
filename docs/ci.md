@@ -130,7 +130,10 @@ Snif also handles LLM provider pressure during review and indexing. The normal
 path still sends full available context first. If the provider returns rate
 limits or upstream timeouts, review retries with smaller context and index
 summarization stops after sustained pressure while preserving summaries already
-written. For strict providers, configure lower `context.max_tokens` and
+written. Reduced review retries remove related files first, degrade changed
+files to diff-only next, and only truncate the diff itself if the provider is
+still failing and the irreducible diff exceeds the reduced retry budget. For
+strict providers, configure lower `context.max_tokens` and
 `context.summarizer_concurrency`.
 
 # GitLab CI
