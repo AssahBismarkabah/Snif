@@ -282,6 +282,17 @@ impl LlmClient {
         Self::new(&config.endpoint, model, api_key)
     }
 
+    fn http_for_policy(&self, retry_policy: LlmRetryPolicy) -> reqwest::Client {
+        if retry_policy == LlmRetryPolicy::ExhaustRetries {
+            return self.http.clone();
+        }
+
+        reqwest::Client::builder()
+            .timeout(retry_policy.request_timeout())
+            .build()
+            .unwrap_or_else(|_| self.http.clone())
+    }
+
     pub async fn chat_completion(&self, system_prompt: &str, user_prompt: &str) -> Result<String> {
         self.chat_completion_with_max_tokens(system_prompt, user_prompt, None)
             .await
@@ -334,6 +345,7 @@ impl LlmClient {
 
         let max_retries = timeouts::LLM_MAX_RETRIES;
         let mut last_failure: Option<LlmRetryFailure> = None;
+        let http = self.http_for_policy(retry_policy);
 
         for attempt in 0..=max_retries {
             if attempt > 0 {
@@ -348,43 +360,24 @@ impl LlmClient {
                 tokio::time::sleep(delay).await;
             }
 
-            let request_timeout = retry_policy.request_timeout();
-            let response = match tokio::time::timeout(
-                request_timeout,
-                self.http
-                    .post(&url)
-                    .header(
-                        "Authorization",
-                        format!("{} {}", http::AUTHORIZATION_BEARER, self.api_key),
-                    )
-                    .header("Content-Type", http::CONTENT_TYPE_JSON)
-                    .json(&request)
-                    .send(),
-            )
-            .await
+            let response = match http
+                .post(&url)
+                .header(
+                    "Authorization",
+                    format!("{} {}", http::AUTHORIZATION_BEARER, self.api_key),
+                )
+                .header("Content-Type", http::CONTENT_TYPE_JSON)
+                .json(&request)
+                .send()
+                .await
             {
-                Ok(Ok(r)) => r,
-                Ok(Err(e)) => {
+                Ok(r) => r,
+                Err(e) => {
                     let message = format!("Request failed: {}", e);
                     let mut failure = LlmRetryFailure::request_failed(max_retries, message);
                     if e.is_timeout() {
                         failure.kind = LlmRetryFailureKind::ProviderPressure;
                     }
-                    if retry_policy.should_surface(&failure) {
-                        return Err(anyhow::Error::new(failure));
-                    }
-                    last_failure = Some(failure);
-                    continue;
-                }
-                Err(_) => {
-                    let mut failure = LlmRetryFailure::request_failed(
-                        max_retries,
-                        format!(
-                            "Request timed out after {} seconds",
-                            request_timeout.as_secs()
-                        ),
-                    );
-                    failure.kind = LlmRetryFailureKind::ProviderPressure;
                     if retry_policy.should_surface(&failure) {
                         return Err(anyhow::Error::new(failure));
                     }
