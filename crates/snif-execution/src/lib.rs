@@ -32,6 +32,14 @@ impl LlmRetryPolicy {
         matches!(self, Self::SurfaceReducibleProviderErrors)
             && failure.is_reducible_provider_error()
     }
+
+    fn request_timeout(self) -> std::time::Duration {
+        let seconds = match self {
+            Self::ExhaustRetries => timeouts::LLM_REQUEST_TIMEOUT_SECS,
+            Self::SurfaceReducibleProviderErrors => timeouts::LLM_ADAPTIVE_REQUEST_TIMEOUT_SECS,
+        };
+        std::time::Duration::from_secs(seconds)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -340,25 +348,43 @@ impl LlmClient {
                 tokio::time::sleep(delay).await;
             }
 
-            let response = match self
-                .http
-                .post(&url)
-                .header(
-                    "Authorization",
-                    format!("{} {}", http::AUTHORIZATION_BEARER, self.api_key),
-                )
-                .header("Content-Type", http::CONTENT_TYPE_JSON)
-                .json(&request)
-                .send()
-                .await
+            let request_timeout = retry_policy.request_timeout();
+            let response = match tokio::time::timeout(
+                request_timeout,
+                self.http
+                    .post(&url)
+                    .header(
+                        "Authorization",
+                        format!("{} {}", http::AUTHORIZATION_BEARER, self.api_key),
+                    )
+                    .header("Content-Type", http::CONTENT_TYPE_JSON)
+                    .json(&request)
+                    .send(),
+            )
+            .await
             {
-                Ok(r) => r,
-                Err(e) => {
+                Ok(Ok(r)) => r,
+                Ok(Err(e)) => {
                     let message = format!("Request failed: {}", e);
                     let mut failure = LlmRetryFailure::request_failed(max_retries, message);
                     if e.is_timeout() {
                         failure.kind = LlmRetryFailureKind::ProviderPressure;
                     }
+                    if retry_policy.should_surface(&failure) {
+                        return Err(anyhow::Error::new(failure));
+                    }
+                    last_failure = Some(failure);
+                    continue;
+                }
+                Err(_) => {
+                    let mut failure = LlmRetryFailure::request_failed(
+                        max_retries,
+                        format!(
+                            "Request timed out after {} seconds",
+                            request_timeout.as_secs()
+                        ),
+                    );
+                    failure.kind = LlmRetryFailureKind::ProviderPressure;
                     if retry_policy.should_surface(&failure) {
                         return Err(anyhow::Error::new(failure));
                     }
@@ -624,6 +650,18 @@ mod tests {
         assert!(!LlmRetryPolicy::SurfaceReducibleProviderErrors.should_surface(&generic));
         assert!(!LlmRetryPolicy::ExhaustRetries.should_surface(&rate_limit));
         assert!(!LlmRetryPolicy::ExhaustRetries.should_surface(&pressure));
+    }
+
+    #[test]
+    fn surface_policy_uses_shorter_request_timeout() {
+        assert_eq!(
+            LlmRetryPolicy::ExhaustRetries.request_timeout(),
+            std::time::Duration::from_secs(timeouts::LLM_REQUEST_TIMEOUT_SECS)
+        );
+        assert_eq!(
+            LlmRetryPolicy::SurfaceReducibleProviderErrors.request_timeout(),
+            std::time::Duration::from_secs(timeouts::LLM_ADAPTIVE_REQUEST_TIMEOUT_SECS)
+        );
     }
 
     #[test]

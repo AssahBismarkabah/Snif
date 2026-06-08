@@ -7,6 +7,9 @@
 - Further reduce provider-pressure fallback requests by shrinking completion
   caps and truncating the diff only after related files and full changed-file
   content have already been removed.
+- Use a shorter per-request timeout for adaptive provider-pressure review and
+  summarization calls so CI can move to fallback instead of waiting on a stuck
+  provider request for the full default timeout.
 - Stop index summarization after sustained provider pressure while preserving
   summaries already written and keeping Snif's full-quality path unchanged for
   healthy providers.

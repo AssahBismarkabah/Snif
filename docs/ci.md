@@ -133,6 +133,8 @@ summarization stops after sustained pressure while preserving summaries already
 written. Reduced review retries remove related files first, degrade changed
 files to diff-only next, and only truncate the diff itself if the provider is
 still failing and the irreducible diff exceeds the reduced retry budget. For
+adaptive provider-pressure calls, Snif uses a shorter per-request timeout than
+the default non-adaptive LLM timeout so CI can move to fallback promptly. For
 strict providers, configure lower `context.max_tokens` and
 `context.summarizer_concurrency`.
 

@@ -12,6 +12,8 @@
 pub mod timeouts {
     /// Timeout for LLM HTTP requests (seconds)
     pub const LLM_REQUEST_TIMEOUT_SECS: u64 = 300;
+    /// Timeout for adaptive LLM requests that can reduce context after provider pressure (seconds)
+    pub const LLM_ADAPTIVE_REQUEST_TIMEOUT_SECS: u64 = 75;
     /// Maximum retry attempts for LLM requests
     pub const LLM_MAX_RETRIES: u32 = 5;
     /// Base delay for retry backoff (seconds)
@@ -785,6 +787,7 @@ mod tests {
     #[test]
     fn llm_retry_constants_preserve_eval_resilience() {
         assert_eq!(timeouts::LLM_REQUEST_TIMEOUT_SECS, 300);
+        assert_eq!(timeouts::LLM_ADAPTIVE_REQUEST_TIMEOUT_SECS, 75);
         assert_eq!(timeouts::LLM_MAX_RETRIES, 5);
     }
 }
