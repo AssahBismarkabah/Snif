@@ -1,6 +1,8 @@
 # Changelog
 
 ## unreleased
+
+## 3.2.9
 - Treat provider overload as a first-class retry failure so review can shrink
   context after `504`/upstream timeout responses instead of retrying the same
   large prompt.
