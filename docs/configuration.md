@@ -136,6 +136,12 @@ completion cap so gateways do not reserve unbounded output tokens. Default:
 Snif runs in parallel during `snif index`. Default: 3. Lower this for providers
 with stricter request-per-minute or token-per-minute limits.
 
+Snif keeps the full review and summarization path by default. If the provider
+later returns rate-limit or capacity-pressure errors such as `429`, `408`,
+`502`, `503`, `504`, or upstream timeouts, Snif may stop additional
+summarization for that index run or retry review with reduced context. Already
+written summaries are preserved.
+
 `retrieval_weights` controls how structural, semantic, and keyword retrieval
 results are weighted when ranking related files. Default: structural 1.0,
 semantic 0.7, keyword 0.3. Higher weight means that retrieval method's results

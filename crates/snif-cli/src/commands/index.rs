@@ -53,6 +53,7 @@ pub fn run(path: &str, full: bool) -> Result<()> {
         files = summary_stats.files_summarized,
         errors = summary_stats.errors,
         rate_limited = summary_stats.rate_limited,
+        provider_limited = summary_stats.provider_limited,
         duration = ?summary_stats.total_duration,
         "Summarization complete"
     );
