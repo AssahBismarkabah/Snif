@@ -1,6 +1,8 @@
 # Changelog
 
 ## unreleased
+
+## 3.2.10
 - Add review integrity validation so malformed, contradictory, or repaired
   empty model output is marked inconclusive instead of being reported as a
   clean review.
