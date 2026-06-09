@@ -316,6 +316,8 @@ fn insert_fixture_events<S: Fn(std::time::Duration)>(
                     "tp": fr.true_positives,
                     "fp": fr.false_positives,
                     "fn": fr.false_negatives,
+                    "inconclusive": fr.inconclusive,
+                    "error": fr.error.as_deref(),
                 },
                 "expected": {
                     "tp": fr.expected,
@@ -330,6 +332,7 @@ fn insert_fixture_events<S: Fn(std::time::Duration)>(
                 "metadata": {
                     "model": model_name,
                     "fixture_name": fr.fixture_name,
+                    "inconclusive": fr.inconclusive,
                 },
             })
         })
@@ -488,6 +491,8 @@ mod tests {
                     tp: TEST_TP_HIGH,
                     fp: TEST_FP_ZERO,
                     fn_count: TEST_FP_ZERO,
+                    inconclusive: false,
+                    error: None,
                 },
                 crate::history::FixtureRecord {
                     name: TEST_FIXTURE_ERROR.to_string(),
@@ -496,6 +501,8 @@ mod tests {
                     tp: TEST_TP_MID,
                     fp: TEST_FP_MID,
                     fn_count: TEST_FP_ZERO,
+                    inconclusive: false,
+                    error: None,
                 },
             ],
         }
@@ -510,6 +517,8 @@ mod tests {
                 true_positives: TEST_TP_HIGH,
                 false_positives: TEST_FP_ZERO,
                 false_negatives: TEST_FP_ZERO,
+                inconclusive: false,
+                error: None,
             },
             FixtureResult {
                 fixture_name: TEST_FIXTURE_ERROR.to_string(),
@@ -518,6 +527,8 @@ mod tests {
                 true_positives: TEST_TP_MID,
                 false_positives: TEST_FP_MID,
                 false_negatives: TEST_FP_ZERO,
+                inconclusive: false,
+                error: None,
             },
         ]
     }

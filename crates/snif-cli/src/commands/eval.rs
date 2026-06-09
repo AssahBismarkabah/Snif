@@ -15,10 +15,12 @@ fn print_fixture_result(
     tp: usize,
     fp: usize,
     fn_count: usize,
+    inconclusive: bool,
 ) {
+    let suffix = if inconclusive { " INCONCLUSIVE" } else { "" };
     println!(
-        "  {:<40} expected={} actual={} TP={} FP={} FN={}",
-        name, expected, actual, tp, fp, fn_count
+        "  {:<40} expected={} actual={} TP={} FP={} FN={}{}",
+        name, expected, actual, tp, fp, fn_count, suffix
     );
 }
 
@@ -67,6 +69,7 @@ pub fn run(path: &str, fixtures: &str, history: &str) -> Result<()> {
             fr.true_positives,
             fr.false_positives,
             fr.false_negatives,
+            fr.inconclusive,
         );
     }
 
@@ -74,6 +77,12 @@ pub fn run(path: &str, fixtures: &str, history: &str) -> Result<()> {
     print_metric("Precision", result.aggregate.precision * 100.0);
     print_metric("Recall", result.aggregate.recall * 100.0);
     print_metric("Noise rate", result.aggregate.noise_rate * 100.0);
+    if result.aggregate.inconclusive_count > 0 {
+        println!(
+            "  {:<12} {}",
+            "Inconclusive", result.aggregate.inconclusive_count
+        );
+    }
     println!();
 
     let record = snif_eval::history::build_record(

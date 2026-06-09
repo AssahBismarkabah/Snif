@@ -86,7 +86,9 @@ pub fn run_evaluation(
 
         let result = snif_execution::execute_review(&system_prompt, &user_prompt, &config.model)?;
 
-        let mut parsed = snif_output::parser::parse_response(&result.response)?;
+        let initial_parsed = snif_output::parser::parse_response(&result.response)?;
+        let mut parsed = initial_parsed.clone();
+        let mut repaired_response = None;
 
         // Run repair if findings are empty OR if chain-of-thought leakage is detected
         let needs_repair = parsed.findings.is_empty()
@@ -96,7 +98,19 @@ pub fn run_evaluation(
             tracing::warn!(fixture = %fix.name, "Repairing review response");
             let repaired = snif_execution::repair_review_response(&result.response, &config.model)?;
             parsed = snif_output::parser::parse_response(&repaired.response)?;
+            repaired_response = Some(repaired.response);
         }
+        let inconclusive_reason = if parsed.findings.is_empty() {
+            snif_output::integrity::empty_review_inconclusive_reason(
+                &result.response,
+                &initial_parsed,
+                repaired_response
+                    .as_deref()
+                    .map(|response| (response, &parsed)),
+            )
+        } else {
+            None
+        };
         let mut findings = parsed.findings;
         findings = snif_output::filter::apply_filters(findings, &config.filter);
 
@@ -112,12 +126,21 @@ pub fn run_evaluation(
             );
         }
 
-        let fixture_result = metrics::compute_fixture_result(
+        let mut fixture_result = metrics::compute_fixture_result(
             &fix.name,
             &fix.expected_findings,
             &findings,
             thresholds::EVAL_LINE_TOLERANCE,
         );
+        if let Some(reason) = inconclusive_reason {
+            fixture_result.inconclusive = true;
+            fixture_result.error = Some(reason.to_string());
+            tracing::error!(
+                fixture = %fix.name,
+                reason = %reason,
+                "Fixture review inconclusive"
+            );
+        }
 
         tracing::info!(
             name = %fix.name,
@@ -125,6 +148,7 @@ pub fn run_evaluation(
             actual = fixture_result.actual,
             tp = fixture_result.true_positives,
             fp = fixture_result.false_positives,
+            inconclusive = fixture_result.inconclusive,
             "Fixture complete"
         );
 

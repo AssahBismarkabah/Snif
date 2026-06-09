@@ -32,6 +32,7 @@ pub mod app {
     pub const SNIF_BRAINTRUST_PROJECT_ID: &str = "SNIF_BRAINTRUST_PROJECT_ID";
     pub const SNIF_REVIEW_MODEL: &str = "SNIF_REVIEW_MODEL";
     pub const SNIF_SUMMARY_MODEL: &str = "SNIF_SUMMARY_MODEL";
+    pub const SNIF_REVIEW_INCONCLUSIVE_MODE: &str = "SNIF_REVIEW_INCONCLUSIVE_MODE";
 }
 
 pub mod ci {

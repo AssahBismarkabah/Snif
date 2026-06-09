@@ -1,6 +1,9 @@
 use anyhow::{bail, Context, Result};
 use snif_config::constants::{cli, context as context_constants};
 use snif_config::env::{app, ci};
+use snif_config::ReviewInconclusiveMode;
+use snif_output::integrity::InconclusiveReason;
+use snif_output::summary::ReviewOutcome;
 use snif_platform::PlatformAdapter;
 use snif_types::{ContentTier, ContextPackage};
 use std::path::Path;
@@ -226,6 +229,7 @@ pub fn run(
                             );
                         }
                         push_context_note(&mut review_context_note, note);
+                        rendered = fallback;
                         result = Some(ok);
                         break;
                     }
@@ -257,7 +261,9 @@ pub fn run(
     );
 
     // Parse findings from LLM response
-    let mut parsed = snif_output::parser::parse_response(&result.response)?;
+    let initial_parsed = snif_output::parser::parse_response(&result.response)?;
+    let mut parsed = initial_parsed.clone();
+    let mut repaired_response = None;
 
     // Run repair if findings are empty OR if chain-of-thought leakage is detected
     let needs_repair =
@@ -271,8 +277,20 @@ pub fn run(
             Some(successful_output_max_tokens),
         )?;
         parsed = snif_output::parser::parse_response(&repaired.response)?;
+        repaired_response = Some(repaired.response);
     }
 
+    let inconclusive_reason = if parsed.findings.is_empty() {
+        snif_output::integrity::empty_review_inconclusive_reason(
+            &result.response,
+            &initial_parsed,
+            repaired_response
+                .as_deref()
+                .map(|response| (response, &parsed)),
+        )
+    } else {
+        None
+    };
     let change_summary = parsed.summary;
     let mut findings = parsed.findings;
 
@@ -282,11 +300,39 @@ pub fn run(
     // Compute fingerprints
     snif_output::fingerprint::compute_fingerprints(&mut findings);
 
-    // Output findings
-    if findings.is_empty() {
-        tracing::info!("No findings — change looks clean");
-    } else {
-        tracing::info!(count = findings.len(), "Findings after filtering");
+    if rendered.trim_stats != PromptTrimStats::default() && review_context_note.is_none() {
+        push_context_note(
+            &mut review_context_note,
+            "Context was trimmed to fit the configured token budget.",
+        );
+    }
+
+    let outcome = classify_review_outcome(
+        inconclusive_reason,
+        &findings,
+        context_was_limited(&rendered, &review_context_note),
+    );
+
+    match outcome {
+        ReviewOutcome::Inconclusive => {
+            let reason = inconclusive_reason
+                .map(|reason| reason.to_string())
+                .unwrap_or_else(|| "review output could not be trusted".to_string());
+            tracing::warn!(reason = %reason, "Review inconclusive");
+            push_context_note(
+                &mut review_context_note,
+                format!("Review was inconclusive: {reason}."),
+            );
+        }
+        ReviewOutcome::LimitedClean => {
+            tracing::warn!("No reportable findings, but review context was limited");
+        }
+        ReviewOutcome::Clean => {
+            tracing::info!("No findings — change looks clean");
+        }
+        ReviewOutcome::Findings => {
+            tracing::info!(count = findings.len(), "Findings after filtering");
+        }
     }
 
     match format {
@@ -314,8 +360,10 @@ pub fn run(
             snif_output::summary::format_pr_summary(&snif_output::summary::ReviewSummaryInput {
                 change_summary: &change_summary,
                 findings: &findings,
+                outcome,
                 changed_paths: &changed_paths,
                 retrieval_results: &retrieval_results,
+                related_files_analyzed: rendered.related_files,
                 diff_lines: diff.lines().count(),
                 model_name: &config.model.review_model,
                 duration_secs: result.duration.as_secs(),
@@ -324,6 +372,10 @@ pub fn run(
         adapter.post_summary(&summary)?;
 
         tracing::info!(posted = findings.len(), "Findings posted");
+
+        if should_fail_inconclusive_review(outcome, config.review.inconclusive_mode) {
+            bail_inconclusive(inconclusive_reason)?;
+        }
 
         // Only resolve stale findings when the current review produced findings.
         // If current review is completely clean (zero findings), don't auto-resolve
@@ -364,6 +416,10 @@ pub fn run(
         }
     }
 
+    if should_fail_inconclusive_review(outcome, config.review.inconclusive_mode) {
+        bail_inconclusive(inconclusive_reason)?;
+    }
+
     Ok(())
 }
 
@@ -386,6 +442,40 @@ fn provider_failure_reason(error: &anyhow::Error) -> &'static str {
     } else {
         "provider failure"
     }
+}
+
+fn classify_review_outcome(
+    inconclusive_reason: Option<InconclusiveReason>,
+    findings: &[snif_types::Finding],
+    context_limited: bool,
+) -> ReviewOutcome {
+    if inconclusive_reason.is_some() {
+        ReviewOutcome::Inconclusive
+    } else if !findings.is_empty() {
+        ReviewOutcome::Findings
+    } else if context_limited {
+        ReviewOutcome::LimitedClean
+    } else {
+        ReviewOutcome::Clean
+    }
+}
+
+fn context_was_limited(
+    rendered: &RenderedReviewPrompts,
+    review_context_note: &Option<String>,
+) -> bool {
+    rendered.trim_stats != PromptTrimStats::default() || review_context_note.is_some()
+}
+
+fn bail_inconclusive(reason: Option<InconclusiveReason>) -> Result<()> {
+    let reason = reason
+        .map(|reason| reason.to_string())
+        .unwrap_or_else(|| "review output could not be trusted".to_string());
+    bail!("Review inconclusive: {reason}")
+}
+
+fn should_fail_inconclusive_review(outcome: ReviewOutcome, mode: ReviewInconclusiveMode) -> bool {
+    outcome == ReviewOutcome::Inconclusive && mode == ReviewInconclusiveMode::Fail
 }
 
 fn render_prompts_for_prompt_budget(
@@ -799,5 +889,60 @@ mod tests {
             note.as_deref(),
             Some("Semantic retrieval was skipped. Context was reduced.")
         );
+    }
+
+    #[test]
+    fn review_outcome_is_inconclusive_when_integrity_check_fails() {
+        let outcome =
+            classify_review_outcome(Some(InconclusiveReason::SummaryClaimsFindings), &[], false);
+
+        assert_eq!(outcome, ReviewOutcome::Inconclusive);
+    }
+
+    #[test]
+    fn review_outcome_marks_empty_limited_context_as_limited_clean() {
+        let outcome = classify_review_outcome(None, &[], true);
+
+        assert_eq!(outcome, ReviewOutcome::LimitedClean);
+    }
+
+    #[test]
+    fn review_outcome_marks_empty_full_context_as_clean() {
+        let outcome = classify_review_outcome(None, &[], false);
+
+        assert_eq!(outcome, ReviewOutcome::Clean);
+    }
+
+    #[test]
+    fn context_limited_tracks_prompt_trimming() {
+        let rendered = RenderedReviewPrompts {
+            system_prompt: String::new(),
+            user_prompt: String::new(),
+            prompt_tokens: 0,
+            related_files: 0,
+            trim_stats: PromptTrimStats {
+                related_files_removed: 1,
+                changed_files_degraded: 0,
+                diff_truncated: false,
+            },
+        };
+
+        assert!(context_was_limited(&rendered, &None));
+    }
+
+    #[test]
+    fn inconclusive_fail_mode_exits_non_zero() {
+        assert!(should_fail_inconclusive_review(
+            ReviewOutcome::Inconclusive,
+            ReviewInconclusiveMode::Fail
+        ));
+    }
+
+    #[test]
+    fn inconclusive_warn_mode_exits_zero() {
+        assert!(!should_fail_inconclusive_review(
+            ReviewOutcome::Inconclusive,
+            ReviewInconclusiveMode::Warn
+        ));
     }
 }

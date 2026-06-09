@@ -723,6 +723,12 @@ pub mod summary {
     pub const PR_SUMMARY_HEADER: &str = "## Snif Review\n\n";
     /// No findings message
     pub const NO_FINDINGS: &str = "**No issues found.** Change looks clean.\n\n";
+    /// Limited-context no findings message
+    pub const LIMITED_NO_FINDINGS: &str =
+        "**No reportable issues found in analyzed context.** Review context was limited.\n\n";
+    /// Inconclusive review message
+    pub const INCONCLUSIVE_REVIEW: &str =
+        "**Review inconclusive; Snif could not produce a trustworthy result.**\n\n";
     /// Findings found prefix
     pub const FINDINGS_FOUND_PREFIX: &str = "**Found ";
     /// Findings found suffix (singular)
@@ -743,6 +749,8 @@ pub mod summary {
     pub const CONTEXT_ANALYZED_FILE_SUFFIX_SINGULAR: &str = " related file";
     /// Context analyzed file suffix (plural)
     pub const CONTEXT_ANALYZED_FILES_SUFFIX_PLURAL: &str = " related files";
+    /// Context analyzed trimming note
+    pub const CONTEXT_ANALYZED_TRIMMED_SUFFIX: &str = " included after trimming";
     /// Structural retrieval label
     pub const STRUCTURAL_RETRIEVAL_LABEL: &str = " via structural analysis";
     /// Semantic retrieval label

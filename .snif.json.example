@@ -54,6 +54,10 @@
     }
   },
 
+  "review": {
+    "inconclusive_mode": "fail"
+  },
+
   "filter": {
     "min_confidence": 0.7,
     "suppress_style_only": true,

@@ -147,6 +147,19 @@ results are weighted when ranking related files. Default: structural 1.0,
 semantic 0.7, keyword 0.3. Higher weight means that retrieval method's results
 rank higher in the final list.
 
+## review
+
+`inconclusive_mode` controls what `snif review` does when the model output
+cannot be trusted. Default: `fail`.
+
+- `fail`: post an inconclusive summary when possible, then exit non-zero.
+- `warn`: post an inconclusive summary and exit zero.
+
+Snif marks a review inconclusive when malformed or repaired model output cannot
+be safely interpreted as either findings or a clean review. This prevents
+truncated, contradictory, or malformed output from being reported as "No issues
+found." Environment override: `SNIF_REVIEW_INCONCLUSIVE_MODE`.
+
 ## filter
 
 `min_confidence` is the minimum confidence score for a finding to survive

@@ -284,6 +284,8 @@ mod tests {
                     } else {
                         eval_output::DEFAULT_COUNTER
                     },
+                    inconclusive: false,
+                    error: None,
                 })
                 .collect(),
         }

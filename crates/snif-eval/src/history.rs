@@ -27,6 +27,10 @@ pub struct FixtureRecord {
     pub tp: usize,
     pub fp: usize,
     pub fn_count: usize,
+    #[serde(default)]
+    pub inconclusive: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 pub struct RegressionWarning {
@@ -50,6 +54,8 @@ pub fn build_record(
             tp: fr.true_positives,
             fp: fr.false_positives,
             fn_count: fr.false_negatives,
+            inconclusive: fr.inconclusive,
+            error: fr.error.clone(),
         })
         .collect();
 
@@ -308,6 +314,8 @@ mod tests {
                 tp,
                 fp,
                 fn_count: usize::from(tp == eval_output::DEFAULT_COUNTER),
+                inconclusive: false,
+                error: None,
             }],
         }
     }

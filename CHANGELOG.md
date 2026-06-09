@@ -1,6 +1,14 @@
 # Changelog
 
 ## unreleased
+- Add review integrity validation so malformed, contradictory, or repaired
+  empty model output is marked inconclusive instead of being reported as a
+  clean review.
+- Add `review.inconclusive_mode` and `SNIF_REVIEW_INCONCLUSIVE_MODE` to choose
+  whether inconclusive reviews fail CI (`fail`, default) or post a warning and
+  exit successfully (`warn`).
+- Report actual included related context after prompt trimming so PR summaries
+  do not overstate how many retrieved files were analyzed.
 
 ## 3.2.9
 - Treat provider overload as a first-class retry failure so review can shrink

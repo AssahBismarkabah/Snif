@@ -10,9 +10,20 @@ struct ReviewResponse {
     findings: Vec<Finding>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParseQuality {
+    Strict,
+    Flexible,
+    Array,
+    Salvaged,
+    Malformed,
+}
+
+#[derive(Debug, Clone)]
 pub struct ParsedResponse {
     pub summary: String,
     pub findings: Vec<Finding>,
+    pub quality: ParseQuality,
 }
 
 /// Update JSON parser state for a character
@@ -161,7 +172,11 @@ pub fn parse_response(response: &str) -> Result<ParsedResponse> {
             has_summary = !summary.is_empty(),
             "Parsed review response"
         );
-        return Ok(ParsedResponse { summary, findings });
+        return Ok(ParsedResponse {
+            summary,
+            findings,
+            quality: ParseQuality::Strict,
+        });
     }
 
     if let Ok(value) = serde_json::from_str::<Value>(json_str) {
@@ -172,6 +187,7 @@ pub fn parse_response(response: &str) -> Result<ParsedResponse> {
                 has_summary = !parsed.summary.is_empty(),
                 "Parsed review response with flexible object extraction"
             );
+            parsed.quality = ParseQuality::Flexible;
             return Ok(parsed);
         }
     }
@@ -194,6 +210,7 @@ pub fn parse_response(response: &str) -> Result<ParsedResponse> {
             Ok(ParsedResponse {
                 summary: String::new(),
                 findings,
+                quality: ParseQuality::Array,
             })
         }
         Err(e) => {
@@ -208,9 +225,15 @@ pub fn parse_response(response: &str) -> Result<ParsedResponse> {
                     "Recovered findings from malformed response"
                 );
             }
+            let quality = if findings.is_empty() {
+                ParseQuality::Malformed
+            } else {
+                ParseQuality::Salvaged
+            };
             Ok(ParsedResponse {
                 summary: String::new(),
                 findings,
+                quality,
             })
         }
     }
@@ -234,7 +257,11 @@ fn parsed_response_from_value(value: &Value) -> Option<ParsedResponse> {
                 if let Some(Value::Array(items)) = map.get(*key) {
                     let findings = parse_findings(items);
                     if !findings.is_empty() || !summary.is_empty() {
-                        return Some(ParsedResponse { summary, findings });
+                        return Some(ParsedResponse {
+                            summary,
+                            findings,
+                            quality: ParseQuality::Flexible,
+                        });
                     }
                 }
             }
@@ -248,6 +275,7 @@ fn parsed_response_from_value(value: &Value) -> Option<ParsedResponse> {
                             summary
                         },
                         findings: parsed.findings,
+                        quality: ParseQuality::Flexible,
                     });
                 }
             }
@@ -262,6 +290,7 @@ fn parsed_response_from_value(value: &Value) -> Option<ParsedResponse> {
                 Some(ParsedResponse {
                     summary: String::new(),
                     findings,
+                    quality: ParseQuality::Flexible,
                 })
             }
         }

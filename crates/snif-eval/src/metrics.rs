@@ -10,6 +10,8 @@ pub struct FixtureResult {
     pub true_positives: usize,
     pub false_positives: usize,
     pub false_negatives: usize,
+    pub inconclusive: bool,
+    pub error: Option<String>,
 }
 
 pub struct AggregateMetrics {
@@ -19,6 +21,7 @@ pub struct AggregateMetrics {
     pub total_tp: usize,
     pub total_fp: usize,
     pub total_fn: usize,
+    pub inconclusive_count: usize,
     pub precision: f64,
     pub recall: f64,
     pub noise_rate: f64,
@@ -83,6 +86,8 @@ pub fn compute_fixture_result(
         true_positives,
         false_positives,
         false_negatives,
+        inconclusive: false,
+        error: None,
     }
 }
 
@@ -90,6 +95,7 @@ pub fn aggregate(results: &[FixtureResult]) -> AggregateMetrics {
     let total_tp: usize = results.iter().map(|r| r.true_positives).sum();
     let total_fp: usize = results.iter().map(|r| r.false_positives).sum();
     let total_fn: usize = results.iter().map(|r| r.false_negatives).sum();
+    let inconclusive_count: usize = results.iter().filter(|r| r.inconclusive).count();
     let total_expected: usize = results.iter().map(|r| r.expected).sum();
     let total_actual: usize = results.iter().map(|r| r.actual).sum();
 
@@ -118,6 +124,7 @@ pub fn aggregate(results: &[FixtureResult]) -> AggregateMetrics {
         total_tp,
         total_fp,
         total_fn,
+        inconclusive_count,
         precision,
         recall,
         noise_rate,
@@ -128,6 +135,7 @@ pub fn check_quality_gates(metrics: &AggregateMetrics) -> bool {
     let precision_ok = metrics.precision >= thresholds::EVAL_MIN_PRECISION;
     let recall_ok = metrics.recall >= thresholds::EVAL_MIN_RECALL;
     let noise_ok = metrics.noise_rate <= thresholds::EVAL_MAX_NOISE_RATE;
+    let inconclusive_ok = metrics.inconclusive_count == eval_output::DEFAULT_COUNTER;
 
     if !precision_ok {
         let pct_precision = metrics.precision * eval_output::PERCENTAGE_MULTIPLIER;
@@ -159,7 +167,14 @@ pub fn check_quality_gates(metrics: &AggregateMetrics) -> bool {
         );
     }
 
-    precision_ok && recall_ok && noise_ok
+    if !inconclusive_ok {
+        tracing::error!(
+            inconclusive = metrics.inconclusive_count,
+            "Quality gate FAILED: inconclusive fixture reviews"
+        );
+    }
+
+    precision_ok && recall_ok && noise_ok && inconclusive_ok
 }
 
 #[cfg(test)]
@@ -344,5 +359,17 @@ mod tests {
             TEST_CATEGORY_CONVENTION,
             &[]
         ));
+    }
+
+    #[test]
+    fn quality_gates_fail_when_any_fixture_is_inconclusive() {
+        let mut result = compute_fixture_result(TEST_FIXTURE_NAME, &[], &[], TEST_LINE_TOLERANCE);
+        result.inconclusive = true;
+        result.error = Some("review output could not be trusted".to_string());
+
+        let aggregate = aggregate(&[result]);
+
+        assert_eq!(aggregate.inconclusive_count, TEST_EXPECTED_COUNT);
+        assert!(!check_quality_gates(&aggregate));
     }
 }

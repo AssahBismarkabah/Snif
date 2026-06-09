@@ -16,6 +16,7 @@ pub struct SnifConfig {
     pub model: ModelConfig,
     pub index: IndexConfig,
     pub context: ContextConfig,
+    pub review: ReviewConfig,
     pub filter: FilterConfig,
     pub conventions_paths: Vec<String>,
     pub eval_fixtures_path: Option<String>,
@@ -54,6 +55,19 @@ pub struct ContextConfig {
     pub output_reserve_tokens: usize,
     pub summarizer_concurrency: usize,
     pub retrieval_weights: RetrievalWeights,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ReviewConfig {
+    pub inconclusive_mode: ReviewInconclusiveMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewInconclusiveMode {
+    Fail,
+    Warn,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -128,6 +142,30 @@ impl Default for RetrievalWeights {
     }
 }
 
+impl Default for ReviewConfig {
+    fn default() -> Self {
+        Self {
+            inconclusive_mode: ReviewInconclusiveMode::Fail,
+        }
+    }
+}
+
+impl Default for ReviewInconclusiveMode {
+    fn default() -> Self {
+        Self::Fail
+    }
+}
+
+impl ReviewInconclusiveMode {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "fail" => Some(Self::Fail),
+            "warn" => Some(Self::Warn),
+            _ => None,
+        }
+    }
+}
+
 impl Default for FilterConfig {
     fn default() -> Self {
         Self {
@@ -172,6 +210,11 @@ impl SnifConfig {
         }
         if let Ok(val) = std::env::var(env::app::SNIF_EMBEDDING_CACHE_DIR) {
             self.index.embedding_cache_dir = val;
+        }
+        if let Ok(val) = std::env::var(env::app::SNIF_REVIEW_INCONCLUSIVE_MODE) {
+            if let Some(mode) = ReviewInconclusiveMode::parse(&val) {
+                self.review.inconclusive_mode = mode;
+            }
         }
     }
 
@@ -229,6 +272,50 @@ mod tests {
         .expect("config should parse");
 
         assert_eq!(config.context.summarizer_concurrency, 1);
+    }
+
+    #[test]
+    fn default_review_inconclusive_mode_fails() {
+        let config = SnifConfig::default();
+
+        assert_eq!(
+            config.review.inconclusive_mode,
+            ReviewInconclusiveMode::Fail
+        );
+    }
+
+    #[test]
+    fn missing_review_config_uses_default() {
+        let config: SnifConfig = serde_json::from_str(
+            r#"{
+                "context": {
+                    "max_tokens": 64000
+                }
+            }"#,
+        )
+        .expect("config should parse");
+
+        assert_eq!(
+            config.review.inconclusive_mode,
+            ReviewInconclusiveMode::Fail
+        );
+    }
+
+    #[test]
+    fn explicit_review_inconclusive_warn_mode_is_honored() {
+        let config: SnifConfig = serde_json::from_str(
+            r#"{
+                "review": {
+                    "inconclusive_mode": "warn"
+                }
+            }"#,
+        )
+        .expect("config should parse");
+
+        assert_eq!(
+            config.review.inconclusive_mode,
+            ReviewInconclusiveMode::Warn
+        );
     }
 
     #[test]
@@ -312,6 +399,30 @@ mod tests {
 
         restore_env_var(env::app::FASTEMBED_CACHE_DIR, old_fastembed);
         restore_env_var(env::app::SNIF_EMBEDDING_CACHE_DIR, old_snif);
+    }
+
+    #[test]
+    fn review_inconclusive_mode_env_overrides_json() {
+        let _guard = env_lock().lock().expect("env lock should not be poisoned");
+        let old_mode = std::env::var(env::app::SNIF_REVIEW_INCONCLUSIVE_MODE).ok();
+        std::env::set_var(env::app::SNIF_REVIEW_INCONCLUSIVE_MODE, "warn");
+
+        let mut config: SnifConfig = serde_json::from_str(
+            r#"{
+                "review": {
+                    "inconclusive_mode": "fail"
+                }
+            }"#,
+        )
+        .expect("config should parse");
+        config.merge_env_vars();
+
+        assert_eq!(
+            config.review.inconclusive_mode,
+            ReviewInconclusiveMode::Warn
+        );
+
+        restore_env_var(env::app::SNIF_REVIEW_INCONCLUSIVE_MODE, old_mode);
     }
 
     #[test]
