@@ -63,9 +63,10 @@ pub struct ReviewConfig {
     pub inconclusive_mode: ReviewInconclusiveMode,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewInconclusiveMode {
+    #[default]
     Fail,
     Warn,
 }
@@ -147,12 +148,6 @@ impl Default for ReviewConfig {
         Self {
             inconclusive_mode: ReviewInconclusiveMode::Fail,
         }
-    }
-}
-
-impl Default for ReviewInconclusiveMode {
-    fn default() -> Self {
-        Self::Fail
     }
 }
 
