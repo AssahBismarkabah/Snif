@@ -559,14 +559,14 @@ async fn summarize_file_levels(
                     continue;
                 }
                 Some(_) => {
-                    // Hash mismatch — child summaries changed, delete and re-summarize
+                    // Hash mismatch — child summaries changed, delete file-level summary only
                     tracing::debug!(file_id, "File content hash changed, re-summarizing");
-                    store.delete_summaries_for_files(&[*file_id])?;
+                    store.delete_file_level_summary(*file_id)?;
                 }
                 None => {
                     // Legacy summary without hash — treat as stale
                     tracing::debug!(file_id, "Legacy file summary without hash, re-summarizing");
-                    store.delete_summaries_for_files(&[*file_id])?;
+                    store.delete_file_level_summary(*file_id)?;
                 }
             }
             // After deletion, check again in case deletion failed

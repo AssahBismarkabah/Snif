@@ -142,64 +142,106 @@ impl Store {
         Ok(())
     }
 
+    /// Delete only the file-level summary (and its embedding) for a given file.
+    /// Preserves all symbol-level summaries. Used when a file-level summary's
+    /// content hash is stale but the child symbol summaries are still valid.
+    pub fn delete_file_level_summary(&self, file_id: i64) -> Result<()> {
+        // Find the file-level summary ID (level = 'file', file_id = ?)
+        let summary_id: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT id FROM summaries WHERE file_id = ?1 AND level = 'file'",
+                [file_id],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if let Some(sid) = summary_id {
+            // Delete the embedding first
+            self.conn.execute(
+                "DELETE FROM summary_embeddings WHERE summary_id = ?1",
+                [sid],
+            )?;
+            // Then delete the file-level summary
+            self.conn
+                .execute("DELETE FROM summaries WHERE id = ?1", [sid])?;
+        }
+
+        Ok(())
+    }
+
     /// Delete summaries and their embeddings for a list of file IDs.
     /// Used to clear stale summaries before re-summarization of changed files.
     /// Also deletes associated embeddings from the summary_embeddings virtual table.
+    ///
+    /// Processes files in batches to stay under SQLite's variable limit.
     pub fn delete_summaries_for_files(&self, file_ids: &[i64]) -> Result<()> {
         if file_ids.is_empty() {
             return Ok(());
         }
 
-        // Collect summary IDs first so we can delete their embeddings
-        let placeholders: String = file_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let find_sql = format!(
-            "SELECT id FROM summaries WHERE file_id IN ({}) OR symbol_id IN
-             (SELECT id FROM symbols WHERE file_id IN ({}))",
-            placeholders, placeholders
-        );
+        // Each file_id appears twice in the query (WHERE file_id IN (...) OR ... WHERE file_id IN (...)),
+        // so the batch size is half the SQLite variable limit.
+        let batch_size = snif_config::constants::limits::SQLITE_MAX_VARIABLE_NUMBER / 2;
 
-        let mut find_stmt = self.conn.prepare(&find_sql)?;
-        let params: Vec<&dyn rusqlite::ToSql> = file_ids
-            .iter()
-            .chain(file_ids.iter())
-            .map(|id| id as &dyn rusqlite::ToSql)
-            .collect();
-        let summary_ids: Vec<i64> = find_stmt
-            .query_map(params.as_slice(), |row| row.get(0))?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+        for batch in file_ids.chunks(batch_size) {
+            let placeholders: String = batch.iter().map(|_| "?").collect::<Vec<_>>().join(",");
 
-        // Delete embeddings for the collected summary IDs
-        if !summary_ids.is_empty() {
-            let embed_placeholders: String = summary_ids
-                .iter()
-                .map(|_| "?")
-                .collect::<Vec<_>>()
-                .join(",");
-            let embed_sql = format!(
-                "DELETE FROM summary_embeddings WHERE summary_id IN ({})",
-                embed_placeholders
+            // Collect summary IDs first so we can delete their embeddings
+            let find_sql = format!(
+                "SELECT id FROM summaries WHERE file_id IN ({}) OR symbol_id IN
+                 (SELECT id FROM symbols WHERE file_id IN ({}))",
+                placeholders, placeholders
             );
-            let mut embed_stmt = self.conn.prepare(&embed_sql)?;
-            let embed_params: Vec<&dyn rusqlite::ToSql> = summary_ids
+
+            let mut find_stmt = self.conn.prepare(&find_sql)?;
+            let params: Vec<&dyn rusqlite::ToSql> = batch
                 .iter()
+                .chain(batch.iter())
                 .map(|id| id as &dyn rusqlite::ToSql)
                 .collect();
-            embed_stmt.execute(embed_params.as_slice())?;
-        }
+            let summary_ids: Vec<i64> = find_stmt
+                .query_map(params.as_slice(), |row| row.get(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
 
-        // Delete the summaries themselves
-        let delete_sql = format!(
-            "DELETE FROM summaries WHERE file_id IN ({}) OR symbol_id IN
-             (SELECT id FROM symbols WHERE file_id IN ({}))",
-            placeholders, placeholders
-        );
-        let mut delete_stmt = self.conn.prepare(&delete_sql)?;
-        let delete_params: Vec<&dyn rusqlite::ToSql> = file_ids
-            .iter()
-            .chain(file_ids.iter())
-            .map(|id| id as &dyn rusqlite::ToSql)
-            .collect();
-        delete_stmt.execute(delete_params.as_slice())?;
+            // Delete embeddings for the collected summary IDs (also batched)
+            for embed_batch in
+                summary_ids.chunks(snif_config::constants::limits::SQLITE_MAX_VARIABLE_NUMBER)
+            {
+                if embed_batch.is_empty() {
+                    continue;
+                }
+                let embed_placeholders: String = embed_batch
+                    .iter()
+                    .map(|_| "?")
+                    .collect::<Vec<_>>()
+                    .join(",");
+                let embed_sql = format!(
+                    "DELETE FROM summary_embeddings WHERE summary_id IN ({})",
+                    embed_placeholders
+                );
+                let mut embed_stmt = self.conn.prepare(&embed_sql)?;
+                let embed_params: Vec<&dyn rusqlite::ToSql> = embed_batch
+                    .iter()
+                    .map(|id| id as &dyn rusqlite::ToSql)
+                    .collect();
+                embed_stmt.execute(embed_params.as_slice())?;
+            }
+
+            // Delete the summaries themselves
+            let delete_sql = format!(
+                "DELETE FROM summaries WHERE file_id IN ({}) OR symbol_id IN
+                 (SELECT id FROM symbols WHERE file_id IN ({}))",
+                placeholders, placeholders
+            );
+            let mut delete_stmt = self.conn.prepare(&delete_sql)?;
+            let delete_params: Vec<&dyn rusqlite::ToSql> = batch
+                .iter()
+                .chain(batch.iter())
+                .map(|id| id as &dyn rusqlite::ToSql)
+                .collect();
+            delete_stmt.execute(delete_params.as_slice())?;
+        }
 
         Ok(())
     }
@@ -682,5 +724,86 @@ mod tests {
         store
             .delete_summary_for_symbol(sym)
             .expect("should succeed even with no summary");
+    }
+
+    #[test]
+    fn delete_file_level_summary_preserves_symbol_summaries() {
+        let store = setup_store();
+        let file_id = insert_file(&store, "src/lib.rs");
+        let sym_a = insert_symbol_row(store.conn(), file_id, "func_a", "function", 1, 10);
+        let sym_b = insert_symbol_row(store.conn(), file_id, "func_b", "function", 15, 30);
+
+        // Insert symbol summaries and a file-level summary
+        store
+            .insert_summary(
+                Some(sym_a),
+                None,
+                summarizer::KIND_FUNCTION,
+                "Function A summary",
+                Some("hash_a"),
+                Some(4),
+            )
+            .expect("summary A should insert");
+        store
+            .insert_summary(
+                Some(sym_b),
+                None,
+                summarizer::KIND_FUNCTION,
+                "Function B summary",
+                Some("hash_b"),
+                Some(4),
+            )
+            .expect("summary B should insert");
+        store
+            .insert_summary(
+                None,
+                Some(file_id),
+                summarizer::LEVEL_FILE,
+                "File summary",
+                Some("hash_file"),
+                Some(4),
+            )
+            .expect("file summary should insert");
+
+        // Delete only the file-level summary
+        store
+            .delete_file_level_summary(file_id)
+            .expect("should delete file-level summary");
+
+        // File-level summary should be gone
+        assert!(
+            store
+                .get_summary_for_file(file_id)
+                .expect("query should succeed")
+                .is_none(),
+            "file-level summary should be deleted"
+        );
+
+        // Both symbol summaries should still exist
+        assert!(
+            store
+                .get_summary_for_symbol(sym_a)
+                .expect("query should succeed")
+                .is_some(),
+            "symbol A summary should be preserved"
+        );
+        assert!(
+            store
+                .get_summary_for_symbol(sym_b)
+                .expect("query should succeed")
+                .is_some(),
+            "symbol B summary should be preserved"
+        );
+    }
+
+    #[test]
+    fn delete_file_level_summary_noop_when_no_file_summary() {
+        let store = setup_store();
+        let file_id = insert_file(&store, "src/lib.rs");
+
+        // No file summary exists — should succeed without error
+        store
+            .delete_file_level_summary(file_id)
+            .expect("should succeed even with no file summary");
     }
 }
