@@ -122,10 +122,89 @@ pub fn run(
     tracing::info!(
         structural = retrieval_results.structural_count,
         semantic = retrieval_results.semantic_count,
+        code_semantic = retrieval_results.code_semantic_count,
         keyword = retrieval_results.keyword_count,
         total = retrieval_results.results.len(),
         "Retrieval complete"
     );
+
+    // On-demand summarization: check for files missing summaries and
+    // generate them if a summarization API key is configured.
+    {
+        let api_key = std::env::var(snif_config::env::keys::SNIF_API_KEY)
+            .or_else(|_| std::env::var(snif_config::env::keys::OPENAI_API_KEY))
+            .unwrap_or_default();
+
+        if !api_key.is_empty()
+            && !config.model.endpoint.is_empty()
+            && !config.model.summary_model.is_empty()
+        {
+            // Collect all file paths that might need summaries: changed files + retrieved related files
+            let mut paths_needing_summaries: Vec<String> = changed_paths.clone();
+            for result in &retrieval_results.results {
+                if !paths_needing_summaries.contains(&result.path) {
+                    paths_needing_summaries.push(result.path.clone());
+                }
+            }
+
+            // Check which files lack summaries and generate them on demand
+            let mut files_without_summaries = Vec::new();
+            for path in &paths_needing_summaries {
+                let has_summary = store
+                    .get_file_id(path)
+                    .ok()
+                    .flatten()
+                    .map(|fid| store.get_summary_for_file(fid).ok().flatten().is_some())
+                    .unwrap_or(false);
+                if !has_summary {
+                    files_without_summaries.push(path.clone());
+                }
+            }
+
+            if !files_without_summaries.is_empty() {
+                tracing::info!(
+                    count = files_without_summaries.len(),
+                    "Generating on-demand summaries for files missing from index"
+                );
+                let summary_stats = snif_summarizer::summarize_files(
+                    &store,
+                    repo_path,
+                    &config.model,
+                    &files_without_summaries,
+                    config.context.summarizer_concurrency,
+                )?;
+
+                tracing::info!(
+                    symbols = summary_stats.symbols_summarized,
+                    files = summary_stats.files_summarized,
+                    symbols_skipped = summary_stats.symbols_skipped_unchanged,
+                    files_skipped = summary_stats.files_skipped_unchanged,
+                    errors = summary_stats.errors,
+                    duration = ?summary_stats.total_duration,
+                    "On-demand summarization complete"
+                );
+
+                // Re-embed any new summaries using the already-loaded embedder
+                if snif_embeddings::has_summaries_missing_embeddings(&store)? {
+                    if let Some(embedder) = embedder.as_ref() {
+                        let embed_stats = snif_embeddings::embed_all_summaries(&store, embedder)?;
+                        tracing::info!(
+                            embedded = embed_stats.summaries_embedded,
+                            dimension = embed_stats.dimension,
+                            duration = ?embed_stats.duration,
+                            "On-demand embedding complete"
+                        );
+                    } else {
+                        tracing::warn!(
+                            "Skipping on-demand embedding because the embedder is not available"
+                        );
+                    }
+                }
+            }
+        } else {
+            tracing::debug!("No API key configured, skipping on-demand summarization");
+        }
+    }
 
     // Build context package
     let mut context = snif_context::build_context(
@@ -296,6 +375,13 @@ pub fn run(
 
     // Apply static filters
     findings = snif_output::filter::apply_filters(findings, &config.filter);
+
+    // Verify findings against source code — penalize evidence that doesn't
+    // match the actual file content (catches LLM hallucinations)
+    findings = snif_output::verify::verify_findings(findings, repo_path);
+
+    // Re-apply confidence threshold after verification may have reduced scores
+    findings.retain(|f| f.confidence >= config.filter.min_confidence);
 
     // Compute fingerprints
     snif_output::fingerprint::compute_fingerprints(&mut findings);

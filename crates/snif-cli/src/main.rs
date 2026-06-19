@@ -21,9 +21,18 @@ enum Commands {
         #[arg(long, default_value = cli::DEFAULT_PATH)]
         path: String,
 
-        /// Force a full rebuild instead of incremental update
+        /// Pre-warm all summaries and embeddings after building the structural
+        /// graph. By default, only the structural graph is built and summaries
+        /// are generated on-demand during review. Use this flag to pre-build
+        /// the full semantic index upfront.
         #[arg(long)]
-        full: bool,
+        full_index: bool,
+
+        /// Reset the database and rebuild from scratch. This drops all existing
+        /// indexes, summaries, and embeddings. Use when the index is corrupted
+        /// or when you want a completely clean state.
+        #[arg(long)]
+        rebuild: bool,
     },
 
     /// Review a code change
@@ -100,8 +109,12 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Index { path, full } => {
-            commands::index::run(&path, full)?;
+        Commands::Index {
+            path,
+            full_index,
+            rebuild,
+        } => {
+            commands::index::run(&path, rebuild, full_index)?;
         }
         Commands::Review {
             path,

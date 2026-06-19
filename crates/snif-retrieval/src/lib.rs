@@ -1,3 +1,4 @@
+mod code_semantic;
 mod keyword;
 mod semantic;
 mod structural;
@@ -28,10 +29,20 @@ pub fn retrieve(
         }
         None => HashMap::new(),
     };
+    let code_sem_results = match embedder {
+        Some(embedder) => code_semantic::code_semantic_retrieval(
+            store,
+            &changed_ids,
+            embedder,
+            retrieval::SEMANTIC_KNN_K,
+        )?,
+        None => HashMap::new(),
+    };
     let kw_results = keyword::keyword_retrieval(store, diff_identifiers, &changed_ids)?;
 
     let structural_count = struct_results.len();
     let semantic_count = sem_results.len();
+    let code_semantic_count = code_sem_results.len();
     let keyword_count = kw_results.len();
 
     let mut merged: HashMap<i64, Vec<RetrievalMethod>> = HashMap::new();
@@ -40,6 +51,9 @@ pub fn retrieve(
         merged.entry(file_id).or_default().extend(methods);
     }
     for (file_id, methods) in sem_results {
+        merged.entry(file_id).or_default().extend(methods);
+    }
+    for (file_id, methods) in code_sem_results {
         merged.entry(file_id).or_default().extend(methods);
     }
     for (file_id, methods) in kw_results {
@@ -73,6 +87,7 @@ pub fn retrieve(
         results,
         structural_count,
         semantic_count,
+        code_semantic_count,
         keyword_count,
     })
 }
@@ -94,6 +109,10 @@ fn compute_score(sources: &[RetrievalMethod], weights: &RetrievalWeights) -> f64
             RetrievalMethod::Semantic { distance } => {
                 let similarity = (1.0 - distance).max(retrieval::SEMANTIC_SIMILARITY_FLOOR);
                 score += weights.semantic * similarity;
+            }
+            RetrievalMethod::CodeSemantic { distance } => {
+                let similarity = (1.0 - distance).max(retrieval::SEMANTIC_SIMILARITY_FLOOR);
+                score += weights.code_semantic * similarity;
             }
             RetrievalMethod::Keyword { matched_terms } => {
                 let term_score = (matched_terms.len() as f64)

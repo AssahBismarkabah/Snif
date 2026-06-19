@@ -1,0 +1,11 @@
+[package]
+name = "snif-chunks"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+sha2.workspace = true
+snif-config = { path = "../snif-config" }
+snif-store = { path = "../snif-store" }
+tracing.workspace = true

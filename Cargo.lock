@@ -2517,12 +2517,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
+name = "snif-chunks"
+version = "3.2.10"
+dependencies = [
+ "anyhow",
+ "sha2",
+ "snif-config",
+ "snif-store",
+ "tracing",
+]
+
+[[package]]
 name = "snif-cli"
 version = "3.2.10"
 dependencies = [
  "anyhow",
  "clap",
  "serde_json",
+ "snif-chunks",
  "snif-cochange",
  "snif-config",
  "snif-context",
@@ -2731,9 +2743,13 @@ name = "snif-summarizer"
 version = "3.2.10"
 dependencies = [
  "anyhow",
+ "serde",
+ "serde_json",
+ "sha2",
  "snif-config",
  "snif-execution",
  "snif-store",
+ "snif-types",
  "tokio",
  "tracing",
 ]

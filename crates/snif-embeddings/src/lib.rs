@@ -167,7 +167,7 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
     let summaries = store.get_all_summaries()?;
 
     if summaries.is_empty() {
-        tracing::info!("All summaries already embedded, skipping");
+        tracing::info!("No summaries found, skipping embedding");
         return Ok(EmbedStats {
             summaries_embedded: embeddings::DEFAULT_COUNT,
             dimension: model::DEFAULT_EMBEDDING_DIMENSION,
@@ -224,6 +224,74 @@ pub fn embed_all_summaries(store: &Store, embedder: &Embedder) -> Result<EmbedSt
         dimension,
         duration: start.elapsed(),
     })
+}
+
+/// Check whether any summaries in the store are missing embeddings.
+/// Used by the review command to decide whether on-demand embedding is needed
+/// after on-demand summarization.
+pub fn has_summaries_missing_embeddings(store: &Store) -> Result<bool> {
+    let summaries = store.get_all_summaries()?;
+    if summaries.is_empty() {
+        return Ok(false);
+    }
+
+    let embedded_ids: HashSet<i64> = store.get_embedded_summary_ids()?.into_iter().collect();
+    Ok(summaries
+        .iter()
+        .any(|(summary_id, _)| !embedded_ids.contains(summary_id)))
+}
+
+/// Embed all code chunks that don't already have embeddings.
+/// This runs after chunking and requires no LLM calls — only the local
+/// embedding model is used. Returns stats about the embedding operation.
+pub fn embed_all_code_chunks(store: &Store, embedder: &Embedder) -> Result<EmbedStats> {
+    let start = Instant::now();
+
+    let unembedded = store.get_unembedded_chunks()?;
+    if unembedded.is_empty() {
+        tracing::info!("All code chunks already embedded, skipping");
+        return Ok(EmbedStats {
+            summaries_embedded: embeddings::DEFAULT_COUNT,
+            dimension: model::DEFAULT_EMBEDDING_DIMENSION,
+            duration: start.elapsed(),
+        });
+    }
+
+    tracing::info!(count = unembedded.len(), "Embedding code chunks");
+
+    let batch_size = embeddings::BATCH_SIZE;
+    let mut total_embedded = embeddings::INITIAL_TOTAL;
+    let mut dimension = model::DEFAULT_EMBEDDING_DIMENSION;
+
+    for chunk in unembedded.chunks(batch_size) {
+        let ids: Vec<i64> = chunk.iter().map(|c| c.id).collect();
+        let texts: Vec<String> = chunk.iter().map(|c| c.content.clone()).collect();
+
+        let embeddings = embedder.embed_batch(&texts)?;
+        if let Some(first) = embeddings.first() {
+            dimension = first.len();
+        }
+
+        let entries: Vec<(i64, Vec<f32>)> = ids.into_iter().zip(embeddings).collect();
+
+        store.insert_code_embeddings_batch(&entries)?;
+        total_embedded += entries.len();
+
+        tracing::debug!(batch = total_embedded, "Embedded code chunk batch");
+    }
+
+    Ok(EmbedStats {
+        summaries_embedded: total_embedded,
+        dimension,
+        duration: start.elapsed(),
+    })
+}
+
+/// Check whether any code chunks in the store are missing embeddings.
+/// Used to decide whether on-demand code embedding is needed during review.
+pub fn has_code_chunks_missing_embeddings(store: &Store) -> Result<bool> {
+    let unembedded = store.get_unembedded_chunks()?;
+    Ok(!unembedded.is_empty())
 }
 
 #[cfg(test)]

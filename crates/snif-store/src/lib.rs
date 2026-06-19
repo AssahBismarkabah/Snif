@@ -1,4 +1,5 @@
 pub mod cochange;
+pub mod code_chunks;
 pub mod embeddings;
 pub mod files;
 pub mod imports;

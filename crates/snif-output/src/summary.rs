@@ -95,6 +95,13 @@ pub fn format_pr_summary(input: &ReviewSummaryInput) -> String {
                     summary::SEMANTIC_RETRIEVAL_LABEL
                 ));
             }
+            if input.retrieval_results.code_semantic_count > 0 {
+                methods.push(format!(
+                    "{}{}",
+                    input.retrieval_results.code_semantic_count,
+                    summary::CODE_SEMANTIC_RETRIEVAL_LABEL
+                ));
+            }
             if input.retrieval_results.keyword_count > 0 {
                 methods.push(format!(
                     "{}{}",
@@ -148,6 +155,7 @@ mod tests {
                 .collect(),
             structural_count: 0,
             semantic_count: 0,
+            code_semantic_count: 0,
             keyword_count: count,
         }
     }

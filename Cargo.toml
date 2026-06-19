@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/snif-cli",
+    "crates/snif-chunks",
     "crates/snif-config",
     "crates/snif-types",
     "crates/snif-parser",

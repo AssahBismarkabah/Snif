@@ -10,6 +10,13 @@ pub struct SimilarSummary {
     pub distance: f64,
 }
 
+/// A code chunk matched by vector similarity.
+pub struct SimilarCodeChunk {
+    pub chunk_id: i64,
+    pub file_id: i64,
+    pub distance: f64,
+}
+
 impl Store {
     pub fn insert_summary_embeddings_batch(&self, entries: &[(i64, Vec<f32>)]) -> Result<()> {
         let tx = self.conn.unchecked_transaction()?;
@@ -85,6 +92,67 @@ impl Store {
                         symbol_id: row.get(2)?,
                         summary_text: row.get(3)?,
                         distance: row.get(4)?,
+                    })
+                },
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    // ── Code chunk embeddings ──────────────────────────────────────
+
+    /// Insert code chunk embeddings in a single transaction.
+    pub fn insert_code_embeddings_batch(&self, entries: &[(i64, Vec<f32>)]) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        {
+            let mut stmt =
+                tx.prepare("INSERT INTO code_embeddings (chunk_id, embedding) VALUES (?1, ?2)")?;
+            for (id, embedding) in entries {
+                stmt.execute(rusqlite::params![id, embedding.as_bytes()])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Get all chunk IDs that already have embeddings in the code_embeddings table.
+    pub fn get_embedded_chunk_ids(&self) -> Result<Vec<i64>> {
+        let mut stmt = self.conn.prepare("SELECT chunk_id FROM code_embeddings")?;
+        let ids = stmt
+            .query_map([], |row| row.get(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(ids)
+    }
+
+    /// Delete all code chunk embeddings.
+    pub fn delete_all_code_embeddings(&self) -> Result<()> {
+        self.conn.execute("DELETE FROM code_embeddings", [])?;
+        Ok(())
+    }
+
+    /// KNN query against code chunk embeddings.
+    /// Returns the top-K nearest code chunks with their file IDs and distances.
+    pub fn query_similar_code_chunks(
+        &self,
+        query_embedding: &[f32],
+        k: usize,
+    ) -> Result<Vec<SimilarCodeChunk>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT cc.id, cc.file_id, ce.distance
+             FROM code_embeddings ce
+             JOIN code_chunks cc ON ce.chunk_id = cc.id
+             WHERE ce.embedding MATCH ?1
+               AND ce.k = ?2
+             ORDER BY ce.distance",
+        )?;
+        let rows = stmt
+            .query_map(
+                rusqlite::params![query_embedding.as_bytes(), k as i64],
+                |row| {
+                    Ok(SimilarCodeChunk {
+                        chunk_id: row.get(0)?,
+                        file_id: row.get(1)?,
+                        distance: row.get(2)?,
                     })
                 },
             )?
