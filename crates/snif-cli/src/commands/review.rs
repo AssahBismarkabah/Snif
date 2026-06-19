@@ -376,6 +376,13 @@ pub fn run(
     // Apply static filters
     findings = snif_output::filter::apply_filters(findings, &config.filter);
 
+    // Verify findings against source code — penalize evidence that doesn't
+    // match the actual file content (catches LLM hallucinations)
+    findings = snif_output::verify::verify_findings(findings, repo_path);
+
+    // Re-apply confidence threshold after verification may have reduced scores
+    findings.retain(|f| f.confidence >= config.filter.min_confidence);
+
     // Compute fingerprints
     snif_output::fingerprint::compute_fingerprints(&mut findings);
 
