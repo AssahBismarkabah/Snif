@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub enum RetrievalMethod {
     Structural(StructuralReason),
     Semantic { distance: f64 },
+    CodeSemantic { distance: f64 },
     Keyword { matched_terms: Vec<String> },
 }
 
@@ -28,6 +29,7 @@ pub struct RetrievalResults {
     pub results: Vec<RetrievalResult>,
     pub structural_count: usize,
     pub semantic_count: usize,
+    pub code_semantic_count: usize,
     pub keyword_count: usize,
 }
 

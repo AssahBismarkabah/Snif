@@ -2,7 +2,14 @@
 
 Outstanding work for Snif beyond v2.0.0.
 
+### Completed: Scalable Indexing (Phase 1 & 2)
 
+- [x] Content-hash-based summary invalidation — summaries are keyed by a SHA-256 hash of the source code. Re-indexing skips unchanged symbols automatically. Stale summaries (hash mismatch) are deleted and regenerated. File-level summaries use a hash of their child summaries.
+- [x] `snif index` now defaults to structural-only (no LLM calls). `snif index --full-index` pre-warms all summaries and embeddings. `snif index --rebuild` resets the database and rebuilds from scratch.
+- [x] On-demand summarization in `snif review` — when the review command encounters files without summaries, it generates them before building context. Only pays for the ~5-15 files a review actually needs.
+- [x] `summarize_files()` public API for targeted summarization — focuses on specific file paths rather than the entire repo.
+- [x] `has_summaries_missing_embeddings()` moved to `snif-embeddings` crate as a public function, shared by both index and review commands.
+- [x] Schema version bumped to 4 to accommodate `content_hash` column in `summaries` table.
 
 ### from gitlab setup what went wrong and needs to be addressed
 

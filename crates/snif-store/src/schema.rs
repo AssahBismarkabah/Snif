@@ -4,7 +4,7 @@ use snif_config::constants::model;
 
 /// Increment this whenever the schema changes. On open, if the stored version
 /// doesn't match, the database is dropped and recreated automatically.
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 5;
 
 pub fn run_migrations(conn: &Connection) -> Result<()> {
     conn.execute_batch(
@@ -62,9 +62,24 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             file_id INTEGER REFERENCES files(id) ON DELETE CASCADE,
             level TEXT NOT NULL,
             summary TEXT NOT NULL,
+            content_hash TEXT,
             token_count INTEGER,
             generated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
+
+        CREATE INDEX IF NOT EXISTS idx_summaries_hash ON summaries(content_hash);
+
+        CREATE TABLE IF NOT EXISTS code_chunks (
+            id INTEGER PRIMARY KEY,
+            file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            content_hash TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_code_chunks_file ON code_chunks(file_id);
+        CREATE INDEX IF NOT EXISTS idx_code_chunks_hash ON code_chunks(content_hash);
 
         CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file_id);
         CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
@@ -89,7 +104,13 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             finding_id INTEGER PRIMARY KEY,
             embedding float[{}]
         );
+
+        CREATE VIRTUAL TABLE IF NOT EXISTS code_embeddings USING vec0(
+            chunk_id INTEGER PRIMARY KEY,
+            embedding float[{}]
+        );
     ",
+        model::DEFAULT_EMBEDDING_DIMENSION,
         model::DEFAULT_EMBEDDING_DIMENSION,
         model::DEFAULT_EMBEDDING_DIMENSION
     ))?;
@@ -120,8 +141,10 @@ pub fn check_version(conn: &Connection) -> bool {
 pub fn drop_all(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "
+        DROP TABLE IF EXISTS code_embeddings;
         DROP TABLE IF EXISTS finding_embeddings;
         DROP TABLE IF EXISTS summary_embeddings;
+        DROP TABLE IF EXISTS code_chunks;
         DROP TABLE IF EXISTS summaries;
         DROP TABLE IF EXISTS cochange;
         DROP TABLE IF EXISTS refs;

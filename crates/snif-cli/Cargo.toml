@@ -10,6 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 snif-config = { path = "../snif-config" }
+snif-chunks = { path = "../snif-chunks" }
 snif-cochange = { path = "../snif-cochange" }
 snif-context = { path = "../snif-context" }
 snif-eval = { path = "../snif-eval" }

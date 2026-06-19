@@ -76,6 +76,7 @@ pub enum ReviewInconclusiveMode {
 pub struct RetrievalWeights {
     pub structural: f64,
     pub semantic: f64,
+    pub code_semantic: f64,
     pub keyword: f64,
 }
 
@@ -138,6 +139,7 @@ impl Default for RetrievalWeights {
         Self {
             structural: 1.0,
             semantic: 0.7,
+            code_semantic: 0.4,
             keyword: 0.3,
         }
     }

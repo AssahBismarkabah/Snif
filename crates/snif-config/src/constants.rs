@@ -142,6 +142,18 @@ pub mod embeddings {
 }
 
 // ============================================================================
+// Code Chunking Constants
+// ============================================================================
+pub mod chunks {
+    /// Number of source lines per code chunk for embedding.
+    /// Larger chunks provide more context but dilute the embedding signal.
+    pub const CHUNK_SIZE: usize = 50;
+    /// Overlap in lines between adjacent code chunks.
+    /// Ensures cross-boundary concepts aren't split.
+    pub const CHUNK_OVERLAP: usize = 10;
+}
+
+// ============================================================================
 // LLM Model Configuration
 // ============================================================================
 pub mod model {
@@ -157,6 +169,11 @@ pub mod model {
     pub const DEFAULT_MAX_FILES: usize = 50;
     /// Default max concurrent summarization tasks.
     pub const DEFAULT_SUMMARIZER_CONCURRENCY: usize = 3;
+    /// Maximum number of symbols to include in a single batch summarization call.
+    /// Batching multiple symbols from the same file into one LLM call reduces
+    /// per-call overhead and total API cost. Symbols that don't fit in a batch
+    /// or fail in batch responses are retried individually.
+    pub const SUMMARIZER_BATCH_SIZE: usize = 5;
     /// Default temperature for LLM requests (deterministic output)
     pub const DEFAULT_TEMPERATURE: f64 = 0.0;
     /// Response format type for JSON output
@@ -175,10 +192,17 @@ pub mod retrieval {
     pub const MIN_COCHANGE_RETRIEVAL_CORRELATION: f64 = 0.2;
     /// Maximum files per commit for co-change analysis
     pub const MAX_FILES_PER_COMMIT: usize = 50;
-    /// Maximum symbols to fetch in a single query
-    pub const MAX_SYMBOLS_FETCH: usize = 10_000;
-    /// Maximum summaries to fetch in a single query
-    pub const MAX_SUMMARIES_FETCH: usize = 50_000;
+    /// Page size for paginated symbol queries.
+    /// Not a ceiling — all symbols are fetched across multiple pages.
+    pub const SYMBOLS_PAGE_SIZE: usize = 10_000;
+    /// Page size for paginated summary queries.
+    /// Not a ceiling — all summaries are fetched across multiple pages.
+    pub const SUMMARIES_PAGE_SIZE: usize = 50_000;
+    /// Default retrieval weight for code-semantic results.
+    /// Lower than summary-semantic (0.7) because raw code is noisier than
+    /// curated summaries, but higher than keyword (0.3) because vector
+    /// similarity captures conceptual relatedness better than exact matches.
+    pub const CODE_SEMANTIC_WEIGHT: f64 = 0.4;
     /// Base score for direct imports in structural retrieval
     pub const DIRECT_IMPORT_SCORE: f64 = 1.0;
     /// Score for reverse imports in structural retrieval
@@ -211,10 +235,6 @@ pub mod limits {
     pub const TEXT_DETECTION_SAMPLE_SIZE: usize = 512;
     /// Maximum bytes for changed file content inclusion
     pub const MAX_CHANGED_FILE_BYTES: usize = 50_000;
-    /// Pagination limit for summary fetching
-    pub const MAX_SUMMARIES_FETCH_LIMIT: usize = 50_000;
-    /// Pagination limit for symbol fetching
-    pub const MAX_SYMBOLS_FETCH_LIMIT: usize = 10_000;
     /// SQLite maximum variables per query (stay under 999)
     pub const SQLITE_MAX_VARIABLE_NUMBER: usize = 900;
 }
@@ -753,6 +773,8 @@ pub mod summary {
     pub const CONTEXT_ANALYZED_TRIMMED_SUFFIX: &str = " included after trimming";
     /// Structural retrieval label
     pub const STRUCTURAL_RETRIEVAL_LABEL: &str = " via structural analysis";
+    /// Code-semantic retrieval label
+    pub const CODE_SEMANTIC_RETRIEVAL_LABEL: &str = " via code similarity";
     /// Semantic retrieval label
     pub const SEMANTIC_RETRIEVAL_LABEL: &str = " via semantic similarity";
     /// Keyword retrieval label
