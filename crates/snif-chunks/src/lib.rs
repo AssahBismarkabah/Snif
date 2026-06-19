@@ -125,19 +125,21 @@ pub fn chunk_all_files(store: &Store, repo_root: &Path) -> Result<ChunkStats> {
         // If the file has changed at all, we delete old chunks + embeddings
         // and re-insert only the new ones. If nothing changed, we skip entirely.
         let file_chunks_existing = store.get_chunks_for_file(*file_id)?;
-        let new_hashes: std::collections::HashSet<String> = file_chunks
+        let mut new_hashes: Vec<String> = file_chunks
             .iter()
             .map(|(_, _, text)| content_hash(text))
             .collect();
-        let existing_hashes: std::collections::HashSet<String> = file_chunks_existing
+        new_hashes.sort();
+        let mut existing_hashes: Vec<String> = file_chunks_existing
             .iter()
             .map(|c| c.content_hash.clone())
             .collect();
+        existing_hashes.sort();
 
-        // If every new chunk's hash already exists in the file's existing chunks
-        // and the count matches, the file is unchanged — skip entirely.
-        let all_unchanged = new_hashes.len() == existing_hashes.len()
-            && new_hashes.iter().all(|h| existing_hashes.contains(h));
+        // If every chunk hash matches position-by-position, the file is unchanged — skip entirely.
+        // Using sorted Vec comparison preserves duplicate hashes that HashSet would collapse,
+        // preventing false unchanged detection when chunks are rearranged or duplicated.
+        let all_unchanged = new_hashes == existing_hashes;
 
         if all_unchanged {
             chunks_skipped_unchanged += file_chunks.len();

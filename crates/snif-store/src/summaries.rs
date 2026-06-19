@@ -114,6 +114,34 @@ impl Store {
         Ok(())
     }
 
+    /// Delete a single symbol's summary and its embedding.
+    /// Used when a symbol's content hash changes — only the affected symbol is
+    /// removed, preserving sibling summaries and the file-level summary.
+    pub fn delete_summary_for_symbol(&self, symbol_id: i64) -> Result<()> {
+        // Find the summary ID for this symbol (if any)
+        let summary_id: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT id FROM summaries WHERE symbol_id = ?1",
+                [symbol_id],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if let Some(sid) = summary_id {
+            // Delete the embedding first
+            self.conn.execute(
+                "DELETE FROM summary_embeddings WHERE summary_id = ?1",
+                [sid],
+            )?;
+            // Then delete the summary
+            self.conn
+                .execute("DELETE FROM summaries WHERE id = ?1", [sid])?;
+        }
+
+        Ok(())
+    }
+
     /// Delete summaries and their embeddings for a list of file IDs.
     /// Used to clear stale summaries before re-summarization of changed files.
     /// Also deletes associated embeddings from the summary_embeddings virtual table.
@@ -570,5 +598,89 @@ mod tests {
             summaries.is_empty(),
             "empty store should return no summaries"
         );
+    }
+
+    #[test]
+    fn delete_summary_for_symbol_only_removes_targeted_symbol() {
+        let store = setup_store();
+        let file_id = insert_file(&store, "src/lib.rs");
+        let sym_a = insert_symbol_row(store.conn(), file_id, "func_a", "function", 1, 10);
+        let sym_b = insert_symbol_row(store.conn(), file_id, "func_b", "function", 15, 30);
+
+        // Insert summaries for both symbols and a file-level summary
+        store
+            .insert_summary(
+                Some(sym_a),
+                None,
+                summarizer::KIND_FUNCTION,
+                "Function A summary",
+                Some("hash_a"),
+                Some(4),
+            )
+            .expect("summary A should insert");
+        store
+            .insert_summary(
+                Some(sym_b),
+                None,
+                summarizer::KIND_FUNCTION,
+                "Function B summary",
+                Some("hash_b"),
+                Some(4),
+            )
+            .expect("summary B should insert");
+        store
+            .insert_summary(
+                None,
+                Some(file_id),
+                summarizer::LEVEL_FILE,
+                "File summary",
+                Some("hash_file"),
+                Some(4),
+            )
+            .expect("file summary should insert");
+
+        // Delete only sym_a's summary
+        store
+            .delete_summary_for_symbol(sym_a)
+            .expect("should delete symbol A summary");
+
+        // Sym_a's summary should be gone
+        assert!(
+            store
+                .get_summary_for_symbol(sym_a)
+                .expect("query should succeed")
+                .is_none(),
+            "symbol A summary should be deleted"
+        );
+
+        // Sym_b's summary should still exist
+        assert!(
+            store
+                .get_summary_for_symbol(sym_b)
+                .expect("query should succeed")
+                .is_some(),
+            "symbol B summary should be preserved"
+        );
+
+        // File-level summary should still exist
+        assert!(
+            store
+                .get_summary_for_file(file_id)
+                .expect("query should succeed")
+                .is_some(),
+            "file-level summary should be preserved"
+        );
+    }
+
+    #[test]
+    fn delete_summary_for_symbol_noop_when_no_summary_exists() {
+        let store = setup_store();
+        let file_id = insert_file(&store, "src/lib.rs");
+        let sym = insert_symbol_row(store.conn(), file_id, "unused_func", "function", 1, 5);
+
+        // No summary exists for this symbol — should succeed without error
+        store
+            .delete_summary_for_symbol(sym)
+            .expect("should succeed even with no summary");
     }
 }

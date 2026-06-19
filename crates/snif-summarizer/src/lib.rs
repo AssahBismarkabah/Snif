@@ -139,7 +139,6 @@ async fn summarize_symbols_async(
     let semaphore = Arc::new(Semaphore::new(concurrency));
 
     let mut symbols_summarized = 0;
-    let mut files_summarized = 0;
     let mut symbols_skipped_unchanged = 0;
     let mut files_skipped_unchanged = 0;
     let mut errors = 0;
@@ -172,14 +171,14 @@ async fn summarize_symbols_async(
                     continue;
                 }
                 Some(_) => {
-                    // Hash mismatch — content changed, delete old summary and re-summarize
+                    // Hash mismatch — content changed, delete only this symbol's summary
                     tracing::debug!(symbol = %sym.name, "Content hash changed, re-summarizing");
-                    store.delete_summaries_for_files(&[sym.file_id])?;
+                    store.delete_summary_for_symbol(sym.id)?;
                 }
                 None => {
-                    // Legacy summary without hash — treat as stale, re-summarize
+                    // Legacy summary without hash — treat as stale, delete only this symbol's summary
                     tracing::debug!(symbol = %sym.name, "Legacy summary without hash, re-summarizing");
-                    store.delete_summaries_for_files(&[sym.file_id])?;
+                    store.delete_summary_for_symbol(sym.id)?;
                 }
             }
             // If we get here, the old summary was deleted; fall through to re-summarize
@@ -466,17 +465,74 @@ async fn summarize_symbols_async(
         .into_iter()
         .collect();
 
-    tracing::info!(count = file_ids.len(), "Summarizing files");
-
     // Build a map of file_id -> path
     let file_paths: HashMap<i64, String> = symbols
         .iter()
         .map(|s| (s.file_id, s.file_path.clone()))
         .collect();
 
+    let file_stats = summarize_file_levels(
+        store,
+        &client,
+        &semaphore,
+        concurrency,
+        &file_ids,
+        &file_paths,
+    )
+    .await?;
+
+    let files_summarized = file_stats.files_summarized;
+    files_skipped_unchanged += file_stats.files_skipped_unchanged;
+    errors += file_stats.errors;
+    rate_limited |= file_stats.rate_limited;
+    provider_limited |= file_stats.provider_limited;
+
+    Ok(SummarizeStats {
+        symbols_summarized,
+        files_summarized,
+        symbols_skipped_unchanged,
+        files_skipped_unchanged,
+        errors,
+        rate_limited,
+        provider_limited,
+        total_duration: start.elapsed(),
+    })
+}
+
+/// Generate file-level summaries from child symbol summaries.
+///
+/// For each file, computes a content hash from its child symbol summaries,
+/// checks if the file-level summary is stale, and if so generates a new one.
+/// Uses the provided client and semaphore for concurrent LLM calls.
+struct FileLevelStats {
+    files_summarized: usize,
+    files_skipped_unchanged: usize,
+    errors: usize,
+    rate_limited: bool,
+    provider_limited: bool,
+}
+
+async fn summarize_file_levels(
+    store: &Store,
+    client: &Arc<LlmClient>,
+    semaphore: &Arc<Semaphore>,
+    concurrency: usize,
+    file_ids: &[i64],
+    file_paths: &HashMap<i64, String>,
+) -> Result<FileLevelStats> {
+    let mut files_summarized = 0;
+    let mut files_skipped_unchanged = 0;
+    let mut errors = 0;
+    let mut rate_limited = false;
+    let mut provider_limited = false;
+    let mut pressure_tracker = ProviderPressureTracker::default();
+    let batch_start = Instant::now();
+
+    tracing::info!(count = file_ids.len(), "Summarizing files");
+
     let mut pending_files = Vec::new();
     let mut files_skipped = 0;
-    for file_id in &file_ids {
+    for file_id in file_ids {
         let child_summaries = store.get_summaries_for_file_symbols(*file_id)?;
         if child_summaries.is_empty() {
             continue;
@@ -551,8 +607,8 @@ async fn summarize_symbols_async(
     for batch in pending_files.chunks(concurrency) {
         let mut tasks = Vec::new();
         for pending in batch {
-            let client = Arc::clone(&client);
-            let sem = Arc::clone(&semaphore);
+            let client = Arc::clone(client);
+            let sem = Arc::clone(semaphore);
             let pending = pending.clone();
 
             tasks.push(tokio::spawn(async move {
@@ -608,7 +664,7 @@ async fn summarize_symbols_async(
         if let Some(reason) = pressure_tracker.record_batch(
             batch.len(),
             batch_provider_pressure_errors,
-            start.elapsed(),
+            batch_start.elapsed(),
         ) {
             rate_limited |= batch_rate_limit_errors > 0;
             provider_limited = true;
@@ -623,15 +679,12 @@ async fn summarize_symbols_async(
         }
     }
 
-    Ok(SummarizeStats {
-        symbols_summarized,
+    Ok(FileLevelStats {
         files_summarized,
-        symbols_skipped_unchanged,
         files_skipped_unchanged,
         errors,
         rate_limited,
         provider_limited,
-        total_duration: start.elapsed(),
     })
 }
 
