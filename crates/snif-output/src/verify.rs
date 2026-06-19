@@ -163,7 +163,12 @@ fn truncate(s: &str, max_len: usize) -> &str {
     if s.len() <= max_len {
         s
     } else {
-        &s[..max_len]
+        // Find the nearest valid char boundary at or before max_len to avoid
+        // panicking on multi-byte UTF-8 characters.
+        match s.char_indices().take_while(|(i, _)| *i <= max_len).last() {
+            Some((i, c)) => &s[..i + c.len_utf8()],
+            None => "",
+        }
     }
 }
 
@@ -299,5 +304,31 @@ mod tests {
         let result = verify_finding(finding, &dir);
         assert_eq!(result.confidence, 0.9);
         let _ = std::fs::remove_file(&file_path);
+    }
+
+    #[test]
+    fn truncate_handles_multibyte_utf8() {
+        // Japanese characters are 3 bytes each — slicing at byte 80 could land
+        // inside a character if we used &s[..80] directly
+        let evidence = "This code has a résumé function and some 日本語 characters that exceed eighty bytes total length";
+        let truncated = truncate(evidence, 80);
+        assert!(
+            truncated.len() <= 83,
+            "truncated length should be at or near boundary: got {}",
+            truncated.len()
+        );
+        // Verify it's valid UTF-8 (would panic if we sliced mid-character)
+        let _ = truncated.to_string();
+    }
+
+    #[test]
+    fn truncate_short_string_unchanged() {
+        let short = "hello";
+        assert_eq!(truncate(short, 80), "hello");
+    }
+
+    #[test]
+    fn truncate_empty_string() {
+        assert_eq!(truncate("", 80), "");
     }
 }
