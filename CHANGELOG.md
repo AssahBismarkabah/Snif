@@ -2,6 +2,63 @@
 
 ## unreleased
 
+## 3.3.0
+
+### Scalable Indexing
+
+- Index defaults to structural-only. `snif index` runs tree-sitter parsing,
+  graph building, co-change analysis, code chunking, and local embedding with
+  zero LLM calls and zero cost. Summaries are generated on-demand during
+  review for only the files a PR actually touches (~5-15 files, ~$0.15).
+  `snif index --full-index` pre-warms all summaries and embeddings (the old
+  default behavior). `snif index --rebuild` replaces the old `--full` flag
+  for a clean database reset.
+- Content-hash invalidation for summaries. Each summary stores a SHA-256
+  hash of the source it was derived from. Re-indexing skips unchanged symbols
+  automatically. Stale summaries (hash mismatch) are deleted and regenerated
+  instead of persisting indefinitely. File-level summaries are invalidated
+  when any child summary changes. Re-indexing a repo where nothing changed
+  is now near-zero cost.
+- Batch summarization. Symbols from the same file are grouped into batches
+  of 5 and sent in a single LLM call instead of one call per symbol. The
+  response is parsed as a JSON object keyed by symbol name. Symbols that fail
+  in batch responses are retried individually. Reduces per-file LLM overhead
+  by roughly 3-5x.
+- Paginated symbol fetching. The hard 10,000-symbol cap is replaced with
+  paginated queries. All symbols are fetched across multiple pages with no
+  silent truncation. Large monorepos are fully indexed instead of silently
+  dropping coverage.
+- Targeted on-demand summarization. `summarize_files()` generates summaries
+  for specific file paths instead of the entire repo. Used by `snif review`
+  to generate summaries only for files that appear in the diff and their
+  retrieval results.
+- Code chunk embeddings as a retrieval signal. A new `snif-chunks` crate
+  splits file content into overlapping line-based chunks, stores them in a
+  `code_chunks` table with content hashes, and embeds them locally with
+  all-MiniLM-L6-v2. A fourth retrieval method (`code_semantic`, weight 0.4)
+  provides coverage immediately after structural indexing with no LLM calls.
+  Lower weight than summary-based semantic (0.7) because raw code is noisier,
+  but higher than keyword (0.3) because vector similarity captures conceptual
+  relatedness better than exact matches.
+- `summarize_files()` and `has_summaries_missing_embeddings()` are now public
+  APIs in their respective crates, shared between index and review commands.
+
+### Review Quality
+
+- Evidence verification. Each finding's cited evidence is verified against
+  the actual source file. Findings whose evidence doesn't appear in the
+  referenced file receive a 0.3 confidence penalty, dropping most fabricated
+  references below the 0.7 minimum threshold. Findings referencing nonexistent
+  files receive a 0.2 penalty. Catches LLM hallucinations where the model
+  fabricates function names, code snippets, or line references.
+- Code-semantic retrieval results appear in the PR summary context line.
+
+### Schema
+
+- Schema version bumped to 4. Old databases are rebuilt automatically.
+- `content_hash` column added to `summaries` table.
+- `code_chunks` table and `code_chunk_embeddings` vec0 virtual table added.
+
 ## 3.2.10
 - Add review integrity validation so malformed, contradictory, or repaired
   empty model output is marked inconclusive instead of being reported as a
